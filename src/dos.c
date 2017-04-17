@@ -858,6 +858,9 @@ void int21()
         }
         break;
     }
+    case 0x2B: // SET SYSTEM DATE
+        cpuSetAX(0x2BFF); // Invalid date - don't support setting date.
+        break;
     case 0x2C: // GET SYSTEM TIME
     {
         // Use BIOS time: 1573040 ticks per day
@@ -874,6 +877,9 @@ void int21()
         cpuSetDX((tsec << 8) | msec);
         break;
     }
+    case 0x2D: // SET SYSTEM TIME
+        cpuSetAX(0x2DFF); // Invalid time - don't support setting time.
+        break;
     case 0x2F: // GET DTA
         cpuSetES((dosDTA & 0xFFF00) >> 4);
         cpuSetBX((dosDTA & 0x000FF));
