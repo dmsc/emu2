@@ -618,8 +618,14 @@ static void char_input(int brk)
 {
     static uint16_t last_key;
     fflush(handles[1] ? handles[1] : stdout);
+
     if( last_key == 0 )
-        last_key = getch(brk);
+    {
+        if(devinfo[0] != 0x80D3 && handles[0])
+            last_key = getc(handles[0]);
+        else
+            last_key = getch(brk);
+    }
     debug(debug_dos, "\tgetch = %02x '%c'\n", last_key, (char)last_key);
     cpuSetAX((last_key & 0xFF) | (cpuGetAX() & 0xFF00));
     if( (last_key & 0xFF) == 0 )
@@ -704,11 +710,12 @@ void int21()
         break;
     case 0xA: // BUFFERED INPUT
     {
+        FILE *f = handles[0] ? handles[0] : stdin;
         int addr = cpuGetAddrDS(cpuGetDX());
         unsigned len = memory[addr], i = 2;
         while(i < len && addr+i<0x100000)
         {
-            int c = getchar();
+            int c = getc(f);
             if(c == '\n' || c == EOF)
                 c = '\r';
             memory[addr+i] = (char)c;
@@ -720,7 +727,10 @@ void int21()
         break;
     }
     case 0xB: // STDIN STATUS
-        cpuSetAX(0x0b00);
+        if(devinfo[0] == 0x80D3)
+            cpuSetAX(kbhit() ? 0x0BFF : 0x0B00);
+        else
+            cpuSetAX(0x0B00);
         break;
     case 0xC: // FLUSH AND READ STDIN
         tcflush(STDIN_FILENO, TCIFLUSH);

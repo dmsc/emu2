@@ -405,7 +405,7 @@ static void init_keyboard(void)
     }
 }
 
-static int kbhit(void)
+int kbhit(void)
 {
     if(queued_key == -1)
     {
