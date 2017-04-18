@@ -421,6 +421,32 @@ static void int21_4e(void)
     if(p->find_first_list)
         dos_free_file_list(p->find_first_list);
 
+    // Check if we want the volume label
+    if(cpuGetCX() & 8)
+    {
+        // Fill DTA with volume label
+        uint8_t *dta = memory + dosDTA;
+
+        // Get file info
+        uint32_t td = get_time_date(time(0));
+        // Fills file size
+        dta[0x15] = 8;
+        dta[0x16] = td;
+        dta[0x17] = td >> 8;
+        dta[0x18] = td >> 16;
+        dta[0x19] = td >> 24;
+        dta[0x1A] = 0;
+        dta[0x1B] = 0;
+        dta[0x1C] = 0;
+        dta[0x1D] = 0;
+        // Fills dos file name
+        memcpy(dta + 0x1E, "VOLUME LABEL", 13);
+        clear_find_first_dta(p);
+        cpuClrFlag(cpuFlag_CF);
+        debug(debug_dos, "\tget volume label\n");
+        return;
+    }
+
     p->find_first_list = dos_find_first_file(cpuGetAddrDS(cpuGetDX()));
     p->find_first_ptr = p->find_first_list;
     if(!p->find_first_ptr || !p->find_first_ptr->unixname)
