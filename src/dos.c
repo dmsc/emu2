@@ -1126,17 +1126,65 @@ void int21()
     case 0x44:
     {
         int h = cpuGetBX();
-        if(!handles[h])
+        int al = ax & 0xFF;
+        if((al < 4 || al == 6 || al == 7 || al == 10 || al == 12 || al == 16) && !handles[h])
         {
             // Show error if it is a file handle.
             debug(debug_dos, "\t(invalid file handle)\n");
             cpuSetFlag(cpuFlag_CF);
             cpuSetAX(6); // invalid handle
-            return;
+            break;
         }
-        debug(debug_dos, "\t= %04x\n", devinfo[h]);
-        cpuSetDX(devinfo[h]);
         cpuClrFlag(cpuFlag_CF);
+        switch(al)
+        {
+        case 0x00: // GET DEV INFO
+            debug(debug_dos, "\t= %04x\n", devinfo[h]);
+            cpuSetDX(devinfo[h]);
+            break;
+        case 0x01: // SET DEV INFO
+        case 0x02: // IOCTL CHAR DEV READ
+        case 0x03: // IOCTL CHAR DEV WRITE
+        case 0x04: // IOCTL BLOCK DEV READ
+        case 0x05: // IOCTL BLOCK DEV |WRITE
+            cpuSetAX(5);
+            cpuSetFlag(cpuFlag_CF);
+            break;
+        case 0x06: // GET INPUT STATUS
+            if(devinfo[h] == 0x80D3)
+                cpuSetAX(kbhit() ? 0x44FF : 0x4400);
+            else
+                cpuSetAX(feof(handles[h]) ? 0x4400 : 0x44FF);
+            break;
+        case 0x07: // GET OUTPUT STATUS
+            cpuSetAX(0x44FF);
+            break;
+        case 0x08: // CHECK DRIVE REMOVABLE
+            h = h & 0xFF;
+            h = h ? h - 1 : dos_get_default_drive();
+            if(h < 2)
+                cpuSetAX(0x0000);
+            else
+                cpuSetAX(0x0001);
+            break;
+        case 0x09: // CHECK DRIVE REMOTE
+            cpuSetDX(0x0100);
+            break;
+        case 0x0A: // CHECK HANDLE REMOTE
+            cpuSetDX(0);
+            break;
+        case 0x0B: // SET SHARING RETRY COUNT
+        case 0x0C: // GENERIC CHAR DEV REQUEST
+        case 0x0D: // GENERIC BLOCK DEV REQUEST
+        case 0x0F: // SET LOGICAL DRIVE MAP
+        case 0x10: // QUERY CHAR DEV CAPABILITY
+        case 0x11: // QUERY BLOCK DEV CAPABILITY
+            cpuSetAX(1);
+            cpuSetFlag(cpuFlag_CF);
+            break;
+        case 0x0E: // GET LOGICAL DRIVE MAP
+            cpuSetAX(0x4400);
+        }
         break;
     }
     case 0x45:
