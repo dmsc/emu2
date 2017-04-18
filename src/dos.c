@@ -1376,6 +1376,11 @@ void int21()
             break;
         }
         break;
+    case 0x66: // GET GLOBAL CODE PAGE
+        cpuSetBX(437);
+        cpuSetDX(437);
+        cpuClrFlag(cpuFlag_CF);
+        break;
     }
     default:
         debug(debug_dos, "UNHANDLED INT 21, AX=%04x\n", cpuGetAX());
