@@ -1386,7 +1386,7 @@ void int21()
         debug(debug_dos, "UNHANDLED INT 21, AX=%04x\n", cpuGetAX());
         debug(debug_int, "UNHANDLED INT 21, AX=%04x\n", cpuGetAX());
         cpuSetFlag(cpuFlag_CF);
-        cpuSetAX(1);
+        cpuSetAX(ax & 0xFF00);
     }
 }
 
