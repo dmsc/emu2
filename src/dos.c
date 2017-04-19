@@ -1578,9 +1578,9 @@ static void init_nls_data(void)
 
 void init_dos(int argc, char **argv)
 {
-    char args[256], environ[1024];
+    char args[256], environ[4096];
     memset(args, 0, 256);
-    memset(environ, 0, 1024);
+    memset(environ, 0, sizeof(environ));
 
     init_handles();
     init_nls_data();
@@ -1631,15 +1631,23 @@ void init_dos(int argc, char **argv)
     *p = 0;
 
     // Copy environment
+    int have_path = 0;
     p = environ;
     for(i++; i < argc; i++)
     {
-        p = addstr(p, argv[i], 1022 - (p - environ));
+        if(!strncmp("PATH=", argv[i], 5) || !strcmp("PATH", argv[i]))
+            have_path = 1;
+        p = addstr(p, argv[i], environ + sizeof(environ) - 2 - p);
         *p = 0;
         p++;
     }
-    if(p == environ)
+    if(!have_path)
+    {
+        // Adds a PATH variable.
+        p = addstr(p, "PATH=C:\\", environ + sizeof(environ) - 2 - p);
+        *p = 0;
         p++;
+    }
 
     const char *progname = getenv(ENV_PROGNAME);
     if( !progname )
