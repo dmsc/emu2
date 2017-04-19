@@ -543,7 +543,7 @@ static void dos_get_drive_info(uint8_t drive)
 // Writes a character to standard output.
 static void dos_putchar(uint8_t ch)
 {
-    if(devinfo[0] == 0x80D3 && video_active())
+    if(devinfo[1] == 0x80D3 && video_active())
         video_putch(ch);
     else if(!handles[1])
         putchar(ch);

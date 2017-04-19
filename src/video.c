@@ -17,7 +17,7 @@
 static uint16_t term_screen[64][256];
 // Current line in output, lines bellow this are not currently displayed.
 // This allows using only part of the terminal.
-static unsigned output_row;
+static int output_row;
 // Current cursor row/column position in the terminal.
 static unsigned term_posx, term_posy, term_color, term_cursor;
 // Current terminal sizes
@@ -30,6 +30,9 @@ static volatile int term_needs_update;
 static FILE *tty_file;
 // Video is already initialized
 static int video_initialized;
+
+// Forward
+static void term_goto_xy(unsigned x, unsigned y);
 
 // Signal handler - terminal size changed
 // TODO: not used yet.
@@ -82,7 +85,7 @@ static void clear_screen(void)
     for(int y = 0; y < 64; y++)
         for(int x = 0; x < 256; x++)
             term_screen[y][x] = 0x0720;
-    output_row = 0;
+    output_row = -1;
     term_posx = 0;
     term_posy = 0;
     vid_posx = 0;
@@ -104,13 +107,14 @@ static void exit_video(void)
 {
     vid_cursor = 1;
     check_screen();
+    term_goto_xy(0, output_row + 1);
     fclose(tty_file);
 }
 
 static void init_video(void)
 {
     debug(debug_video, "starting video emulation.\n");
-    int tty_fd = open("/dev/tty", O_NOCTTY | O_WRONLY);
+    int tty_fd = dup(1); //open("/dev/tty", O_NOCTTY | O_WRONLY);
     if(tty_fd < 0)
     {
         print_error("error at open TTY, %s\n", strerror(errno));
@@ -195,9 +199,9 @@ static void put_vc(uint8_t c)
 // Move terminal cursor to the position
 static void term_goto_xy(unsigned x, unsigned y)
 {
-    if(term_posy < y && term_posy < output_row)
+    if(term_posy < y && (int)term_posy < output_row)
     {
-        int inc = (y < output_row) ? y - term_posy : output_row - term_posy;
+        int inc = (int)y < output_row ? y - term_posy : output_row - term_posy;
         fprintf(tty_file, "\x1b[%dB", inc);
         term_posy += inc;
     }
@@ -246,7 +250,7 @@ static void put_vc_xy(uint8_t vc, uint8_t color, unsigned x, unsigned y)
         term_posy++;
     }
 
-    if(term_posy > output_row)
+    if(output_row < (int)term_posy)
         output_row = term_posy;
 }
 
@@ -258,14 +262,14 @@ void check_screen(void)
         return;
 
     uint16_t *vm = (uint16_t *)(memory + 0xB8000);
-    unsigned max = output_row;
-    for(int y = output_row; y < vid_sy; y++)
-        for(int x = 0; x < vid_sx; x++)
+    unsigned max = output_row + 1;
+    for(unsigned y = output_row + 1; y < vid_sy; y++)
+        for(unsigned x = 0; x < vid_sx; x++)
             if(((vm[x + y * vid_sx] ^ term_screen[y][x]) & 0xFF) != 0)
                 max = y + 1;
 
-    for(int y = 0; y < max; y++)
-        for(int x = 0; x < vid_sx; x++)
+    for(unsigned y = 0; y < max; y++)
+        for(unsigned x = 0; x < vid_sx; x++)
         {
             int16_t vc = vm[x + y * vid_sx];
             if(vc != term_screen[y][x])
@@ -290,8 +294,11 @@ void check_screen(void)
 }
 
 static void vid_scroll_up(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1,
-                          unsigned n)
+                          int n)
 {
+    debug(debug_video, "scroll up %d: (%d, %d) - (%d, %d)\n", n,
+          x0, y0, x1, y1);
+
     // Check parameters
     if(x1 >= vid_sx)
         x1 = vid_sx - 1;
@@ -302,22 +309,41 @@ static void vid_scroll_up(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1,
     if(n > y1 - y0 + 1 || !n)
         n = y1 + 1 - y0;
 
-    // TODO: try to scroll TERMINAL
+    // Scroll TERMINAL if we are scrolling (almost) the entire screen
+    if(y0 == 0 && y1 >= vid_sy - 2 && x0 < 2 && x1 >= vid_sx - 2)
+    {
+        // Update screen before
+        check_screen();
+        int m = n > output_row + 1 ? output_row + 1 : n;
+        if(term_posy < m)
+            term_goto_xy(0, m);
+        output_row -= m;
+        term_posy -= m;
+        for(unsigned y = 0; y + m < term_sy; y++)
+            for(unsigned x = 0; x < term_sx; x++)
+                term_screen[y][x] = term_screen[y + m][x];
+        for(unsigned y = term_sy - m; y < term_sy; y++)
+            for(unsigned x = 0; x < term_sx; x++)
+                term_screen[y][x] = 0x0720;
+    }
 
     // Scroll VIDEO
     uint16_t *vm = (uint16_t *)(memory + 0xB8000);
-    for(int y = y0; y + n <= y1; y++)
-        for(int x = x0; x <= x1; x++)
+    for(unsigned y = y0; y + n <= y1; y++)
+        for(unsigned x = x0; x <= x1; x++)
             vm[x + y * vid_sx] = vm[x + y * vid_sx + n * vid_sx];
     // Set last rows
-    for(int y = y1 - (n - 1); y <= y1; y++)
-        for(int x = x0; x <= x1; x++)
+    for(unsigned y = y1 - (n - 1); y <= y1; y++)
+        for(unsigned x = x0; x <= x1; x++)
             vm[x + y * vid_sx] = (vid_color << 8) + 0x20;
 }
 
 static void vid_scroll_dwn(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1,
                            unsigned n)
 {
+    debug(debug_video, "scroll up %d: (%d, %d) - (%d, %d)\n", n,
+          x0, y0, x1, y1);
+
     // Check parameters
     if(x1 >= vid_sx)
         x1 = vid_sx - 1;
@@ -332,19 +358,19 @@ static void vid_scroll_dwn(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1,
 
     // Scroll VIDEO
     uint16_t *vm = (uint16_t *)(memory + 0xB8000);
-    for(int y = y1; y >= y0 + n; y--)
-        for(int x = x0; x <= x1; x++)
+    for(unsigned y = y1; y >= y0 + n; y--)
+        for(unsigned x = x0; x <= x1; x++)
             vm[x + y * vid_sx] = vm[x + y * vid_sx - n * vid_sx];
     // Set first rows
-    for(int y = y0; y < y0 + n; y++)
-        for(int x = x0; x <= x1; x++)
+    for(unsigned y = y0; y < y0 + n; y++)
+        for(unsigned x = x0; x <= x1; x++)
             vm[x + y * vid_sx] = (vid_color << 8) + 0x20;
 }
 
-static void set_xy(unsigned x, unsigned y, uint16_t c)
+static void set_xy(unsigned x, unsigned y, uint16_t c, uint16_t mask)
 {
     uint16_t *vm = (uint16_t *)(memory + 0xB8000);
-    vm[x + y * vid_sx] = c;
+    vm[x + y * vid_sx] = (vm[x + y * vid_sx] & mask) | c;
 }
 
 static uint16_t get_xy(unsigned x, unsigned y)
@@ -353,15 +379,15 @@ static uint16_t get_xy(unsigned x, unsigned y)
     return vm[x + y * vid_sx];
 }
 
-static void video_putchar(uint8_t ch, uint8_t at)
+static void video_putchar(uint8_t ch, uint16_t at)
 {
     if(ch == 0x0A)
     {
         vid_posy++;
         while(vid_posy >= vid_sy)
         {
-            vid_scroll_up(0, 0, vid_sx - 1, vid_sy - 1, 1);
             vid_posy = vid_sy - 1;
+            vid_scroll_up(0, 0, vid_sx - 1, vid_sy - 1, 1);
         }
     }
     else if(ch == 0x0D)
@@ -373,7 +399,10 @@ static void video_putchar(uint8_t ch, uint8_t at)
     }
     else
     {
-        set_xy(vid_posx, vid_posy, ch + (at << 8));
+        if(at & 0xFFFF)
+            set_xy(vid_posx, vid_posy, ch, 0xFF00);
+        else
+            set_xy(vid_posx, vid_posy, ch + (at << 8), 0);
         vid_posx++;
         if(vid_posx >= vid_sx)
         {
@@ -381,8 +410,8 @@ static void video_putchar(uint8_t ch, uint8_t at)
             vid_posy++;
             while(vid_posy >= vid_sy)
             {
-                vid_scroll_up(0, 0, vid_sx - 1, vid_sy - 1, 1);
                 vid_posy = vid_sy - 1;
+                vid_scroll_up(0, 0, vid_sx - 1, vid_sy - 1, 1);
             }
         }
     }
@@ -391,8 +420,8 @@ static void video_putchar(uint8_t ch, uint8_t at)
 
 void video_putch(char ch)
 {
-    debug(debug_video, "putchar %02x\n", ch & 0xFF);
-    video_putchar(ch, vid_color);
+    debug(debug_video, "putchar %02x at (%d,%d)\n", ch & 0xFF, vid_posx, vid_posy);
+    video_putchar(ch, 0xFF00);
 }
 
 // VIDEO int
@@ -456,7 +485,7 @@ void int10()
         vid_color = cpuGetBX() & 0xFF;
         for(int i = cpuGetCX(); i>0; i--)
         {
-            set_xy(px, py, (ax & 0xFF) + (vid_color << 8));
+            set_xy(px, py, (ax & 0xFF) + (vid_color << 8), 0);
             px ++;
             if(px >= vid_sx)
             {
