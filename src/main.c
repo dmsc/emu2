@@ -145,10 +145,22 @@ static void timer_alarm(int x)
 
 static void init_bios_mem(void)
 {
-    memory[0x463] = 0xD4;
-    memory[0x464] = 0x3;
+    // Some of those are also in video.c, we write a
+    // default value here for programs that don't call
+    // INT10 functions before reading.
+    memory[0x449] = 3;    // video mode
+    memory[0x44A] = 80;   // screen columns
+    memory[0x44B] = 0;    // ...
+    memory[0x450] = 0;    // cursor column
+    memory[0x451] = 0;    // cursor row
+    memory[0x462] = 0;    // current screen page
+    memory[0x463] = 0xD4; // I/O port of video CRTC
+    memory[0x464] = 0x03; // ...
+    memory[0x484] = 24;   // screen rows - 1
+    // Store an "INT-19h" instruction in address FFFF:0000
     memory[0xFFFF0] = 0xCB;
     memory[0xFFFF1] = 0x19;
+
     update_timer();
 }
 
