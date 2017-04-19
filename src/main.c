@@ -143,6 +143,11 @@ static void timer_alarm(int x)
     exit_cpu = 1;
 }
 
+static void exit_handler(int x)
+{
+    exit(1);
+}
+
 static void init_bios_mem(void)
 {
     // Some of those are also in video.c, we write a
@@ -272,6 +277,12 @@ int main(int argc, char **argv)
         init_dos(argc - 1, argv + 1);
 
     signal(SIGALRM, timer_alarm);
+    // Install an exit handler to allow exit functions to run
+    signal(SIGHUP, exit_handler);
+    signal(SIGINT, exit_handler);
+    signal(SIGQUIT, exit_handler);
+    signal(SIGPIPE, exit_handler);
+    signal(SIGTERM, exit_handler);
     struct itimerval itv;
     itv.it_interval.tv_sec = 0;
     itv.it_interval.tv_usec = 54925;
