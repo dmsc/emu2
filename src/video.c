@@ -75,12 +75,9 @@ static void update_posxy(void)
     memory[0x462] = 0; // current page = 0
 }
 
-static void clear_screen(void)
+// Clears the terminal data - not the actual terminal screen
+static void clear_terminal(void)
 {
-    // Clear video screen
-    uint16_t *vm = (uint16_t *)(memory + 0xB8000);
-    for(int i = 0; i < 16384; i++)
-        vm[i] = 0x0720;
     // Clear screen terminal:
     for(int y = 0; y < 64; y++)
         for(int x = 0; x < 256; x++)
@@ -88,12 +85,22 @@ static void clear_screen(void)
     output_row = -1;
     term_posx = 0;
     term_posy = 0;
+    // Get current terminal size
+    term_get_size();
+    putc('\r', tty_file); // Go to column 0
+}
+
+static void clear_screen(void)
+{
+    debug(debug_video, "clear video screen\n");
+    // Clear video screen
+    uint16_t *vm = (uint16_t *)(memory + 0xB8000);
+    for(int i = 0; i < 16384; i++)
+        vm[i] = 0x0720;
     vid_posx = 0;
     vid_posy = 0;
     vid_color = 0x07;
     vid_cursor = 1;
-    // Get current terminal size
-    term_get_size();
     // TODO: support other video modes
     vid_sx = 80;
     vid_sy = 25;
@@ -101,7 +108,6 @@ static void clear_screen(void)
     memory[0x44A] = vid_sx;
     memory[0x484] = vid_sy - 1;
     update_posxy();
-    putc('\r', tty_file); // Go to column 0
 }
 
 static unsigned get_last_used_row(void)
@@ -122,6 +128,7 @@ static void exit_video(void)
     term_goto_xy(0, max);
     fputs("\x1b[m", tty_file);
     fclose(tty_file);
+    debug(debug_video, "exit video - row %d\n", max);
 }
 
 static void init_video(void)
@@ -139,6 +146,7 @@ static void init_video(void)
 
     // Set video mode
     clear_screen();
+    clear_terminal();
     term_needs_update = 0;
     term_cursor = 1;
     term_color = 0x07;
