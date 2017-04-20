@@ -101,13 +101,26 @@ static void clear_screen(void)
     memory[0x44A] = vid_sx;
     memory[0x484] = vid_sy - 1;
     update_posxy();
+    putc('\r', tty_file); // Go to column 0
+}
+
+static unsigned get_last_used_row(void)
+{
+    unsigned max = 0;
+    for(unsigned y = 0; y < vid_sy; y++)
+        for(unsigned x = 0; x < vid_sx; x++)
+            if(term_screen[y][x] != 0x700 && term_screen[y][x] != 0x720)
+                max = y + 1;
+    return max;
 }
 
 static void exit_video(void)
 {
     vid_cursor = 1;
     check_screen();
-    term_goto_xy(0, output_row + 1);
+    unsigned max = get_last_used_row();
+    term_goto_xy(0, max);
+    fputs("\x1b[m", tty_file);
     fclose(tty_file);
 }
 
@@ -265,7 +278,7 @@ void check_screen(void)
     unsigned max = output_row + 1;
     for(unsigned y = output_row + 1; y < vid_sy; y++)
         for(unsigned x = 0; x < vid_sx; x++)
-            if(((vm[x + y * vid_sx] ^ term_screen[y][x]) & 0xFF) != 0)
+            if(vm[x + y * vid_sx] != term_screen[y][x])
                 max = y + 1;
 
     for(unsigned y = 0; y < max; y++)
