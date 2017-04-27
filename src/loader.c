@@ -289,10 +289,11 @@ uint16_t create_PSP(const char *cmdline, const char *environment,
     dosPSP[81] = 0x21;                  //
     dosPSP[82] = 0xCB;                  //
     unsigned l = strlen(cmdline);
-    if(l > 127)
-        l = 127;
+    if(l > 126)
+        l = 126;
     dosPSP[128] = l; // 80: Cmd line len
     memcpy(dosPSP + 129, cmdline, l);
+    dosPSP[129 + l] = 0x00d;            // Adds an ENTER at the end
     // Copy environment:
     memcpy(memory + env_seg * 16, environment, env_size);
     // Then, a word == 1
