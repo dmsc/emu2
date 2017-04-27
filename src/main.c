@@ -56,6 +56,12 @@ static void int11(void)
     cpuSetAX(0x0021);
 }
 
+// BIOS - GET MEMORY
+static void int12(void)
+{
+    cpuSetAX(640);
+}
+
 // Network access, ignored.
 static void int2a(void)
 {
@@ -85,6 +91,8 @@ void bios_routine(unsigned inum)
         int10();
     else if(inum == 0x11)
         int11();
+    else if(inum == 0x12)
+        int12();
     else if(inum == 0x06)
     {
         uint16_t ip = cpuGetStack(0);
@@ -153,6 +161,8 @@ static void init_bios_mem(void)
     // Some of those are also in video.c, we write a
     // default value here for programs that don't call
     // INT10 functions before reading.
+    memory[0x413] = 0x80; // ram size: 640k
+    memory[0x414] = 0x02; //
     memory[0x449] = 3;    // video mode
     memory[0x44A] = 80;   // screen columns
     memory[0x44B] = 0;    // ...
@@ -165,6 +175,15 @@ static void init_bios_mem(void)
     // Store an "INT-19h" instruction in address FFFF:0000
     memory[0xFFFF0] = 0xCB;
     memory[0xFFFF1] = 0x19;
+    // BIOS date at F000:FFF5
+    memory[0xFFFF5] = 0x30;
+    memory[0xFFFF6] = 0x31;
+    memory[0xFFFF7] = 0x2F;
+    memory[0xFFFF8] = 0x30;
+    memory[0xFFFF9] = 0x31;
+    memory[0xFFFFA] = 0x2F;
+    memory[0xFFFFB] = 0x31;
+    memory[0xFFFFC] = 0x37;
 
     update_timer();
 }
