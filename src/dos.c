@@ -1466,6 +1466,9 @@ void int21()
         cpuSetDX(437);
         cpuClrFlag(cpuFlag_CF);
         break;
+    case 0x67: // SET HANDLE COUNT
+        cpuClrFlag(cpuFlag_CF);
+        break;
     }
     default:
         debug(debug_dos, "UNHANDLED INT 21, AX=%04x\n", cpuGetAX());
