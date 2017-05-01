@@ -474,7 +474,7 @@ int dos_load_exe(FILE *f, uint16_t psp_mcb)
     n = fread(memory + load_seg * 16, 1, data_size, f);
     debug(debug_dos, "\texe read %d of %d data bytes\n", n, data_size);
     if(n < data_size)
-        return 0;
+        debug(debug_dos, "\tWARNING: short program!\n");
 
     // EXE start at load address
     int start = load_seg * 16;
