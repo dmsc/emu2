@@ -134,7 +134,7 @@ static void exit_video(void)
 static void init_video(void)
 {
     debug(debug_video, "starting video emulation.\n");
-    int tty_fd = dup(1); //open("/dev/tty", O_NOCTTY | O_WRONLY);
+    int tty_fd = open("/dev/tty", O_NOCTTY | O_WRONLY);
     if(tty_fd < 0)
     {
         print_error("error at open TTY, %s\n", strerror(errno));
