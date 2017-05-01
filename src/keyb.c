@@ -411,46 +411,49 @@ int kbhit(void)
     {
         init_keyboard();
         queued_key = read_key();
+        if(queued_key != -1)
+        {
+            update_bios_state();
+            cpuTriggerIRQ(1);
+        }
     }
-    update_bios_state();
     return (queued_key == -1) ? 0 : queued_key;
 }
 
 int getch(int detect_brk)
 {
     int ret;
-    if(queued_key != -1)
+    while(queued_key == -1)
     {
-        ret = queued_key;
-        queued_key = -1;
-        return ret;
+        if( kbhit() )
+            break;
+        usleep(1000000);
+        waiting_key = 1;
+        emulator_update();
+        waiting_key = 0;
     }
-    else
-    {
-        init_keyboard();
-        while((ret = read_key()) == -1)
-        {
-            usleep(1000000);
-            waiting_key = 1;
-            emulator_update();
-            waiting_key = 0;
-            cpuTriggerIRQ(1);
-        }
-    }
-    update_bios_state();
-    if(detect_brk && ((ret & 0xFF) == 3))
+    if(detect_brk && ((queued_key & 0xFF) == 3))
         raise(SIGINT);
+    ret = queued_key;
+    queued_key = -1;
     return ret;
 }
 
 void update_keyb(void)
 {
-    if(tty_fd >= 0 && !waiting_key)
-    {
-        // Check if there are keys available, and calls IRQ-1
-        if(queued_key == -1 && kbhit())
-            cpuTriggerIRQ(1);
-    }
+    // See if any key is available:
+    if(tty_fd >= 0 && !waiting_key && queued_key == -1)
+        kbhit();
+}
+
+// Handle keyboard controller port reading
+uint8_t keyb_read_port(unsigned port)
+{
+    debug(debug_int, "keyboard read_port: %02X (key=%04X)\n", port, queued_key);
+    if(port == 0x60)
+        return queued_key >> 8;
+    else
+        return 0xFF;
 }
 
 // BIOS keyboards handler
