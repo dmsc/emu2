@@ -24,6 +24,7 @@ static uint32_t nls_terminator_table;
 static uint32_t nls_collating_table;
 static uint32_t nls_dbc_set_table;
 static uint8_t *nls_country_info;
+static uint32_t dos_sysvars;
 
  // Disk Transfer Area, buffer for find-first-file output.
 static int dosDTA;
@@ -1358,6 +1359,11 @@ void int21()
     case 0x4F: // FIND NEXT MATCHING FILE
         int21_4f();
         break;
+    case 0x52: // GET SYSVARS
+        cpuSetES(dos_sysvars >> 4);
+        cpuSetBX((dos_sysvars & 0xF) + 24);
+        cpuClrFlag(cpuFlag_CF);
+        break;
     case 0x56: // RENAME
     {
         char *fname1 = dos_unix_path(cpuGetAddrDS(cpuGetDX()), 0);
@@ -1597,6 +1603,10 @@ void init_dos(int argc, char **argv)
     // Init memory handling - available start address at 0x800,
     // ending address at 0xA0000.
     mcb_init(0x80,0xA000);
+
+    // Init SYSVARS
+    dos_sysvars = get_static_memory(128, 0);
+    put16(dos_sysvars + 22, 0x0080); // First MCB
 
     // Setup default drive
     if( getenv(ENV_DEF_DRIVE) )
