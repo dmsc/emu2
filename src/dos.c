@@ -188,7 +188,7 @@ static void dos_open_file(int create)
     }
     int name_addr = cpuGetAddrDS(cpuGetDX());
     char *fname = dos_unix_path(name_addr, create);
-    if(!fname)
+    if( !memory[name_addr] || !fname)
     {
         debug(debug_dos, "\t(file not found)\n");
         cpuSetAX(2);
