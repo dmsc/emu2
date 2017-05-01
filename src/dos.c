@@ -1402,6 +1402,11 @@ void int21()
             cpuSetAX(mem_get_alloc_strategy());
         else if(1 == al)
             mem_set_alloc_strategy(cpuGetBX());
+        else if(3 == al)
+        {
+            cpuSetFlag(cpuFlag_CF);
+            cpuSetAX(1);
+        }
     }
     case 0x62: // GET PSP SEGMENT
         cpuSetBX(get_current_PSP());
