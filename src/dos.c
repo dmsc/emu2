@@ -257,6 +257,76 @@ static void dos_open_file(int create)
     free(fname);
 }
 
+static int get_fcb_handle(void)
+{
+    return get16(0x18 + cpuGetAddrDS(cpuGetDX()));
+}
+
+static void dos_show_fcb()
+{
+    if(!debug_active(debug_dos))
+        return;
+
+    int addr = cpuGetAddrDS(cpuGetDX());
+    char name[12];
+    memcpy(name, &memory[addr+1], 11);
+
+    debug(debug_dos,"\tFCB:[d=%02x:n=%.8s.%.3s:bn=%04x:rs=%04x:fs=%08x:h=%04x]\n",
+          memory[0xFFFFF&addr],name,name+8,get16(addr+0x0C),
+          get16(addr+0x0E),get16(addr+0x10)+65536*get16(addr+0x12),
+          get16(addr+0x18));
+}
+
+static void dos_open_file_fcb(int create)
+{
+    int h = get_new_handle();
+    if(!h)
+    {
+        cpuSetAX(0xFF);
+        cpuSetFlag(cpuFlag_CF);
+        return;
+    }
+    int fcb_addr = cpuGetAddrDS(cpuGetDX());
+    char *fname = dos_unix_path_fcb(fcb_addr, create);
+    if(!fname)
+    {
+        debug(debug_dos, "\t(file not found)\n");
+        cpuSetAX(0xFF);
+        cpuSetFlag(cpuFlag_CF);
+        return;
+    }
+    const char *mode = create ? "w+b" : "r+b";
+    debug(debug_dos, "\topen fcb '%s', '%s', %04x ", fname, mode, h);
+    handles[h] = fopen(fname, mode);
+    if(!handles[h])
+    {
+        debug(debug_dos, "%s.\n", strerror(errno));
+        cpuSetAX(0xFF);
+        cpuSetFlag(cpuFlag_CF);
+        free(fname);
+        return;
+    }
+    // Get file size
+    fseek(handles[h], 0, SEEK_END);
+    long sz = ftell(handles[h]);
+    fseek(handles[h], 0, SEEK_SET);
+    // Set FCB info:
+    put16(fcb_addr+0x0C, 0); // block number
+    put16(fcb_addr+0x0E, 0); // record size
+    put16(fcb_addr+0x10, sz & 0xFFFF);
+    put16(fcb_addr+0x12, sz >> 16);
+    put16(fcb_addr+0x14, 0); // date of last write
+    put16(fcb_addr+0x16, 0); // time of last write
+    put16(fcb_addr+0x18, h); // reserved - store DOS handle!
+
+    debug(debug_dos, "OK.\n");
+    cpuClrFlag(cpuFlag_CF);
+    cpuSetAX(0x00);
+    dos_show_fcb();
+    free(fname);
+}
+
+
 // Converts Unix time_t to DOS time/date
 static uint32_t get_time_date(time_t tm)
 {
@@ -779,6 +849,17 @@ void int21()
         // Number of drives = 3, 'A:', 'B:' and 'C:'
         cpuSetAX(0x0E03);
         break;
+    case 0x0F: // OPEN FILE USING FCB
+        dos_open_file_fcb(0);
+        break;
+    case 0x10: // CLOSE FILE USING FCB
+        dos_show_fcb();
+        dos_close_file(get_fcb_handle());
+        cpuSetAX(0);
+        break;
+    case 0x16: // CREATE FILE USING FCB
+        dos_open_file_fcb(1);
+        break;
     case 0x19: // GET DEFAULT DRIVE
         debug(debug_dos, "\tget default drive = '%c'\n", dos_get_default_drive() + 'A');
         cpuSetAX(dos_get_default_drive());
@@ -796,6 +877,72 @@ void int21()
         put16(4 * (ax & 0xFF), cpuGetDX());
         put16(4 * (ax & 0xFF) + 2, cpuGetDS());
         break;
+    case 0x27: // BLOCK READ FROM FCB
+    {
+        dos_show_fcb();
+        FILE *f = handles[get_fcb_handle()];
+        if(!f)
+        {
+            cpuSetFlag(cpuFlag_CF);
+            cpuSetAX(1); // no data read
+            return;
+        }
+        unsigned bnum = get16(0x0C + cpuGetAddrDS(cpuGetDX()));
+        unsigned bsize = get16(0x0E + cpuGetAddrDS(cpuGetDX()));
+        unsigned len = cpuGetCX();
+        uint8_t *buf = getptr(dosDTA, bsize * len);
+        if(!buf)
+        {
+            debug(debug_dos, "\tbuffer pointer invalid\n");
+            cpuSetAX(2); // segment wrap in DTA
+            cpuSetFlag(cpuFlag_CF);
+            break;
+        }
+        // Seek to block and read
+        fseek(f, bnum * bsize, SEEK_SET);
+        unsigned n = fread(buf, bsize, len, f);
+        if( n == len )
+            cpuSetAX(0);
+        else
+            cpuSetAX(1);
+        // Update position
+        put16(0x0C + cpuGetAddrDS(cpuGetDX()), bnum + n);
+        cpuSetCX(n);
+        cpuClrFlag(cpuFlag_CF);
+        dos_show_fcb();
+        break;
+    }
+    case 0x28: // BLOCK WRITE TO FCB
+    {
+        dos_show_fcb();
+        FILE *f = handles[get_fcb_handle()];
+        if(!f)
+        {
+            cpuSetFlag(cpuFlag_CF);
+            cpuSetAX(1); // disk full or file read-only
+            return;
+        }
+        unsigned bnum = get16(0x0C + cpuGetAddrDS(cpuGetDX()));
+        unsigned bsize = get16(0x0E + cpuGetAddrDS(cpuGetDX()));
+        unsigned len = cpuGetCX();
+        uint8_t *buf = getptr(dosDTA, bsize * len);
+        if(!buf)
+        {
+            debug(debug_dos, "\tbuffer pointer invalid\n");
+            cpuSetAX(2); // segment wrap in DTA
+            cpuSetFlag(cpuFlag_CF);
+            break;
+        }
+        // Seek to block and write
+        fseek(f, bnum * bsize, SEEK_SET);
+        unsigned n = fwrite(buf, 1, len, f);
+        // Update position
+        put16(0x0C + cpuGetAddrDS(cpuGetDX()), bnum + n);
+        cpuSetAX(0);
+        cpuSetCX(n);
+        cpuClrFlag(cpuFlag_CF);
+        break;
+    }
     case 0x29: // PARSE FILENAME TO FCB
     {
         // TODO: length could be more than 64 bytes!

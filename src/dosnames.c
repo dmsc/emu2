@@ -532,6 +532,43 @@ char *dos_unix_path(int addr, int force)
     return dos_unix_path_rec(base, path, force);
 }
 
+// Converts a FCB path to equivalent Unix filename
+char *dos_unix_path_fcb(int addr, int force)
+{
+    char path[64];
+    char fcb_name[12];
+    int opos = 0;
+    // Copy drive number from the FCB structure:
+    int drive = memory[addr] & 0xFF;
+    if( !drive )
+        drive = dos_default_drive;
+    else
+        drive = drive - 1;
+    // And copy file name
+    memcpy(fcb_name, &memory[addr+1], 11);
+    fcb_name[12] = 0;
+    debug(debug_dos, "\tconvert dos fcb name %c:'%s'\n", drive + 'A', fcb_name);
+
+    // Copy current directory
+    memcpy(path, dos_cwd[drive], 64);
+    opos = strlen(path);
+
+    for(int pos=0; pos<8 && opos<63; pos++, opos++)
+        if( 0 == (path[opos] = dos_valid_char(fcb_name[pos])) )
+            break;
+    if(opos<63 && dos_valid_char(fcb_name[8]))
+        path[opos++] = '.';
+    for(int pos=8; pos<11 && opos<63; pos++, opos++)
+        if( 0 == (path[opos] = dos_valid_char(fcb_name[pos])) )
+            break;
+    path[opos] = 0;
+    // Get UNIX base path:
+    const char *base = get_base_path(drive);
+    // Adds CWD if path is not absolute
+    return dos_unix_path_rec(base, path, force);
+}
+
+
 ////////////////////////////////////////////////////////////////////
 // Implements FindFirstFile
 struct dos_file_list *dos_find_first_file(int addr)

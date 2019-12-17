@@ -12,6 +12,12 @@
 // If the file does not exists, and "force" is false, returns null.
 char *dos_unix_path(int addr, int force);
 
+// Converts a DOS FCB file name to equivalent Unix filename
+// If the file exists, returns the name of the file.
+// If the file does not exists, and "force" is true, returns the possible lowercase name.
+// If the file does not exists, and "force" is false, returns null.
+char *dos_unix_path_fcb(int addr, int force);
+
 // Changes current working directory
 int dos_change_cwd(char *path);
 int dos_change_dir(int addr);
