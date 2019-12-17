@@ -35,9 +35,20 @@ static void put16(int addr, int v)
     memory[0xFFFFF & (addr + 1)] = v >> 8;
 }
 
+static void put32(int addr, unsigned v)
+{
+    put16(addr, v & 0xFFFF);
+    put16(addr+2, v >> 16);
+}
+
 static int get16(int addr)
 {
     return memory[0xFFFFF & addr] + (memory[0xFFFFF & (addr + 1)] << 8);
+}
+
+static unsigned get32(int addr)
+{
+    return get16(addr) + (get16(addr+2) << 16);
 }
 
 static int putmem(uint32_t dest, const uint8_t *src, unsigned size)
@@ -107,24 +118,25 @@ static int get_new_handle(void)
     return 0;
 }
 
-static void dos_close_file(int h)
+static int dos_close_file(int h)
 {
     FILE *f = handles[h];
     if(!f)
     {
         cpuSetFlag(cpuFlag_CF);
         cpuSetAX(6);
-        return;
+        return -1;
     }
     handles[h] = 0;
     devinfo[h] = 0;
     cpuClrFlag(cpuFlag_CF);
     for(int i=0; i<max_handles; i++)
         if(handles[i] == f)
-            return; // Still referenced
+            return 0; // Still referenced, don't really close
     if(f == stdin || f == stdout || f == stderr)
-        return;
+        return 0; // Never close standard streams
     fclose(f);
+    return 0;
 }
 
 static void create_dir(void)
@@ -271,10 +283,10 @@ static void dos_show_fcb()
     char name[12];
     memcpy(name, &memory[addr+1], 11);
 
-    debug(debug_dos,"\tFCB:[d=%02x:n=%.8s.%.3s:bn=%04x:rs=%04x:fs=%08x:h=%04x]\n",
-          memory[0xFFFFF&addr],name,name+8,get16(addr+0x0C),
-          get16(addr+0x0E),get16(addr+0x10)+65536*get16(addr+0x12),
-          get16(addr+0x18));
+    debug(debug_dos,"\tFCB:"
+          "[d=%02x:n=%.8s.%.3s:bn=%04x:rs=%04x:fs=%08x:h=%04x:rn=%02x:ra=%08x]\n",
+          memory[addr], name, name+8, get16(addr+0x0C), get16(addr+0x0E),
+          get32(addr+0x10),get16(addr+0x18),memory[addr+0x20],get32(addr+0x21));
 }
 
 static void dos_open_file_fcb(int create)
@@ -312,12 +324,12 @@ static void dos_open_file_fcb(int create)
     fseek(handles[h], 0, SEEK_SET);
     // Set FCB info:
     put16(fcb_addr+0x0C, 0); // block number
-    put16(fcb_addr+0x0E, 0); // record size
-    put16(fcb_addr+0x10, sz & 0xFFFF);
-    put16(fcb_addr+0x12, sz >> 16);
+    put16(fcb_addr+0x0E, 128); // record size
+    put32(fcb_addr+0x10, sz); // file size
     put16(fcb_addr+0x14, 0); // date of last write
     put16(fcb_addr+0x16, 0); // time of last write
     put16(fcb_addr+0x18, h); // reserved - store DOS handle!
+    memory[fcb_addr+0x20] = 0; // current record
 
     debug(debug_dos, "OK.\n");
     cpuClrFlag(cpuFlag_CF);
@@ -854,8 +866,7 @@ void int21()
         break;
     case 0x10: // CLOSE FILE USING FCB
         dos_show_fcb();
-        dos_close_file(get_fcb_handle());
-        cpuSetAX(0);
+        cpuSetAX(dos_close_file(get_fcb_handle()) ? 0xFF : 0);
         break;
     case 0x16: // CREATE FILE USING FCB
         dos_open_file_fcb(1);
@@ -887,11 +898,13 @@ void int21()
             cpuSetAX(1); // no data read
             return;
         }
-        unsigned bnum = get16(0x0C + cpuGetAddrDS(cpuGetDX()));
-        unsigned bsize = get16(0x0E + cpuGetAddrDS(cpuGetDX()));
-        unsigned len = cpuGetCX();
-        uint8_t *buf = getptr(dosDTA, bsize * len);
-        if(!buf)
+        int fcb = cpuGetAddrDS(cpuGetDX());
+        unsigned rsize = get16(0x0E + fcb);
+        unsigned rnum = (rsize>63 ? 0xFFFF : 0xFFFFF) & get32(0x21 + fcb);
+        unsigned len = cpuGetCX() * rsize;
+        unsigned pos = rnum * rsize;
+        uint8_t *buf = getptr(dosDTA, len);
+        if(!buf || !rsize)
         {
             debug(debug_dos, "\tbuffer pointer invalid\n");
             cpuSetAX(2); // segment wrap in DTA
@@ -899,15 +912,26 @@ void int21()
             break;
         }
         // Seek to block and read
-        fseek(f, bnum * bsize, SEEK_SET);
-        unsigned n = fread(buf, bsize, len, f);
+        if( fseek(f, pos, SEEK_SET) )
+        {
+            cpuSetAX(1);
+            break;
+        }
+        unsigned n = fread(buf, 1, len, f);
         if( n == len )
             cpuSetAX(0);
+        else if (n % rsize != 0)
+        {
+            cpuSetAX(3);
+            for(unsigned i=n; i % rsize; i++)
+                buf[i] = 0;
+        }
         else
             cpuSetAX(1);
         // Update position
-        put16(0x0C + cpuGetAddrDS(cpuGetDX()), bnum + n);
-        cpuSetCX(n);
+        memory[0x20 + fcb] = (pos + n) % rsize;
+        put32(0x21 + fcb, (pos + n) / rsize);
+        cpuSetCX( (n + rsize - 1) / rsize );
         cpuClrFlag(cpuFlag_CF);
         dos_show_fcb();
         break;
@@ -922,11 +946,13 @@ void int21()
             cpuSetAX(1); // disk full or file read-only
             return;
         }
-        unsigned bnum = get16(0x0C + cpuGetAddrDS(cpuGetDX()));
-        unsigned bsize = get16(0x0E + cpuGetAddrDS(cpuGetDX()));
-        unsigned len = cpuGetCX();
-        uint8_t *buf = getptr(dosDTA, bsize * len);
-        if(!buf)
+        int fcb = cpuGetAddrDS(cpuGetDX());
+        unsigned rsize = get16(0x0E + fcb);
+        unsigned rnum = (rsize>63 ? 0xFFFF : 0xFFFFF) & get32(0x21 + fcb);
+        unsigned len = cpuGetCX() * rsize;
+        unsigned pos = rnum * rsize;
+        uint8_t *buf = getptr(dosDTA, len);
+        if(!buf || !rsize)
         {
             debug(debug_dos, "\tbuffer pointer invalid\n");
             cpuSetAX(2); // segment wrap in DTA
@@ -934,12 +960,13 @@ void int21()
             break;
         }
         // Seek to block and write
-        fseek(f, bnum * bsize, SEEK_SET);
+        fseek(f, pos, SEEK_SET);
         unsigned n = fwrite(buf, 1, len, f);
         // Update position
-        put16(0x0C + cpuGetAddrDS(cpuGetDX()), bnum + n);
+        memory[0x20 + fcb] = (pos + n) % rsize;
+        put32(0x21 + fcb, (pos + n) / rsize);
+        cpuSetCX( (n + rsize - 1) / rsize );
         cpuSetAX(0);
-        cpuSetCX(n);
         cpuClrFlag(cpuFlag_CF);
         break;
     }
