@@ -338,6 +338,90 @@ static void dos_open_file_fcb(int create)
     free(fname);
 }
 
+static void dos_fcb_rand_to_block(int fcb)
+{
+    // Update block position from random position
+    unsigned rnum = get32(0x21 + fcb);
+    memory[0x20 + fcb] = rnum & 127;
+    put16(0x0C, rnum / 128);
+}
+
+static int dos_read_record_fcb(int addr, int update)
+{
+    FILE *f = handles[get_fcb_handle()];
+    if(!f)
+        return 1; // no data read
+
+    int fcb = cpuGetAddrDS(cpuGetDX());
+    unsigned rsize = get16(0x0E + fcb);
+    unsigned pos = rsize * get32(0x21 + fcb);
+    uint8_t *buf = getptr(addr, rsize);
+    if(!buf || !rsize)
+    {
+        debug(debug_dos, "\tbuffer pointer invalid\n");
+        return 2; // segment wrap in DTA
+    }
+    // Seek to block and read
+    if( fseek(f, pos, SEEK_SET) )
+        return 1; // no data read
+    // Read
+    unsigned n = fread(buf, 1, rsize, f);
+    // Update random and block positions
+    if( update )
+    {
+        put32(0x21 + fcb, (pos + n) / rsize);
+        dos_fcb_rand_to_block(fcb);
+    }
+
+    if( n == rsize )
+        return 0; // read full record
+    else if(!n)
+        return 1; // EOF
+    else
+    {
+        for(unsigned i=n; i<rsize; i++)
+            buf[i] = 0;
+        return 3; // read partial record
+    }
+}
+
+int dos_write_record_fcb(int addr, int update)
+{
+    FILE *f = handles[get_fcb_handle()];
+    if(!f)
+        return 1; // no data write
+
+    int fcb = cpuGetAddrDS(cpuGetDX());
+    unsigned rsize = get16(0x0E + fcb);
+    unsigned pos = rsize * get32(0x21 + fcb);
+    uint8_t *buf = getptr(addr, rsize);
+    if(!buf || !rsize)
+    {
+        debug(debug_dos, "\tbuffer pointer invalid\n");
+        return 2; // segment wrap in DTA
+    }
+    // Seek to block and read
+    if( fseek(f, pos, SEEK_SET) )
+        return 1; // no data read
+    // Write
+    unsigned n = fwrite(buf, 1, rsize, f);
+    // Update random and block positions
+    if( update )
+    {
+        put32(0x21 + fcb, (pos + n) / rsize);
+        dos_fcb_rand_to_block(fcb);
+    }
+    // Update file size
+    if (pos + n >  get32(fcb+0x10))
+        put32(fcb+0x10, pos+n);
+
+    if( n == rsize )
+        return 0; // write full record
+    else
+        return 3; // disk full
+}
+
+
 
 // Converts Unix time_t to DOS time/date
 static uint32_t get_time_date(time_t tm)
@@ -868,6 +952,14 @@ void int21()
         dos_show_fcb();
         cpuSetAX(dos_close_file(get_fcb_handle()) ? 0xFF : 0);
         break;
+    case 0x14: // SEQUENTIAL READ USING FCB
+        dos_show_fcb();
+        cpuSetAX(dos_read_record_fcb(dosDTA, 1));
+        break;
+    case 0x15: // SEQUENTIAL WRITE USING FCB
+        dos_show_fcb();
+        cpuSetAX(dos_write_record_fcb(dosDTA, 1));
+        break;
     case 0x16: // CREATE FILE USING FCB
         dos_open_file_fcb(1);
         break;
@@ -884,90 +976,44 @@ void int21()
     case 0x1C: // GET DRIVE INFO
         dos_get_drive_info(cpuGetDX() & 0xFF);
         break;
+    case 0x21: // RANDOM READ USING FCB
+        dos_show_fcb();
+        cpuSetAX(dos_read_record_fcb(dosDTA, 0));
+        break;
+    case 0x22: // RANDOM WRITE USING FCB
+        dos_show_fcb();
+        cpuSetAX(dos_write_record_fcb(dosDTA, 0));
+        break;
     case 0x25: // set interrupt vector
         put16(4 * (ax & 0xFF), cpuGetDX());
         put16(4 * (ax & 0xFF) + 2, cpuGetDS());
         break;
     case 0x27: // BLOCK READ FROM FCB
-    {
-        dos_show_fcb();
-        FILE *f = handles[get_fcb_handle()];
-        if(!f)
-        {
-            cpuSetFlag(cpuFlag_CF);
-            cpuSetAX(1); // no data read
-            return;
-        }
-        int fcb = cpuGetAddrDS(cpuGetDX());
-        unsigned rsize = get16(0x0E + fcb);
-        unsigned rnum = (rsize>63 ? 0xFFFF : 0xFFFFF) & get32(0x21 + fcb);
-        unsigned len = cpuGetCX() * rsize;
-        unsigned pos = rnum * rsize;
-        uint8_t *buf = getptr(dosDTA, len);
-        if(!buf || !rsize)
-        {
-            debug(debug_dos, "\tbuffer pointer invalid\n");
-            cpuSetAX(2); // segment wrap in DTA
-            cpuSetFlag(cpuFlag_CF);
-            break;
-        }
-        // Seek to block and read
-        if( fseek(f, pos, SEEK_SET) )
-        {
-            cpuSetAX(1);
-            break;
-        }
-        unsigned n = fread(buf, 1, len, f);
-        if( n == len )
-            cpuSetAX(0);
-        else if (n % rsize != 0)
-        {
-            cpuSetAX(3);
-            for(unsigned i=n; i % rsize; i++)
-                buf[i] = 0;
-        }
-        else
-            cpuSetAX(1);
-        // Update position
-        memory[0x20 + fcb] = (pos + n) % rsize;
-        put32(0x21 + fcb, (pos + n) / rsize);
-        cpuSetCX( (n + rsize - 1) / rsize );
-        cpuClrFlag(cpuFlag_CF);
-        dos_show_fcb();
-        break;
-    }
     case 0x28: // BLOCK WRITE TO FCB
     {
-        dos_show_fcb();
-        FILE *f = handles[get_fcb_handle()];
-        if(!f)
-        {
-            cpuSetFlag(cpuFlag_CF);
-            cpuSetAX(1); // disk full or file read-only
-            return;
-        }
         int fcb = cpuGetAddrDS(cpuGetDX());
+        unsigned count = cpuGetCX();
         unsigned rsize = get16(0x0E + fcb);
-        unsigned rnum = (rsize>63 ? 0xFFFF : 0xFFFFF) & get32(0x21 + fcb);
-        unsigned len = cpuGetCX() * rsize;
-        unsigned pos = rnum * rsize;
-        uint8_t *buf = getptr(dosDTA, len);
-        if(!buf || !rsize)
+        unsigned e = 0;
+        int target = dosDTA;
+        dos_show_fcb();
+
+        while( !e && count )
         {
-            debug(debug_dos, "\tbuffer pointer invalid\n");
-            cpuSetAX(2); // segment wrap in DTA
-            cpuSetFlag(cpuFlag_CF);
-            break;
+            if( 0x27 == (ax >> 8) )
+                e = dos_read_record_fcb(target, 1);
+            else
+                e = dos_write_record_fcb(target, 1);
+
+            if( e == 0 || e == 3 )
+            {
+                target += rsize;
+                count --;
+            }
         }
-        // Seek to block and write
-        fseek(f, pos, SEEK_SET);
-        unsigned n = fwrite(buf, 1, len, f);
-        // Update position
-        memory[0x20 + fcb] = (pos + n) % rsize;
-        put32(0x21 + fcb, (pos + n) / rsize);
-        cpuSetCX( (n + rsize - 1) / rsize );
-        cpuSetAX(0);
-        cpuClrFlag(cpuFlag_CF);
+        cpuSetCX(cpuGetCX() - count);
+        cpuSetAX(e);
+        dos_show_fcb();
         break;
     }
     case 0x29: // PARSE FILENAME TO FCB
