@@ -1066,7 +1066,7 @@ void int21()
                     dst[i] = ' ';
                 break;
             }
-            else if(c == '*' && i <= 9)
+            else if(c == '*' && i < 9)
             {
                 for(; i < 9; i++)
                     dst[i] = '?';
