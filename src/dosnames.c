@@ -559,14 +559,20 @@ char *dos_unix_path_fcb(int addr, int force)
     opos = strlen(path);
 
     for(int pos=0; pos<8 && opos<63; pos++, opos++)
-        if( 0 == (path[opos] = dos_valid_char(fcb_name[pos])) )
+        if( fcb_name[pos] == '?' )
+            path[opos] = '?';
+        else if( 0 == (path[opos] = dos_valid_char(fcb_name[pos])) )
             break;
-    if(opos<63 && dos_valid_char(fcb_name[8]))
+    if(opos<63 && (dos_valid_char(fcb_name[8]) || fcb_name[8] == '?') )
         path[opos++] = '.';
     for(int pos=8; pos<11 && opos<63; pos++, opos++)
-        if( 0 == (path[opos] = dos_valid_char(fcb_name[pos])) )
+        if( fcb_name[pos] == '?' )
+            path[opos] = '?';
+        else if( 0 == (path[opos] = dos_valid_char(fcb_name[pos])) )
             break;
     path[opos] = 0;
+
+    debug(debug_dos, "\ttemp name '%s'\n", path);
     // Get UNIX base path:
     const char *base = get_base_path(drive);
     // Adds CWD if path is not absolute
@@ -576,10 +582,9 @@ char *dos_unix_path_fcb(int addr, int force)
 
 ////////////////////////////////////////////////////////////////////
 // Implements FindFirstFile
-struct dos_file_list *dos_find_first_file(int addr)
+// NOTE: this frees fspec before return
+static struct dos_file_list *find_first_file(char *fspec)
 {
-    // Convert the filespec to a unix path
-    char *fspec = dos_unix_path(addr, 1);
     // Now, separate the path to the spec
     char *glob, *unixpath, *p = rindex(fspec, '/');
     if(!p)
@@ -600,4 +605,14 @@ struct dos_file_list *dos_find_first_file(int addr)
     free(fspec);
 
     return dirEntries;
+}
+
+struct dos_file_list *dos_find_first_file(int addr)
+{
+    return find_first_file(dos_unix_path(addr, 1));
+}
+
+struct dos_file_list *dos_find_first_file_fcb(int addr)
+{
+    return find_first_file(dos_unix_path_fcb(addr, 1));
 }

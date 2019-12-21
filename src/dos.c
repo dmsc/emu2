@@ -269,9 +269,20 @@ static void dos_open_file(int create)
     free(fname);
 }
 
+static int get_ex_fcb(void)
+{
+    return cpuGetAddrDS(cpuGetDX());
+}
+
+static int get_fcb(void)
+{
+    int fcb = cpuGetAddrDS(cpuGetDX());
+    return memory[fcb] == 255 ? fcb + 7 : fcb;
+}
+
 static int get_fcb_handle(void)
 {
-    return get16(0x18 + cpuGetAddrDS(cpuGetDX()));
+    return get16(0x18 + get_fcb());
 }
 
 static void dos_show_fcb()
@@ -298,7 +309,7 @@ static void dos_open_file_fcb(int create)
         cpuSetFlag(cpuFlag_CF);
         return;
     }
-    int fcb_addr = cpuGetAddrDS(cpuGetDX());
+    int fcb_addr = get_fcb();
     char *fname = dos_unix_path_fcb(fcb_addr, create);
     if(!fname)
     {
@@ -352,7 +363,7 @@ static int dos_read_record_fcb(int addr, int update)
     if(!f)
         return 1; // no data read
 
-    int fcb = cpuGetAddrDS(cpuGetDX());
+    int fcb = get_fcb();
     unsigned rsize = get16(0x0E + fcb);
     unsigned pos = rsize * get32(0x21 + fcb);
     uint8_t *buf = getptr(addr, rsize);
@@ -391,7 +402,7 @@ int dos_write_record_fcb(int addr, int update)
     if(!f)
         return 1; // no data write
 
-    int fcb = cpuGetAddrDS(cpuGetDX());
+    int fcb = get_fcb();
     unsigned rsize = get16(0x0E + fcb);
     unsigned pos = rsize * get32(0x21 + fcb);
     uint8_t *buf = getptr(addr, rsize);
@@ -652,6 +663,83 @@ static void int21_4f(void)
         fill_find_first_DTA(p->find_first_ptr);
         p->find_first_ptr++;
     }
+}
+
+static void dos_find_next_fcb(void)
+{
+    struct find_first_dta *p = get_find_first_dta();
+    struct dos_file_list *d = p->find_first_ptr;
+
+    if(!d || !p->find_first_ptr->unixname)
+    {
+        debug(debug_dos, "\t(end)\n");
+        clear_find_first_dta(p);
+        cpuSetAX(0xFF);
+    }
+    else
+    {
+        debug(debug_dos, "\t'%s' ('%s')\n", d->dosname, d->unixname);
+        // Fills output FCB at DTA - use extended or normal depending on input
+        int ofcb = memory[get_ex_fcb()] == 0xFF ? dosDTA + 7 : dosDTA;
+        int pos = 1;
+        for(char *c = d->dosname; *c; c++)
+        {
+            if( *c != '.' )
+                memory[ofcb+pos++] = *c;
+            else
+                while(pos < 9)
+                    memory[ofcb+pos++] = ' ';
+        }
+        while(pos < 12)
+            memory[ofcb+pos++] = ' ';
+        if( strcmp("//", d->unixname) )
+        {
+            // Get file info
+            uint32_t td = 0x10001;
+            uint8_t attr = 0x0;
+            uint32_t sz = 0;
+            struct stat st;
+            // Ignore errors.
+            if(0 == stat(d->unixname, &st))
+            {
+                td = get_time_date(st.st_mtime);
+                attr = get_attributes(st.st_mode);
+                if(st.st_size & ~0x7FFFFFFF)
+                    sz = 0x7FFFFFFF;
+                else
+                    sz = st.st_size;
+            }
+            // Fills file size
+            memory[ofcb+0x0C] = attr;
+            put32(ofcb+0x17, td);
+            put32(ofcb+0x1D, sz);
+            // Fill drive letter
+            memory[ofcb] = memory[get_fcb()];
+        }
+        p->find_first_ptr++;
+        cpuSetAX(0x00);
+    }
+}
+
+static void dos_find_first_fcb(void)
+{
+    struct find_first_dta *p = get_find_first_dta();
+    // Gets all directory entries
+    if(p->find_first_list)
+        dos_free_file_list(p->find_first_list);
+
+    int efcb = get_ex_fcb();
+    if( memory[efcb] == 0xFF && memory[efcb+6] == 0x08 )
+    {
+        p->find_first_list = calloc(2, sizeof(struct dos_file_list));
+        p->find_first_list[0].unixname = strdup("//");
+        memcpy(p->find_first_list[0].dosname, "DISK LABEL", 11);
+        p->find_first_list[1].unixname = 0;
+    }
+    else
+        p->find_first_list = dos_find_first_file_fcb(get_fcb());
+    p->find_first_ptr = p->find_first_list;
+    return dos_find_next_fcb();
 }
 
 // DOS int 21, ah=57
@@ -952,6 +1040,12 @@ void int21()
         dos_show_fcb();
         cpuSetAX(dos_close_file(get_fcb_handle()) ? 0xFF : 0);
         break;
+    case 0x11: // FIND FIRST FILE USING FCB
+        dos_find_first_fcb();
+        break;
+    case 0x12: // FIND NEXT FILE USING FCB
+        dos_find_next_fcb();
+        break;
     case 0x14: // SEQUENTIAL READ USING FCB
         dos_show_fcb();
         cpuSetAX(dos_read_record_fcb(dosDTA, 1));
@@ -991,7 +1085,7 @@ void int21()
     case 0x27: // BLOCK READ FROM FCB
     case 0x28: // BLOCK WRITE TO FCB
     {
-        int fcb = cpuGetAddrDS(cpuGetDX());
+        int fcb = get_fcb();
         unsigned count = cpuGetCX();
         unsigned rsize = get16(0x0E + fcb);
         unsigned e = 0;

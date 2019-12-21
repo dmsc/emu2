@@ -40,6 +40,7 @@ struct dos_file_list
 // Returns a list with filenames compatibles with the DOS filespec, as pairs
 // The list will be deleted at the next call
 struct dos_file_list *dos_find_first_file(int addr);
+struct dos_file_list *dos_find_first_file_fcb(int addr);
 
 // Frees a fileList.
 void dos_free_file_list(struct dos_file_list *dl);
