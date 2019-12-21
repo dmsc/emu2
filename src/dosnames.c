@@ -551,7 +551,7 @@ char *dos_unix_path_fcb(int addr, int force)
         drive = drive - 1;
     // And copy file name
     memcpy(fcb_name, &memory[addr+1], 11);
-    fcb_name[12] = 0;
+    fcb_name[11] = 0;
     debug(debug_dos, "\tconvert dos fcb name %c:'%s'\n", drive + 'A', fcb_name);
 
     // Copy current directory
