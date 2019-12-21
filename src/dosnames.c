@@ -121,16 +121,21 @@ static int dos_glob(const char *n, const char *g)
     while(*n && *g)
     {
         char cg = *g, cn = *n;
-        // An '*' consumes any leter, except the dot
-        if(cg == '*' && cn != '.')
-        {
-            n++;
-            continue;
-        }
-        // Consume extra '*'
+        // An '*' consumes any letter, except the dot
         if(cg == '*')
         {
+            if(cn == '.')
+                g++;
+            else
+                n++;
+            continue;
+        }
+        // An '?' consumes one letter, except the dot
+        if(cg == '?')
+        {
             g++;
+            if(cn != '.')
+                n++;
             continue;
         }
         // Convert letters to uppercase
@@ -138,8 +143,8 @@ static int dos_glob(const char *n, const char *g)
             cg = cg - 'a' + 'A';
         if(cn >= 'a' && cn <= 'z')
             cn = cn - 'a' + 'A';
-        // Consume equal leters or '?'
-        if(cg == '?' || cg == cn)
+        // Consume equal letters or '?'
+        if(cg == cn)
         {
             g++;
             n++;
@@ -147,8 +152,8 @@ static int dos_glob(const char *n, const char *g)
         }
         return 0;
     }
-    // Consume extra '*' and '.'
-    while(*g == '*' || *g == '.')
+    // Consume extra '*', '?' and '.'
+    while(*g == '*' || *g == '?' || *g == '.')
         g++;
     if(*n || *g)
         return 0;
