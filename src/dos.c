@@ -510,40 +510,6 @@ static void int21_43(void)
     return;
 }
 
-// Fills the Find First Data from a dos/unix name pair
-static void fill_find_first_DTA(struct dos_file_list *d)
-{
-    uint8_t *dta = memory + dosDTA;
-
-    // Get file info
-    uint32_t td = 0x10001;
-    uint8_t attr = 0x0;
-    uint32_t sz = 0;
-    struct stat st;
-    // Ignore errors.
-    if(0 == stat(d->unixname, &st))
-    {
-        td = get_time_date(st.st_mtime);
-        attr = get_attributes(st.st_mode);
-        if(st.st_size & ~0x7FFFFFFF)
-            sz = 0x7FFFFFFF;
-        else
-            sz = st.st_size;
-    }
-    // Fills file size
-    dta[0x15] = attr;
-    dta[0x16] = td;
-    dta[0x17] = td >> 8;
-    dta[0x18] = td >> 16;
-    dta[0x19] = td >> 24;
-    dta[0x1A] = sz;
-    dta[0x1B] = sz >> 8;
-    dta[0x1C] = sz >> 16;
-    dta[0x1D] = sz >> 24;
-    // Fills dos file name
-    memcpy(dta + 0x1E, d->dosname, 13);
-}
-
 // Each DTA (Data Transfer Area) in memory can hold a find-first data
 // block. We simply encode our pointer in this area and use this struct
 // to hold the values.
@@ -590,9 +556,57 @@ static void clear_find_first_dta(struct find_first_dta *p)
     dos_free_file_list(p->find_first_list);
 }
 
+// DOS int 21, ah=4f
+static void dos_find_next(int first)
+{
+    struct find_first_dta *p = get_find_first_dta();
+    struct dos_file_list *d = p->find_first_ptr;
+    if(!d || !p->find_first_ptr->unixname)
+    {
+        debug(debug_dos, "\t(end)\n");
+        clear_find_first_dta(p);
+        cpuSetFlag(cpuFlag_CF);
+        cpuSetAX(first ? 0x02 : 0x12);
+    }
+    else
+    {
+        debug(debug_dos, "\t'%s' ('%s')\n", d->dosname, d->unixname);
+
+        // Fills the Find First Data from a dos/unix name pair
+        if( strcmp("//", d->unixname) )
+        {
+            // Normal file/directory
+            struct stat st;
+            if(0 == stat(d->unixname, &st))
+            {
+                memory[dosDTA+0x15] = get_attributes(st.st_mode);
+                put32(dosDTA+0x16, get_time_date(st.st_mtime));
+                put32(dosDTA+0x1A, (st.st_size > 0x7FFFFFFF) ? 0x7FFFFFFF : st.st_size);
+            }
+            else
+            {
+                memory[dosDTA+0x15] = 0;
+                put32(dosDTA+0x16, 0x10001);
+                put32(dosDTA+0x1A, 0);
+            }
+        }
+        else
+        {
+            // Fills volume label data
+            memory[dosDTA+0x15] = 8;
+            put32(dosDTA+0x16, get_time_date(time(0)));
+            put32(dosDTA+0x1A, 0);
+        }
+        // Fills dos file name
+        memcpy(memory + dosDTA + 0x1E, d->dosname, 13);
+        // Next file
+        p->find_first_ptr++;
+        cpuClrFlag(cpuFlag_CF);
+    }
+}
 
 // DOS int 21, ah=4e
-static void int21_4e(void)
+static void dos_find_first(void)
 {
     struct find_first_dta *p = get_find_first_dta();
     // Gets all directory entries
@@ -602,67 +616,16 @@ static void int21_4e(void)
     // Check if we want the volume label
     if(cpuGetCX() & 8)
     {
-        // Fill DTA with volume label
-        uint8_t *dta = memory + dosDTA;
-
-        // Get file info
-        uint32_t td = get_time_date(time(0));
-        // Fills file size
-        dta[0x15] = 8;
-        dta[0x16] = td;
-        dta[0x17] = td >> 8;
-        dta[0x18] = td >> 16;
-        dta[0x19] = td >> 24;
-        dta[0x1A] = 0;
-        dta[0x1B] = 0;
-        dta[0x1C] = 0;
-        dta[0x1D] = 0;
-        // Fills dos file name
-        memcpy(dta + 0x1E, "VOLUME LABEL", 13);
-        clear_find_first_dta(p);
-        cpuClrFlag(cpuFlag_CF);
-        debug(debug_dos, "\tget volume label\n");
-        return;
+        p->find_first_list = calloc(2, sizeof(struct dos_file_list));
+        p->find_first_list[0].unixname = strdup("//");
+        memcpy(p->find_first_list[0].dosname, "DISK LABEL", 11);
+        p->find_first_list[1].unixname = 0;
     }
+    else
+        p->find_first_list = dos_find_first_file(cpuGetAddrDS(cpuGetDX()));
 
-    p->find_first_list = dos_find_first_file(cpuGetAddrDS(cpuGetDX()));
     p->find_first_ptr = p->find_first_list;
-    if(!p->find_first_ptr || !p->find_first_ptr->unixname)
-    {
-        debug(debug_dos, "\t(none)\n");
-        clear_find_first_dta(p);
-        cpuSetFlag(cpuFlag_CF);
-        cpuSetAX(2);
-    }
-    else
-    {
-        debug(debug_dos, "\t'%s' ('%s')\n", p->find_first_ptr->dosname,
-              p->find_first_ptr->unixname);
-        cpuClrFlag(cpuFlag_CF);
-        fill_find_first_DTA(p->find_first_ptr);
-        p->find_first_ptr++;
-    }
-}
-
-// DOS int 21, ah=4f
-static void int21_4f(void)
-{
-    struct find_first_dta *p = get_find_first_dta();
-    if(!p->find_first_ptr || !p->find_first_ptr->unixname)
-    {
-        debug(debug_dos, "\t(end)\n");
-        clear_find_first_dta(p);
-        cpuSetFlag(cpuFlag_CF);
-        cpuSetAX(0x12);
-    }
-    else
-    {
-        debug(debug_dos, "\t'%s' ('%s')\n", p->find_first_ptr->dosname,
-              p->find_first_ptr->unixname);
-        cpuClrFlag(cpuFlag_CF);
-        fill_find_first_DTA(p->find_first_ptr);
-        p->find_first_ptr++;
-    }
+    return dos_find_next(1);
 }
 
 static void dos_find_next_fcb(void)
@@ -692,29 +655,31 @@ static void dos_find_next_fcb(void)
         }
         while(pos < 12)
             memory[ofcb+pos++] = ' ';
+        // Fill drive letter
+        memory[ofcb] = memory[get_fcb()];
+        // Get file info
         if( strcmp("//", d->unixname) )
         {
-            // Get file info
-            uint32_t td = 0x10001;
-            uint8_t attr = 0x0;
-            uint32_t sz = 0;
+            // Normal file/directory
             struct stat st;
-            // Ignore errors.
             if(0 == stat(d->unixname, &st))
             {
-                td = get_time_date(st.st_mtime);
-                attr = get_attributes(st.st_mode);
-                if(st.st_size & ~0x7FFFFFFF)
-                    sz = 0x7FFFFFFF;
-                else
-                    sz = st.st_size;
+                memory[ofcb+0x0C] = get_attributes(st.st_mode);
+                put32(ofcb+0x17, get_time_date(st.st_mtime));
+                put32(ofcb+0x1D, (st.st_size > 0x7FFFFFFF) ? 0x7FFFFFFF : st.st_size);
             }
-            // Fills file size
-            memory[ofcb+0x0C] = attr;
-            put32(ofcb+0x17, td);
-            put32(ofcb+0x1D, sz);
-            // Fill drive letter
-            memory[ofcb] = memory[get_fcb()];
+            else
+            {
+                memory[ofcb+0x0C] = 0;
+                put32(ofcb+0x17, 0x10001);
+                put32(ofcb+0x1D, 0);
+            }
+        }
+        else
+        {
+            memory[ofcb+0x0C] = 8;
+            put32(ofcb+0x17, get_time_date(time(0)));
+            put32(ofcb+0x1D, 0);
         }
         p->find_first_ptr++;
         cpuSetAX(0x00);
@@ -1668,10 +1633,10 @@ void int21()
         cpuClrFlag(cpuFlag_CF);
         break;
     case 0x4E: // FIND FIRST MATCHING FILE
-        int21_4e();
+        dos_find_first();
         break;
     case 0x4F: // FIND NEXT MATCHING FILE
-        int21_4f();
+        dos_find_next(0);
         break;
     case 0x52: // GET SYSVARS
         cpuSetES(dos_sysvars >> 4);
