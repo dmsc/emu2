@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
 extern volatile int exit_cpu;
 extern uint8_t memory[];
@@ -79,5 +80,49 @@ void cpuClrFlag(enum cpuFlags flag);
 // Alter direct CPU flags, only use on startup
 void cpuSetStartupFlag(enum cpuFlags flag);
 void cpuClrStartupFlag(enum cpuFlags flag);
+
+// Helper functions to access memory
+// Read 16 bit number
+static inline void put16(int addr, int v)
+{
+    memory[0xFFFFF & (addr)] = v;
+    memory[0xFFFFF & (addr + 1)] = v >> 8;
+}
+
+// Read 32 bit number
+static inline void put32(int addr, unsigned v)
+{
+    put16(addr, v & 0xFFFF);
+    put16(addr+2, v >> 16);
+}
+
+// Write 16 bit number
+static inline int get16(int addr)
+{
+    return memory[0xFFFFF & addr] + (memory[0xFFFFF & (addr + 1)] << 8);
+}
+
+// Write 32 bit number
+static inline unsigned get32(int addr)
+{
+    return get16(addr) + (get16(addr+2) << 16);
+}
+
+// Copy data to CPU memory
+static inline int putmem(uint32_t dest, const uint8_t *src, unsigned size)
+{
+    if(size >= 0x100000 || dest >= 0x100000 || size + dest >= 0x100000)
+        return 1;
+    memcpy(memory + dest, src, size);
+    return 0;
+}
+
+// Get pointer to CPU memory or null if overflow
+static inline uint8_t *getptr(uint32_t addr, unsigned size)
+{
+    if(size >= 0x100000 || addr >= 0x100000 || size + addr >= 0x100000)
+        return 0;
+    return memory + addr;
+}
 
 #endif // EMU_H

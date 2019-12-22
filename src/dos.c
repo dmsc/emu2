@@ -26,45 +26,8 @@ static uint32_t nls_dbc_set_table;
 static uint8_t *nls_country_info;
 static uint32_t dos_sysvars;
 
- // Disk Transfer Area, buffer for find-first-file output.
+// Disk Transfer Area, buffer for find-first-file output.
 static int dosDTA;
-
-static void put16(int addr, int v)
-{
-    memory[0xFFFFF & (addr)] = v;
-    memory[0xFFFFF & (addr + 1)] = v >> 8;
-}
-
-static void put32(int addr, unsigned v)
-{
-    put16(addr, v & 0xFFFF);
-    put16(addr+2, v >> 16);
-}
-
-static int get16(int addr)
-{
-    return memory[0xFFFFF & addr] + (memory[0xFFFFF & (addr + 1)] << 8);
-}
-
-static unsigned get32(int addr)
-{
-    return get16(addr) + (get16(addr+2) << 16);
-}
-
-static int putmem(uint32_t dest, const uint8_t *src, unsigned size)
-{
-    if(size >= 0x100000 || dest >= 0x100000 || size + dest >= 0x100000)
-        return 1;
-    memcpy(memory + dest, src, size);
-    return 0;
-}
-
-static uint8_t *getptr(uint32_t addr, unsigned size)
-{
-    if(size >= 0x100000 || addr >= 0x100000 || size + addr >= 0x100000)
-        return 0;
-    return memory + addr;
-}
 
 // Allocates memory for static DOS tables, from "rom" memory
 static uint32_t get_static_memory(uint16_t bytes, uint16_t align)

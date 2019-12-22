@@ -315,17 +315,6 @@ unsigned get_current_PSP(void)
     return current_PSP;
 }
 
-static int get16(int addr)
-{
-    return memory[addr] + (memory[addr + 1] << 8);
-}
-
-static void put16(int addr, int v)
-{
-    memory[addr] = v;
-    memory[addr + 1] = v >> 8;
-}
-
 static int g16(uint8_t *buf)
 {
     return buf[0] + (buf[1] << 8);
