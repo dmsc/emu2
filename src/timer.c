@@ -24,10 +24,7 @@ void update_timer(void)
 
     bios_timer = cnt % 0x1800B0;
     bios_dater = cnt / 0x1800B0;
-    memory[0x46C] = bios_timer & 0xFF;
-    memory[0x46D] = (bios_timer >> 8) & 0xFF;
-    memory[0x46E] = (bios_timer >> 16) & 0xFF;
-    memory[0x46F] = (bios_timer >> 24) & 0xFF;
+    put32(0x46C, bios_timer);
     memory[0x470] = bios_dater & 0xFF;
 }
 

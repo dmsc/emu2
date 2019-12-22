@@ -23,7 +23,7 @@ int dos_change_cwd(char *path);
 int dos_change_dir(int addr);
 
 // Gets current working directory
-const char *dos_get_cwd(int drive);
+const uint8_t *dos_get_cwd(int drive);
 
 // Sets/gets default drive
 void dos_set_default_drive(int drive);
@@ -32,7 +32,7 @@ int dos_get_default_drive(void);
 // Struct used as return to dosFindFirstFile
 struct dos_file_list
 {
-    char dosname[13];
+    uint8_t dosname[13];
     char *unixname;
 };
 

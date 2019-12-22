@@ -125,4 +125,18 @@ static inline uint8_t *getptr(uint32_t addr, unsigned size)
     return memory + addr;
 }
 
+// Get a copy of CPU memory forcing a nul byte at end.
+// Four static buffers are used, so at most 4 results can be in use.
+static inline char *getstr(uint32_t addr, unsigned size)
+{
+    static int cbuf = 0;
+    static char buf[256][4];
+
+    cbuf = (cbuf + 1) & 3;
+    memset(buf[cbuf], 0, 256);
+    if(size < 255 && addr < 0x100000 && size + addr < 0x100000)
+        memcpy(buf[cbuf], memory + addr, size);
+    return buf[cbuf];
+}
+
 #endif // EMU_H

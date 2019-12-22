@@ -20,10 +20,8 @@ static void mcb_new(int mcb, int owner, int size, int last)
     if(mcb < 0)
         return;
     memory[mcb * 16 + 0] = last ? 'Z' : 'M';
-    memory[mcb * 16 + 1] = owner & 0xFF;
-    memory[mcb * 16 + 2] = owner >> 8;
-    memory[mcb * 16 + 3] = size & 0xFF;
-    memory[mcb * 16 + 4] = size >> 8;
+    put16(mcb * 16 + 1, owner);
+    put16(mcb * 16 + 3, size);
     debug(debug_dos, "\tmcb_new: mcb:$%04X type:%c owner:$%04X size:$%04X\n",
           mcb, last ? 'Z' : 'M', owner, size);
 }
@@ -32,30 +30,28 @@ static int mcb_size(int mcb)
 {
     if(mcb < 0)
         return 0;
-    return memory[mcb * 16 + 3] + 256 * memory[mcb * 16 + 4];
+    return get16(mcb * 16 + 3);
 }
 
 static void mcb_set_size(int mcb, int sz)
 {
     if(mcb < 0)
         return;
-    memory[mcb * 16 + 3] = sz & 0xFF;
-    memory[mcb * 16 + 4] = sz >> 8;
+    put16(mcb * 16 + 3, sz);
 }
 
 static int mcb_owner(int mcb)
 {
     if(mcb < 0 || mcb >= 0x10000)
         return 0;
-    return memory[mcb * 16 + 1] + 256 * memory[mcb * 16 + 2];
+    return get16(mcb * 16 + 1);
 }
 
 static void mcb_set_owner(int mcb, int owner)
 {
     if(mcb < 0)
         return;
-    memory[mcb * 16 + 1] = owner & 0xFF;
-    memory[mcb * 16 + 2] = owner >> 8;
+    put16(mcb * 16 + 1, owner);
 }
 
 static int mcb_ok(int mcb)
@@ -297,8 +293,7 @@ uint16_t create_PSP(const char *cmdline, const char *environment,
     // Copy environment:
     memcpy(memory + env_seg * 16, environment, env_size);
     // Then, a word == 1
-    memory[env_seg * 16 + env_size] = 1;
-    memory[env_seg * 16 + env_size + 1] = 0;
+    put16(env_seg * 16 + env_size, 1);
     // And the program name
     if(progname)
     {
@@ -401,8 +396,7 @@ int dos_load_exe(FILE *f, uint16_t psp_mcb)
         fread(memory + mem, 1, max, f);
 
         // Fill top program address in PSP
-        memory[psp_mcb * 16 + 16 + 2] = (psp_mcb + mcb_size(psp_mcb) + 1) & 0xFF;
-        memory[psp_mcb * 16 + 16 + 3] = (psp_mcb + mcb_size(psp_mcb) + 1) >> 8;
+        put16(psp_mcb * 16 + 16 + 2, psp_mcb + mcb_size(psp_mcb) + 1);
 
         cpuSetIP(0x100);
         cpuSetCS(psp_mcb + 1);
@@ -455,8 +449,7 @@ int dos_load_exe(FILE *f, uint16_t psp_mcb)
           exe_sz, g16(buf + 10), g16(buf + 12), mcb_size(psp_mcb));
 
     // Fill top program address in PSP
-    memory[psp_mcb * 16 + 16 + 2] = (psp_mcb + mcb_size(psp_mcb) + 1) & 0xFF;
-    memory[psp_mcb * 16 + 16 + 3] = (psp_mcb + mcb_size(psp_mcb) + 1) >> 8;
+    put16(psp_mcb * 16 + 16 + 2, psp_mcb + mcb_size(psp_mcb) + 1);
 
     // Seek to start of data and read
     fseek(f, head_size, SEEK_SET);

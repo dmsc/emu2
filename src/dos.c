@@ -254,9 +254,7 @@ static void dos_show_fcb()
         return;
 
     int addr = cpuGetAddrDS(cpuGetDX());
-    char name[12];
-    memcpy(name, &memory[addr+1], 11);
-
+    char *name = getstr(addr+1, 11);
     debug(debug_dos,"\tFCB:"
           "[d=%02x:n=%.8s.%.3s:bn=%04x:rs=%04x:fs=%08x:h=%04x:rn=%02x:ra=%08x]\n",
           memory[addr], name, name+8, get16(addr+0x0C), get16(addr+0x0E),
@@ -561,7 +559,7 @@ static void dos_find_next(int first)
             put32(dosDTA+0x1A, 0);
         }
         // Fills dos file name
-        memcpy(memory + dosDTA + 0x1E, d->dosname, 13);
+        putmem(dosDTA + 0x1E, d->dosname, 13);
         // Next file
         p->find_first_ptr++;
         cpuClrFlag(cpuFlag_CF);
@@ -608,7 +606,7 @@ static void dos_find_next_fcb(void)
         // Fills output FCB at DTA - use extended or normal depending on input
         int ofcb = memory[get_ex_fcb()] == 0xFF ? dosDTA + 7 : dosDTA;
         int pos = 1;
-        for(char *c = d->dosname; *c; c++)
+        for(uint8_t *c = d->dosname; *c; c++)
         {
             if( *c != '.' )
                 memory[ofcb+pos++] = *c;
@@ -778,7 +776,7 @@ static int run_emulator(char *file, const char *prgname, char *cmdline, char *en
         drv[1] = dos_get_default_drive() + 'A';
         setenv(ENV_DEF_DRIVE, drv, 1);
         // and CWD
-        setenv(ENV_CWD, dos_get_cwd(dos_get_default_drive()), 1);
+        setenv(ENV_CWD, (const char *)dos_get_cwd(dos_get_default_drive()), 1);
         // pass open file descriptors to child process
         for(unsigned i = 0; i < 3; i++)
             if(handles[i])
@@ -1013,12 +1011,12 @@ void int21()
     case 0x27: // BLOCK READ FROM FCB
     case 0x28: // BLOCK WRITE TO FCB
     {
+        dos_show_fcb();
         int fcb = get_fcb();
         unsigned count = cpuGetCX();
         unsigned rsize = get16(0x0E + fcb);
         unsigned e = 0;
         int target = dosDTA;
-        dos_show_fcb();
 
         while( !e && count )
         {
@@ -1041,16 +1039,16 @@ void int21()
     case 0x29: // PARSE FILENAME TO FCB
     {
         // TODO: length could be more than 64 bytes!
-        uint8_t *fname = getptr(cpuGetAddrDS(cpuGetSI()), 64);
-        uint8_t *orig = fname;
+        char *fname = getstr(cpuGetAddrDS(cpuGetSI()), 64);
+        char *orig = fname;
         uint8_t *dst = getptr(cpuGetAddrES(cpuGetDI()), 37);
-        if(!fname || !dst)
+        if(!dst)
         {
-            debug(debug_dos, "\tinvalid source / destination\n");
+            debug(debug_dos, "\tinvalid destination\n");
             cpuSetAX(cpuGetAX() | 0x00FF);
             break;
         }
-        debug(debug_dos, "\t'%.63s' -> ", fname);
+        debug(debug_dos, "\t'%s' -> ", fname);
         if(ax & 1)
             // Skip separator
             if(*fname && strchr(":;.,=+", *fname))
@@ -1474,9 +1472,9 @@ void int21()
     case 0x47: // GET CWD
     {
         // Note: ignore drive letter in DL
-        const char *path = dos_get_cwd(cpuGetDX() & 0xFF);
+        const uint8_t *path = dos_get_cwd(cpuGetDX() & 0xFF);
         debug(debug_dos, "\tcwd '%c' = '%s'\n", '@' + (cpuGetDX() & 0xFF), path);
-        memcpy(memory + cpuGetAddrDS(cpuGetSI()), path, 64);
+        putmem(cpuGetAddrDS(cpuGetSI()), path, 64);
         cpuSetAX(0x0100);
         cpuClrFlag(cpuFlag_CF);
         break;
@@ -1548,26 +1546,32 @@ void int21()
             }
             else
                 cpuClrFlag(cpuFlag_CF);
-            free(fname);
         }
         else if((ax & 0xFF) == 0)
         {
-            // Get executable file name:
-            char prgname[64];
-            memcpy(prgname, memory + cpuGetAddrDS(cpuGetDX()), 64);
-            prgname[63] = 0;
             debug(debug_dos, "\texec: '%s'\n", fname);
+            // Get executable file name:
+            char *prgname = getstr(cpuGetAddrDS(cpuGetDX()), 64);
             // Read command line parameters:
             int pb = cpuGetAddrES(cpuGetBX());
             int cmd_addr = cpuGetAddress(get16(pb + 4), get16(pb + 2));
             int clen = memory[cmd_addr];
-            char *cmdline = malloc(clen + 1);
-            memcpy(cmdline, memory + cmd_addr + 1, clen);
-            cmdline[clen] = 0;
+            char *cmdline = getstr(cmd_addr, clen);
             debug(debug_dos, "\texec command line: '%s %.*s'\n", fname, clen, cmdline);
             char *env = "\0\0";
             if(get16(pb) != 0)
-                env = (char *)memory + cpuGetAddress(get16(pb), 0);
+            {
+                // Sanitize env
+                int eaddr = cpuGetAddress(get16(pb), 0);
+                while( memory[eaddr] != 0 && eaddr < 0xFFFFF )
+                {
+                    while( memory[eaddr] != 0 && eaddr < 0xFFFFF )
+                        eaddr ++;
+                    eaddr ++;
+                }
+                if( eaddr < 0xFFFFF )
+                    env = (char *)(memory + cpuGetAddress(get16(pb), 0));
+            }
             if(run_emulator(fname, prgname, cmdline, env))
             {
                 cpuSetAX(5); // access denied
@@ -1575,8 +1579,6 @@ void int21()
             }
             else
                 cpuClrFlag(cpuFlag_CF);
-            free(cmdline);
-            free(fname);
         }
         else
         {
@@ -1584,8 +1586,8 @@ void int21()
                   fname, ax & 0xFF);
             cpuSetFlag(cpuFlag_CF);
             cpuSetAX(1);
-            free(fname);
         }
+        free(fname);
         break;
     }
     case 0x4C: // EXIT

@@ -30,7 +30,7 @@ static char dos_valid_char(char c)
 }
 
 // Converts the Unix filename "u" to a Dos filename "d".
-static int unix_to_dos(char *d, const char *u)
+static int unix_to_dos(uint8_t *d, const char *u)
 {
     int dot;
     int k;
@@ -64,11 +64,11 @@ static int unix_to_dos(char *d, const char *u)
 }
 
 // Search a name in the current directory list
-static int dos_search_name(const struct dos_file_list *dl, const char *name)
+static int dos_search_name(const struct dos_file_list *dl, const uint8_t *name)
 {
     for(; dl->unixname; dl++)
     {
-        if(!strcmp(dl->dosname, name))
+        if(!strncmp((const char *)dl->dosname, (const char *)name, 13))
             return 1;
     }
     return 0;
@@ -116,7 +116,7 @@ static int dos_unix_sort(const struct dirent **s1, const struct dirent **s2)
 }
 
 // GLOB
-static int dos_glob(const char *n, const char *g)
+static int dos_glob(const uint8_t *n, const char *g)
 {
     while(*n && *g)
     {
@@ -359,7 +359,7 @@ static char *dos_unix_path_rec(const char *upath, const char *dospath, int force
 }
 
 // CWD for all drives - 'A' to 'Z'
-static char dos_cwd[26][64];
+static uint8_t dos_cwd[26][64];
 static int dos_default_drive = 2; // C:
 
 void dos_set_default_drive(int drive)
@@ -483,7 +483,7 @@ static const char *get_base_path(int drive)
     return base;
 }
 
-const char *dos_get_cwd(int drive)
+const uint8_t *dos_get_cwd(int drive)
 {
     drive = drive?drive-1:dos_default_drive;
     return dos_cwd[drive];
@@ -511,18 +511,13 @@ int dos_change_cwd(char *path)
 // changes CWD
 int dos_change_dir(int addr)
 {
-    char path[64];
-    memcpy(path, &memory[addr], 63);
-    path[63] = 0;
-    return dos_change_cwd(path);
+    return dos_change_cwd(getstr(addr,63));
 }
 
 // Converts a DOS full path to equivalent Unix filename
 char *dos_unix_path(int addr, int force)
 {
-    char path[64];
-    memcpy(path, &memory[addr], 63);
-    path[63] = 0;
+    char *path = getstr(addr, 63);
     debug(debug_dos, "\tconvert dos path '%s'\n", path);
     // Check for standard paths:
     if( *path && (!strcasecmp(path, "NUL") || !strcasecmp(path+1,":NUL")) )
@@ -540,8 +535,6 @@ char *dos_unix_path(int addr, int force)
 // Converts a FCB path to equivalent Unix filename
 char *dos_unix_path_fcb(int addr, int force)
 {
-    char path[64];
-    char fcb_name[12];
     int opos = 0;
     // Copy drive number from the FCB structure:
     int drive = memory[addr] & 0xFF;
@@ -550,11 +543,11 @@ char *dos_unix_path_fcb(int addr, int force)
     else
         drive = drive - 1;
     // And copy file name
-    memcpy(fcb_name, &memory[addr+1], 11);
-    fcb_name[11] = 0;
+    char *fcb_name = getstr(addr+1, 11);
     debug(debug_dos, "\tconvert dos fcb name %c:'%s'\n", drive + 'A', fcb_name);
 
-    // Copy current directory
+    // Build complete path, copy current directory and add FCB file name
+    char path[64];
     memcpy(path, dos_cwd[drive], 64);
     opos = strlen(path);
 
