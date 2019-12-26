@@ -6,6 +6,7 @@
 #include "keyb.h"
 #include "loader.h"
 #include "timer.h"
+#include "utils.h"
 #include "video.h"
 
 #include <errno.h>
@@ -792,8 +793,8 @@ static int run_emulator(char *file, const char *prgname, char *cmdline, char *en
         // Accumulate args:
         char *args[64];
         int i;
-        char exe_path[4096] = {0,};
-        if(readlink("/proc/self/exe", exe_path, 4096) == -1)
+        const char *exe_path = get_program_exe_path();
+        if(!exe_path)
             print_error("can't get emulator path.\n");
         args[0] = prog_name;
         args[1] = file;
