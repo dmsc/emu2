@@ -130,7 +130,7 @@ static inline uint8_t *getptr(uint32_t addr, unsigned size)
 static inline char *getstr(uint32_t addr, unsigned size)
 {
     static int cbuf = 0;
-    static char buf[256][4];
+    static char buf[4][256];
 
     cbuf = (cbuf + 1) & 3;
     memset(buf[cbuf], 0, 256);

@@ -1558,8 +1558,8 @@ void int21()
             int pb = cpuGetAddrES(cpuGetBX());
             int cmd_addr = cpuGetAddress(get16(pb + 4), get16(pb + 2));
             int clen = memory[cmd_addr];
-            char *cmdline = getstr(cmd_addr, clen);
-            debug(debug_dos, "\texec command line: '%s %.*s'\n", fname, clen, cmdline);
+            char *cmdline = getstr(cmd_addr + 1, clen);
+            debug(debug_dos, "\texec command line: '%s %.*s'\n", prgname, clen, cmdline);
             char *env = "\0\0";
             if(get16(pb) != 0)
             {
