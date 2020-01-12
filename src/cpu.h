@@ -19,9 +19,17 @@
 
 #include <stdint.h>
 
-// Enable/disable 8086 stack emulation, used by some software
-// to detect if the CPU is an 80186 and up.
-//#define CPU_8086
+// Enable/disable 80286 stack emulation, 80286 and higher push the old value of
+// SP, 8086/80186 push new value.
+//
+// This is used by some software to detect extra instructions that are present
+// in the 80186 also, so we emulate this even if no 80286 instructions are
+// supported.
+#define CPU_PUSH_80286
+
+// Enable 80186 shift behaviour - shift count is modulo 32.
+// This is used in some software to detect 80186 and higher.
+#define CPU_SHIFT_80186
 
 enum
 {

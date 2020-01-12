@@ -110,18 +110,16 @@ static uint32_t GetAbsAddrSeg(int seg, uint16_t off)
         return sregs[seg] * 16 + off;
 }
 
-#ifdef CPU_8086
 static void PushWord(uint16_t w)
 {
     wregs[SP] -= 2;
     SetMemW(SS, wregs[SP], w);
 }
-#else // 80186 and up
-static void PushWord(uint16_t w)
-{
-    SetMemW(SS, wregs[SP] - 2, w);
-    wregs[SP] -= 2;
-}
+
+#ifdef CPU_PUSH_80286
+#  define PUSH_SP() PushWord(wregs[SP]); break;
+#else
+#  define PUSH_SP() PushWord(wregs[SP] - 2); break;
 #endif
 
 static uint16_t PopWord(void)
@@ -1390,7 +1388,10 @@ static uint8_t shift1_b(uint8_t val, int ModRM)
 
 static uint8_t shifts_b(uint8_t val, int ModRM, unsigned count)
 {
+
+#ifdef CPU_SHIFT_80186
     count &= 0x1F;
+#endif
 
     if(!count)
         return val; // No flags affected.
@@ -1542,7 +1543,9 @@ static uint16_t shift1_w(uint16_t val, int ModRM)
 
 static uint16_t shifts_w(uint16_t val, int ModRM, unsigned count)
 {
+#ifdef CPU_SHIFT_80186
     count &= 0x1F;
+#endif
 
     if(!count)
         return val; // No flags affected.
@@ -2362,7 +2365,7 @@ static void do_instruction(uint8_t code)
     case 0x51: PUSH_WR(CX);
     case 0x52: PUSH_WR(DX);
     case 0x53: PUSH_WR(BX);
-    case 0x54: PUSH_WR(SP);
+    case 0x54: PUSH_SP();
     case 0x55: PUSH_WR(BP);
     case 0x56: PUSH_WR(SI);
     case 0x57: PUSH_WR(DI);
