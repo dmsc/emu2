@@ -1,6 +1,7 @@
 #include "keyb.h"
 #include "dbg.h"
 #include "emu.h"
+#include "codepage.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -307,15 +308,6 @@ static int get_esc_secuence(void)
     }
 }
 
-static int val_utf(int x)
-{
-    // TODO: recode to dos codepage!
-    if(x < 0x100)
-        return add_scancode(x);
-    else
-        return 0;
-}
-
 static int read_key(void)
 {
     char ch = 0xFF;
@@ -338,7 +330,7 @@ static int read_key(void)
         char ch1 = 0xFF;
         if(read(tty_fd, &ch1, 1) == 0 || (ch1 & 0xC0) != 0x80)
             return 0; // INVALID UTF-8
-        return val_utf(((ch & 0x1F) << 6) | (ch1 & 0x3F));
+        return get_dos_char(((ch & 0x1F) << 6) | (ch1 & 0x3F));
     }
     else if((ch & 0xF0) == 0xE0)
     {
@@ -346,8 +338,8 @@ static int read_key(void)
         if(read(tty_fd, &ch1, 1) == 0 || (ch1 & 0xC0) != 0x80 ||
            read(tty_fd, &ch2, 1) == 0 || (ch2 & 0xC0) != 0x80)
             return -1; // INVALID UTF-8
-        return val_utf(((ch & 0x0F) << 12) | ((ch1 & 0x3F) << 6) |
-                       (ch2 & 0x3F));
+        return get_dos_char(((ch & 0x0F) << 12) | ((ch1 & 0x3F) << 6) |
+                            (ch2 & 0x3F));
     }
     else if((ch & 0xF8) == 0xF0)
     {
@@ -356,8 +348,8 @@ static int read_key(void)
            read(tty_fd, &ch2, 1) == 0 || (ch2 & 0xC0) != 0x80 ||
            read(tty_fd, &ch3, 1) == 0 || (ch3 & 0xC0) != 0x80)
             return -1; // INVALID UTF-8
-        return val_utf(((ch & 0x07) << 18) | ((ch1 & 0x3F) << 12) |
-                       ((ch2 & 0x3F) << 6) | (ch3 & 0x3F));
+        return get_dos_char(((ch & 0x07) << 18) | ((ch1 & 0x3F) << 12) |
+                            ((ch2 & 0x3F) << 6) | (ch3 & 0x3F));
     }
     else
         return 0; // INVALID UTF-8

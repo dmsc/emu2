@@ -1,3 +1,4 @@
+#include "codepage.h"
 #include "dos.h"
 #include "dbg.h"
 #include "dosnames.h"
@@ -1861,6 +1862,7 @@ void init_dos(int argc, char **argv)
     memset(environ, 0, sizeof(environ));
 
     init_handles();
+    init_codepage();
     init_nls_data();
 
     // Init INTERRUPT handlers - point to our own handlers

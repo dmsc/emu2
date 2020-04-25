@@ -7,4 +7,4 @@
 #define ENV_DEF_DRIVE "EMU2_DEFAULT_DRIVE"
 #define ENV_CWD       "EMU2_CWD"
 #define ENV_DRIVE     "EMU2_DRIVE_"
-
+#define ENV_CODEPAGE  "EMU2_CODEPAGE"

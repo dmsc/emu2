@@ -29,13 +29,15 @@ void print_usage(void)
            "  %-18s  DOS current working directory, use 'C:\\' if not given.\n"
            "  %-18s  Set unix path as root of drive 'n', by default all drives\n"
            "\t\t      point to the unix working directory.\n"
+           ". %-18s  Set DOS code-page. Set to '?' to show lost of code-pages.\n"
            , prog_name
            , ENV_DBG_NAME
            , ENV_DBG_OPT
            , ENV_PROGNAME
            , ENV_DEF_DRIVE
            , ENV_CWD
-           , ENV_DRIVE "n");
+           , ENV_DRIVE "n"
+           , ENV_CODEPAGE);
     exit(EXIT_SUCCESS);
 }
 
