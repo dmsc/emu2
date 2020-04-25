@@ -42,6 +42,16 @@ The available environment variables are:
 - `EMU2_DRIVE_`n       Set unix path as root of drive `n`, by default all drives
                        point to the unix working directory.
 
+- `EMU2_CODEPAGE`      Set DOS code-page to the specified string. Set to '?' to
+                       show list of included code-pages, multiple aliases
+                       separeted with commas.  Set to a file name to read the
+                       mapping table from a file with the unicode value for
+                       each byte.  You can download mapping tables from
+                       ftp://ftp.unicode.org/Public/MAPPINGS/VENDORS/MICSFT/PC/
+                       The code-page setting affects keyboard input and screen
+                       output, but does not change the DOS NLS information.
+                       The default code-page is CP437.
+
 Simple Example
 --------------
 
