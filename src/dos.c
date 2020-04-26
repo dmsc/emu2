@@ -1010,6 +1010,24 @@ void int21()
         put16(4 * (ax & 0xFF), cpuGetDX());
         put16(4 * (ax & 0xFF) + 2, cpuGetDS());
         break;
+    case 0x26: // Create PSP (allocate segment (singleton), and copy PSP)
+    {
+        uint8_t *new_base = getptr(cpuGetAddress(cpuGetDX(),0), 0x100);
+        uint8_t *orig = getptr(cpuGetAddress(get_current_PSP(),0), 0x100);
+        if (!new_base || !orig)
+        {
+            debug(debug_dos, "\tinvalid new PSP segment %04x.\n", cpuGetDX());
+            break;
+        }
+        // Copy PSP to the new segment, 0x80 is what DOS does - this excludes command line
+        memcpy(new_base,orig, 0x80);
+        debug(debug_dos, "\tnew PSP segment %04x.\n", cpuGetDX());
+        debug(debug_dos, "\tnew PSP size %02x%02x.\n", new_base[7], new_base[6]);
+        debug(debug_dos, "\toriginal PSP segment %04x.\n", get_current_PSP());
+        debug(debug_dos, "\toriginal PSP size %02x%02x.\n", orig[7], orig[6]);
+        // TODO: Initialize PSP values: int 22h, 23h, 24h and parent PSP segment to 0
+        break;
+    }
     case 0x27: // BLOCK READ FROM FCB
     case 0x28: // BLOCK WRITE TO FCB
     {
