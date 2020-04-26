@@ -2550,6 +2550,7 @@ void execute(void)
 }
 
 // Set CPU registers from outside
+void cpuSetAL(unsigned v) { wregs[AX] = (wregs[AX] & 0xFF00) | (v & 0xFF); }
 void cpuSetAX(unsigned v) { wregs[AX] = v; }
 void cpuSetCX(unsigned v) { wregs[CX] = v; }
 void cpuSetDX(unsigned v) { wregs[DX] = v; }

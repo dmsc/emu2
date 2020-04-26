@@ -269,7 +269,7 @@ static void dos_open_file_fcb(int create)
     int h = get_new_handle();
     if(!h)
     {
-        cpuSetAX(0xFF);
+        cpuSetAL(0xFF);
         cpuSetFlag(cpuFlag_CF);
         return;
     }
@@ -278,7 +278,7 @@ static void dos_open_file_fcb(int create)
     if(!fname)
     {
         debug(debug_dos, "\t(file not found)\n");
-        cpuSetAX(0xFF);
+        cpuSetAL(0xFF);
         cpuSetFlag(cpuFlag_CF);
         return;
     }
@@ -288,7 +288,7 @@ static void dos_open_file_fcb(int create)
     if(!handles[h])
     {
         debug(debug_dos, "%s.\n", strerror(errno));
-        cpuSetAX(0xFF);
+        cpuSetAL(0xFF);
         cpuSetFlag(cpuFlag_CF);
         free(fname);
         return;
@@ -308,7 +308,7 @@ static void dos_open_file_fcb(int create)
 
     debug(debug_dos, "OK.\n");
     cpuClrFlag(cpuFlag_CF);
-    cpuSetAX(0x00);
+    cpuSetAL(0x00);
     dos_show_fcb();
     free(fname);
 }
@@ -601,7 +601,7 @@ static void dos_find_next_fcb(void)
     {
         debug(debug_dos, "\t(end)\n");
         clear_find_first_dta(p);
-        cpuSetAX(0xFF);
+        cpuSetAL(0xFF);
     }
     else
     {
@@ -646,7 +646,7 @@ static void dos_find_next_fcb(void)
             put32(ofcb+0x1D, 0);
         }
         p->find_first_ptr++;
-        cpuSetAX(0x00);
+        cpuSetAL(0x00);
     }
 }
 
@@ -715,8 +715,7 @@ static void dos_get_drive_info(uint8_t drive)
         drive = dos_get_default_drive();
     else
         drive --;
-    uint16_t ah = cpuGetAX() & 0xFF00;
-    cpuSetAX(ah + 32);// 16k clusters
+    cpuSetAL(32);     // 16k clusters
     cpuSetCX(512);    // 512 bytes/sector
     cpuSetDX(0xFFFF); // total 1GB
     cpuSetBX(0x0000); // media ID byte, offset
@@ -742,7 +741,7 @@ static void int21_9(void)
     for(; memory[i] != 0x24 && i<0x100000; i++)
         dos_putchar(memory[i]);
 
-    cpuSetAX((cpuGetAX() & 0xFF00) | 0x24);
+    cpuSetAL(0x24);
 }
 
 static int return_code;
@@ -837,7 +836,7 @@ static void char_input(int brk)
             last_key = getch(brk);
     }
     debug(debug_dos, "\tgetch = %02x '%c'\n", last_key, (char)last_key);
-    cpuSetAX((last_key & 0xFF) | (cpuGetAX() & 0xFF00));
+    cpuSetAL(last_key);
     if( (last_key & 0xFF) == 0 )
         last_key = last_key >> 8;
     else
@@ -906,7 +905,7 @@ void int21()
         else
         {
             dos_putchar(cpuGetDX() & 0xFF);
-            cpuSetAX((ax & 0xFF00) | (cpuGetDX() & 0xFF));
+            cpuSetAL(cpuGetDX());
         }
         break;
     case 0x7: // DIRECT CHARACTER INPUT WITHOUT ECHO
@@ -967,7 +966,8 @@ void int21()
         break;
     case 0x10: // CLOSE FILE USING FCB
         dos_show_fcb();
-        cpuSetAX(dos_close_file(get_fcb_handle()) ? 0xFF : 0);
+        // Set full AX because dos_close_file clobbers AX
+        cpuSetAX(dos_close_file(get_fcb_handle()) ? 0x10FF : 0x1000);
         break;
     case 0x11: // FIND FIRST FILE USING FCB
         dos_find_first_fcb();
@@ -977,18 +977,18 @@ void int21()
         break;
     case 0x14: // SEQUENTIAL READ USING FCB
         dos_show_fcb();
-        cpuSetAX(dos_read_record_fcb(dosDTA, 1));
+        cpuSetAL(dos_read_record_fcb(dosDTA, 1));
         break;
     case 0x15: // SEQUENTIAL WRITE USING FCB
         dos_show_fcb();
-        cpuSetAX(dos_write_record_fcb(dosDTA, 1));
+        cpuSetAL(dos_write_record_fcb(dosDTA, 1));
         break;
     case 0x16: // CREATE FILE USING FCB
         dos_open_file_fcb(1);
         break;
     case 0x19: // GET DEFAULT DRIVE
         debug(debug_dos, "\tget default drive = '%c'\n", dos_get_default_drive() + 'A');
-        cpuSetAX(dos_get_default_drive());
+        cpuSetAL(dos_get_default_drive());
         break;
     case 0x1A: // SET DTA
         dosDTA = 0xFFFFF & (cpuGetDS() * 16 + cpuGetDX());
@@ -1001,11 +1001,11 @@ void int21()
         break;
     case 0x21: // RANDOM READ USING FCB
         dos_show_fcb();
-        cpuSetAX(dos_read_record_fcb(dosDTA, 0));
+        cpuSetAL(dos_read_record_fcb(dosDTA, 0));
         break;
     case 0x22: // RANDOM WRITE USING FCB
         dos_show_fcb();
-        cpuSetAX(dos_write_record_fcb(dosDTA, 0));
+        cpuSetAL(dos_write_record_fcb(dosDTA, 0));
         break;
     case 0x25: // set interrupt vector
         put16(4 * (ax & 0xFF), cpuGetDX());
@@ -1053,7 +1053,7 @@ void int21()
             }
         }
         cpuSetCX(cpuGetCX() - count);
-        cpuSetAX(e);
+        cpuSetAL(e);
         dos_show_fcb();
         break;
     }
@@ -1066,7 +1066,7 @@ void int21()
         if(!dst)
         {
             debug(debug_dos, "\tinvalid destination\n");
-            cpuSetAX(cpuGetAX() | 0x00FF);
+            cpuSetAL(0xFF);
             break;
         }
         debug(debug_dos, "\t'%s' -> ", fname);
@@ -1140,7 +1140,7 @@ void int21()
             cpuSetDS(cpuGetDS() + 1);
         }
         cpuSetSI((si));
-        cpuSetAX((ax & 0xFF00) + ret);
+        cpuSetAL(ret);
         debug(debug_dos, "%c:'%.11s'\n", dst[0]?dst[0]+'@':'*',dst+1);
         break;
     }
@@ -1150,14 +1150,14 @@ void int21()
         struct tm lt;
         if(localtime_r(&tm, &lt))
         {
-            cpuSetAX(0x2A00 + lt.tm_wday);
+            cpuSetAL(lt.tm_wday);
             cpuSetCX(lt.tm_year + 1900);
             cpuSetDX(((lt.tm_mon + 1) << 8) | (lt.tm_mday));
         }
         break;
     }
     case 0x2B: // SET SYSTEM DATE
-        cpuSetAX(0x2BFF); // Invalid date - don't support setting date.
+        cpuSetAL(0xFF); // Invalid date - don't support setting date.
         break;
     case 0x2C: // GET SYSTEM TIME
     {
@@ -1176,7 +1176,7 @@ void int21()
         break;
     }
     case 0x2D: // SET SYSTEM TIME
-        cpuSetAX(0x2DFF); // Invalid time - don't support setting time.
+        cpuSetAL(0xFF); // Invalid time - don't support setting time.
         break;
     case 0x2F: // GET DTA
         cpuSetES((dosDTA & 0xFFF00) >> 4);

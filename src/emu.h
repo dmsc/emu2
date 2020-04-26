@@ -32,6 +32,7 @@ void emulator_update(void);
 void cpuTriggerIRQ(int num);
 
 // Register reading/writing
+void cpuSetAL(unsigned v);
 void cpuSetAX(unsigned v);
 void cpuSetCX(unsigned v);
 void cpuSetDX(unsigned v);
