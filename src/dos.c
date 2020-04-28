@@ -775,7 +775,7 @@ static int run_emulator(char *file, const char *prgname, char *cmdline, char *en
         setenv(ENV_PROGNAME, prgname, 1);
         // default drive
         char drv[2] = { 0, 0 };
-        drv[1] = dos_get_default_drive() + 'A';
+        drv[0] = dos_get_default_drive() + 'A';
         setenv(ENV_DEF_DRIVE, drv, 1);
         // and CWD
         setenv(ENV_CWD, (const char *)dos_get_cwd(dos_get_default_drive()), 1);
