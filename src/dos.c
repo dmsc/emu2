@@ -883,6 +883,26 @@ static void int21_debug(void)
 // DOS int
 void int21()
 {
+    // Check CP/M call, INT 21h from address 0x000C0
+    if(cpuGetAddress(cpuGetStack(2), cpuGetStack(0)) == 0xC2)
+    {
+        debug(debug_dos, "CP/M CALL: ");
+        int old_ax = cpuGetAX();
+        int ip = cpuGetStack(10), cs = cpuGetStack(8), flags = cpuGetStack(4);
+        // Fix-up registers
+        cpuSetAX((cpuGetCX() << 8) | (old_ax & 0xFF));
+        cpuSetSP(cpuGetSP() + 6);
+        // Fix-up return address, interchanges segment/ip:
+        int stack = cpuGetAddress(cpuGetSS(), cpuGetSP());
+        put16(stack, ip);
+        put16(stack+2, cs);
+        put16(stack+4, flags);
+        // Call ourselves
+        int21();
+        // Restore AH
+        cpuSetAX( (old_ax & 0xFF00) | (cpuGetAX() & 0xFF) );
+        return;
+    }
     debug(debug_int, "D-21%04X: BX=%04X\n", cpuGetAX(), cpuGetBX());
     if(debug_active(debug_dos))
         int21_debug();
@@ -1873,6 +1893,10 @@ void init_dos(int argc, char **argv)
         memory[i * 4 + 2] = 0;
         memory[i * 4 + 3] = 0;
     }
+
+    // Patch an INT 21 at address 0x000C0, this is for the CP/M emulation code
+    memory[0x000C0] = 0xCD;
+    memory[0x000C1] = 0x21;
 
     // Init memory handling - available start address at 0x800,
     // ending address at 0xA0000.

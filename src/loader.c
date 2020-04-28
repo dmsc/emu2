@@ -279,6 +279,11 @@ uint16_t create_PSP(const char *cmdline, const char *environment,
     dosPSP[1] = 0x20;
     dosPSP[2] = 0x00;                   // 02: memory end segment
     dosPSP[3] = 0x00;                   //
+    dosPSP[5] = 0x9A;                   // 05: FAR call to CP/M entry point:
+    dosPSP[6] = 0xF0;                   //       CALL FAR F01D:FEF0
+    dosPSP[7] = 0xFE;                   //     this jumps to 0xC0, where an
+    dosPSP[8] = 0x1D;                   //     INT 21h is patched.
+    dosPSP[9] = 0xF0;
     dosPSP[44] = 0xFF & env_seg;        // 2C: environment segment
     dosPSP[45] = 0xFF & (env_seg >> 8); //
     dosPSP[80] = 0xCD;                  // 50: INT 21h / RETF
