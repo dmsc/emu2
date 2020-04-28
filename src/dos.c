@@ -778,7 +778,7 @@ static int run_emulator(char *file, const char *prgname, char *cmdline, char *en
         drv[0] = dos_get_default_drive() + 'A';
         setenv(ENV_DEF_DRIVE, drv, 1);
         // and CWD
-        setenv(ENV_CWD, (const char *)dos_get_cwd(dos_get_default_drive()), 1);
+        setenv(ENV_CWD, (const char *)dos_get_cwd(0), 1);
         // pass open file descriptors to child process
         for(unsigned i = 0; i < 3; i++)
             if(handles[i])
