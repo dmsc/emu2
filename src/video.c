@@ -25,6 +25,7 @@ static unsigned term_posx, term_posy, term_color, term_cursor;
 static unsigned term_sx, term_sy;
 // Current emulated video sizes and cursor position
 static unsigned vid_sx, vid_sy, vid_posx, vid_posy, vid_cursor, vid_color;
+static unsigned vid_no_blank;
 // Signals that the terminal size needs updating
 static volatile int term_needs_update;
 // Terminal FD, allows video output even with redirection.
@@ -92,13 +93,16 @@ static void clear_terminal(void)
     putc('\r', tty_file); // Go to column 0
 }
 
-static void clear_screen(void)
+static void set_text_mode(int clear)
 {
-    debug(debug_video, "clear video screen\n");
+    debug(debug_video, "set text mode%s\n", clear ? " and clear" : "");
     // Clear video screen
-    uint16_t *vm = (uint16_t *)(memory + 0xB8000);
-    for(int i = 0; i < 16384; i++)
-        vm[i] = 0x0720;
+    if(clear)
+    {
+        uint16_t *vm = (uint16_t *)(memory + 0xB8000);
+        for(int i = 0; i < 16384; i++)
+            vm[i] = 0x0720;
+    }
     vid_posx = 0;
     vid_posy = 0;
     vid_color = 0x07;
@@ -147,7 +151,7 @@ static void init_video(void)
     video_initialized = 1;
 
     // Set video mode
-    clear_screen();
+    set_text_mode(1);
     clear_terminal();
     term_needs_update = 0;
     term_cursor = 1;
@@ -431,10 +435,13 @@ void int10()
     switch(ax >> 8)
     {
     case 0x00: // SET VIDEO MODE
-        if((ax & 0xFF) > 3)
+        if((ax & 0x7F) > 3)
             debug(debug_video, "-> SET GRAPHICS MODE %x<-\n", ax & 0xFF);
         else
-            clear_screen();
+        {
+            set_text_mode((ax & 0x80) == 0);
+            vid_no_blank = ax & 0x80;
+        }
         break;
     case 0x01:                              // SET CURSOR SHAPE
         if((cpuGetCX() & 0x6000) == 0x2000) // Hide cursor
