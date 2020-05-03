@@ -200,6 +200,9 @@ static void term_goto_xy(unsigned x, unsigned y)
     if(term_posy < y)
     {
         putc('\r', tty_file);
+        // Set background color to black, as some terminals insert lines with
+        // the current background color.
+        set_color(term_color & 0x0F);
         // TODO: Draw new line with background color from video screen
         for(unsigned i = term_posy; i < y; i++)
             putc('\n', tty_file);
@@ -231,8 +234,8 @@ static void term_goto_xy(unsigned x, unsigned y)
 // Outputs a character with the given attributes at the given position
 static void put_vc_xy(uint8_t vc, uint8_t color, unsigned x, unsigned y)
 {
-    set_color(color);
     term_goto_xy(x, y);
+    set_color(color);
 
     put_vc(vc);
     term_posx++;
