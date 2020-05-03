@@ -79,6 +79,7 @@ static void update_posxy(void)
 // Clears the terminal data - not the actual terminal screen
 static void clear_terminal(void)
 {
+    debug(debug_video, "clear terminal shadow\n");
     // Clear screen terminal:
     for(int y = 0; y < 64; y++)
         for(int x = 0; x < 256; x++)
@@ -336,7 +337,7 @@ static void vid_scroll_up(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1,
 static void vid_scroll_dwn(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1,
                            unsigned n)
 {
-    debug(debug_video, "scroll up %d: (%d, %d) - (%d, %d)\n", n,
+    debug(debug_video, "scroll down %d: (%d, %d) - (%d, %d)\n", n,
           x0, y0, x1, y1);
 
     // Check parameters
@@ -423,6 +424,7 @@ void video_putch(char ch)
 void int10()
 {
     debug(debug_int, "V-10%04X: BX=%04X\n", cpuGetAX(), cpuGetBX());
+    debug(debug_video, "V-10%04X: BX=%04X\n", cpuGetAX(), cpuGetBX());
     if(!video_initialized)
         init_video();
     unsigned ax = cpuGetAX();
@@ -596,6 +598,6 @@ void int10()
         // Ignored
         break;
     default:
-        debug(debug_int, "UNHANDLED INT 10, AX=%04x\n", ax);
+        debug(debug_video, "UNHANDLED INT 10, AX=%04x\n", ax);
     }
 }
