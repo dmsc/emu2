@@ -608,3 +608,37 @@ void int10()
         debug(debug_video, "UNHANDLED INT 10, AX=%04x\n", ax);
     }
 }
+
+// CRTC port emulation, some software use it to fix "snow" in CGA modes.
+static uint8_t crtc_port;
+static uint16_t crtc_cursor_loc;
+
+uint8_t video_crtc_read(int port)
+{
+    if(port & 1)
+    {
+        if( crtc_port == 0x0E )
+            return crtc_cursor_loc >> 8;
+        if( crtc_port == 0x0F )
+            return crtc_cursor_loc;
+        else
+            return 0;
+    }
+    else
+        return crtc_port;
+}
+
+void video_crtc_write(int port, uint8_t value)
+{
+    if(port & 1)
+    {
+        if( crtc_port == 0x0E )
+            crtc_cursor_loc = (crtc_cursor_loc & 0xFF) | (value << 8);
+        if( crtc_port == 0x0F )
+            crtc_cursor_loc = (crtc_cursor_loc & 0xFF00) | (value);
+        else
+            debug(debug_video, "CRTC port write [%02x] <- %02x\n", crtc_port, value);
+    }
+    else
+        crtc_port = value;
+}

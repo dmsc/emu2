@@ -27,8 +27,8 @@ uint8_t read_port(unsigned port)
         retrace++;
         return retrace & 0x09;
     }
-    else if(port == 0x3D5)
-        return 0;
+    else if(port == 0x3D4 || port == 0x3D5)
+        return video_crtc_read(port);
     else if(port >= 0x40 && port <= 0x43)
         return port_timer_read(port);
     else if(port >= 0x60 && port <= 0x65)
@@ -41,7 +41,10 @@ void write_port(unsigned port, uint8_t value)
 {
     if(port >= 0x40 && port <= 0x43)
         return port_timer_write(port, value);
-    debug(debug_port, "port write %04x <- %02x\n", port, value);
+    else if(port == 0x03D4 || port == 0x03D5)
+        return video_crtc_write(port, value);
+    else
+        debug(debug_port, "port write %04x <- %02x\n", port, value);
 }
 
 void emulator_update(void)
