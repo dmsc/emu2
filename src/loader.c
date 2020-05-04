@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 
 // Main Memory (17 * 64K, no overlap)
 uint8_t memory[0x110000];
@@ -13,6 +14,313 @@ uint16_t mcb_start = 0x40;
 uint8_t mcb_alloc_st = 0;
 // PSP (Program Segment Prefix) location
 uint16_t current_PSP;
+
+#define FCB_PARSE_DOS (3)
+
+int valid_fcb_sep(int i)
+{
+    return isspace(i) || i == ',' || i=='=' || (FCB_PARSE_DOS > 1 && i==';');
+}
+
+int valid_fcb_char(int i)
+{
+    return isalnum(i) || (i > 127 && i < 229) || (i > 229) ||
+           (i == '\\' && FCB_PARSE_DOS == 1) || strchr("!#$%&'()-@^_`{}~?<>", i);
+}
+
+#define FCB_PARSE_INIT 0
+#define FCB_PARSE_INIT_PLUS 10
+#define FCB_PARSE_FCB1 1
+#define FCB_PARSE_FCB1_EXT 2
+#define FCB_PARSE_SEP 3
+#define FCB_PARSE_SEP_PLUS 13
+#define FCB_PARSE_SEP_PURGE 23
+#define FCB_PARSE_FCB2 4
+#define FCB_PARSE_FCB2_EXT 5
+#define FCB_PARSE_EXIT 6
+
+void cmdline_to_fcb(const char *cmd_line, uint8_t *fcb1, uint8_t *fcb2) {
+    int i = 0;
+    int state = FCB_PARSE_INIT;
+    uint8_t *offset = fcb1 + 1;
+    *fcb1 = 0;
+    *fcb2 = 0;
+    memset(fcb1 + 1, ' ', 11);
+    memset(fcb2 + 1, ' ', 11);
+    while (cmd_line[i]) {
+        int c=cmd_line[i];
+        if(FCB_PARSE_DOS == 1 && c==';') {
+            c='+';
+        }
+        switch (state) {
+        case FCB_PARSE_INIT:
+        case FCB_PARSE_INIT_PLUS:
+            switch (c) {
+            case '.':
+                offset = fcb1 + 9;
+                state = FCB_PARSE_FCB1_EXT;
+                break;
+            case '+':
+               if (state == FCB_PARSE_INIT) {
+                    state = FCB_PARSE_INIT_PLUS;
+                } else {
+                    offset = fcb2 + 1;
+                    state = (FCB_PARSE_DOS == 1)?FCB_PARSE_SEP:FCB_PARSE_SEP_PURGE;
+                }
+                break;
+            case '*':
+                for (int j = 0; j < 8; j++) {
+                    fcb1[j + 1] = '?';
+                }
+                offset = fcb1 + 9;
+                break;
+            default:
+                if (valid_fcb_sep(c)) {
+                    if(FCB_PARSE_DOS > 1 && state == FCB_PARSE_INIT_PLUS 
+                        && (FCB_PARSE_DOS>2 || !isspace(c))) {
+                        offset = fcb2 + 1;
+                        state = FCB_PARSE_SEP_PURGE;
+                        i--;                
+                    }
+                    break;
+                }
+                if (valid_fcb_char(c)) {
+                    if (cmd_line[i + 1] == ':') {
+                        *fcb1 = toupper(c) - 'A' + 1;
+                        i++;
+                    } else {
+                        *offset = toupper(c);
+                        offset++;
+                    }
+                    state = FCB_PARSE_FCB1;
+                } else {
+                    if(FCB_PARSE_DOS == 1) {
+                        state = FCB_PARSE_EXIT;
+                    } else {
+                        offset = fcb2 +1;
+                        state = FCB_PARSE_SEP_PURGE;
+                    }
+                }
+                break;
+            } 
+            break;
+        case FCB_PARSE_FCB1:
+            switch (c) {
+            case '.':
+                offset = fcb1 + 9;
+                state = FCB_PARSE_FCB1_EXT;
+                break;
+            case '*':
+                while (offset - fcb1 - 1 < 8) {
+                    *offset = '?';
+                    offset++;
+                }
+                break;
+#if FCB_PARSE_DOS == 1
+            case '+':
+            case ';':
+                offset = fcb2 + 1;
+                state = FCB_PARSE_SEP_PLUS;
+                break;
+            case ':':
+                offset = fcb2 + 1;
+                state = FCB_PARSE_FCB2;
+                break;
+#endif
+            default:
+                if (valid_fcb_sep(c)) {
+                    offset = fcb2 + 1;
+                    state = FCB_PARSE_SEP;
+                    break;
+                }
+                if (!valid_fcb_char(c)) {
+                    offset = fcb2 + 1;
+                    if(FCB_PARSE_DOS == 1) {
+                        state = FCB_PARSE_EXIT;
+                    } else {
+                        offset = fcb2 + 1;
+                        state = FCB_PARSE_SEP_PURGE;
+                    }
+                    break;
+                }
+                if (offset - fcb1 - 1 < 8) {
+                    *offset = toupper(c);
+                    offset++;
+                }
+                break;
+            }
+            break;
+        case FCB_PARSE_FCB1_EXT:
+            switch (c) {
+            case '.':
+                if(FCB_PARSE_DOS == 1) {
+                    offset = fcb2 + 9;
+                    state = FCB_PARSE_FCB2_EXT;
+                } else {
+                    offset = fcb2 + 1;
+                    state = FCB_PARSE_SEP_PURGE;
+                }
+                break;
+            case '*':
+                while (offset - fcb1 - 9 < 3) {
+                    *offset = '?';
+                    offset++;
+                }
+                break;
+#if FCB_PARSE_DOS == 1
+            case ';':
+            case '+':
+                offset = fcb2 + 1;
+                state = FCB_PARSE_SEP_PLUS;
+                break;
+            case ':':
+                offset = fcb2 + 1;
+                state = FCB_PARSE_FCB2;
+                break;
+#endif
+            default:
+                if (valid_fcb_sep(c)) {
+                    offset = fcb2 + 1;
+                    state = FCB_PARSE_SEP;
+                    break;
+                }
+                if (!valid_fcb_char(c)) {
+                    if(FCB_PARSE_DOS == 1) {
+                        state = FCB_PARSE_EXIT;
+                    } else {
+                        offset = fcb2 + 1;
+                        state = FCB_PARSE_SEP_PURGE;
+                    }
+                    break;
+                }
+                if (offset - fcb1 - 9 < 3) {
+                    *offset = toupper(c);
+                    offset++;
+                }
+                break;
+            }
+            break;
+        case FCB_PARSE_SEP_PURGE:
+            if (valid_fcb_sep(c)) {
+                state = FCB_PARSE_SEP;
+                i--;
+                break;
+            }
+            break;
+        case 3:
+        case 13:
+            switch (c) {
+            case '.':
+                offset = fcb2 + 9;
+                state = FCB_PARSE_FCB2_EXT;
+                break;
+            case '+':
+                if (state == FCB_PARSE_SEP) {
+                    state = FCB_PARSE_SEP_PLUS;
+                } else {
+                   state = FCB_PARSE_EXIT;
+                }
+                break;
+            case '*':
+                for (int j = 0; j < 8; j++) {
+                    fcb2[j + 1] = '?';
+                }
+                break;
+            default:
+                if (valid_fcb_sep(c)) {
+                    if(FCB_PARSE_DOS > 2 && state == FCB_PARSE_SEP_PLUS) {
+                        state = FCB_PARSE_EXIT;
+                    }
+                    break;
+                }
+                if (valid_fcb_char(c)) {
+                    if (cmd_line[i + 1] == ':') {
+                        *fcb2 = toupper(c) - 'A' + 1;
+                        i++;
+                    } else {
+                        *offset = toupper(c);
+                        offset++;
+                    }
+                    state = FCB_PARSE_FCB2;
+                } else {
+                    state = FCB_PARSE_EXIT;
+                }
+                break;
+            }
+            break;
+        case FCB_PARSE_FCB2:
+           switch (c) {
+            case '.':
+                offset = fcb2 + 9;
+                state = FCB_PARSE_FCB2_EXT;
+                break;
+            case '*':
+                while (offset - fcb2 - 1 < 8) {
+                    *offset = '?';
+                    offset++;
+                }
+                break;
+            case '+':
+            case ';':
+            case ':':
+                state = FCB_PARSE_EXIT;
+                break;
+            default:
+                if (valid_fcb_sep(c)) {
+                    state = FCB_PARSE_EXIT;
+                    break;
+                }
+                if (!valid_fcb_char(c)) {
+                    state = FCB_PARSE_EXIT;
+                    break;
+                }
+                if (offset - fcb2 - 1 < 8) {
+                    *offset = toupper(c);
+                    offset++;
+                }
+                break;
+            }
+            break;
+        case FCB_PARSE_FCB2_EXT:
+            switch (c) {
+            case '*':
+                while (offset - fcb2 - 9 < 3) {
+                    *offset = '?';
+                    offset++;
+                }
+                state = FCB_PARSE_EXIT;
+                break;
+            case '.':
+            case '+':
+            case ';':
+            case ':':
+                state = FCB_PARSE_EXIT;
+                break;
+            default:
+                if (valid_fcb_sep(c)) {
+                    state = FCB_PARSE_EXIT;
+                    break;
+                }
+                if (!valid_fcb_char(c)) {
+                    state = FCB_PARSE_EXIT;
+                    break;
+                }
+                if (offset - fcb2 - 9 < 3) {
+                    *offset = toupper(c);
+                    offset++;
+                }
+                break;
+            }
+            break;
+        default:
+            break;
+        }
+        if (state == FCB_PARSE_EXIT) {
+            break;
+        }
+        i++;
+    }
+}
 
 // Mem handling
 static void mcb_new(int mcb, int owner, int size, int last)
@@ -307,6 +615,7 @@ uint16_t create_PSP(const char *cmdline, const char *environment,
             l = 63;
         memcpy(memory + env_seg * 16 + env_size + 2, progname, l);
     }
+    cmdline_to_fcb(cmdline,dosPSP+0x5C,dosPSP+0x6C);
     return psp_mcb;
 }
 
