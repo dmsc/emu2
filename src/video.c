@@ -25,7 +25,7 @@ static unsigned term_posx, term_posy, term_color, term_cursor;
 static unsigned term_sx, term_sy;
 // Current emulated video sizes and cursor position
 static unsigned vid_sx, vid_sy, vid_posx, vid_posy, vid_cursor, vid_color;
-static unsigned vid_no_blank;
+static unsigned vid_font_lines, vid_no_blank;
 // Signals that the terminal size needs updating
 static volatile int term_needs_update;
 // Terminal FD, allows video output even with redirection.
@@ -110,6 +110,7 @@ static void set_text_mode(int clear)
     // TODO: support other video modes
     vid_sx = 80;
     vid_sy = 25;
+    vid_font_lines = 16;
     memory[0x449] = 0x03; // video mode
     memory[0x44A] = vid_sx;
     memory[0x484] = vid_sy - 1;
@@ -505,25 +506,74 @@ void int10()
         video_putch(ax);
         break;
     case 0x0F: // GET CURRENT VIDEO MODE
-        cpuSetAX((vid_sx << 8) | 0x0003); // 80x25 mode
+        cpuSetAX((vid_sx << 8) | 0x0003 | vid_no_blank); // 80x25 mode
         cpuSetBX(0);
         break;
     case 0x10:
         if(ax == 0x1002) // TODO: Set pallete registers - ignore
             break;
-        debug(debug_int, "UNHANDLED INT 10, AX=%04x\n", ax);
+        else if(ax == 0x1003) // TODO: Set blinking state
+            break;
+        debug(debug_video, "UNHANDLED INT 10, AX=%04x\n", ax);
         break;
     case 0x11:
         if(ax == 0x1130)
         {
             cpuSetDX((vid_sy - 1) & 0xFF);
-            cpuSetCX(0x0008);
+            cpuSetCX(vid_font_lines);
+        }
+        else if(ax == 0x1104 || ax == 0x1111 || ax == 0x1114)
+        {
+            // Clear end-of-screen
+            unsigned max = get_last_used_row();
+            debug(debug_video, "set 25 lines mode %d\n", max);
+            if (max > 25)
+            {
+                term_goto_xy(0, 24);
+                set_color(0x07);
+                fputs("\x1b[J", tty_file);
+                for(int y = 25; y < 64; y++)
+                    for(int x = 0; x < 256; x++)
+                        term_screen[y][x] = 0x0720;
+                if (output_row > 24)
+                    output_row = 24;
+            }
+            // Set 8x16 font - 80x25 mode:
+            vid_sy = 25;
+            vid_font_lines = 16;
+            memory[0x484] = vid_sy - 1;
+        }
+        else if(ax == 0x1102 || ax == 0x1112)
+        {
+            // Set 8x8 font - 80x43 or 80x50 mode:
+            debug(debug_video, "set 43/50 lines mode\n");
+            // Hack - QBASIC.EXE assumes that the mode is always 50 lines on VGA,
+            // and *sets* the height into the BIOS area!
+            if(memory[0x484]>42)
+                vid_sy = 50;
+            else
+                vid_sy = 43;
+            vid_font_lines = 8;
+            memory[0x484] = vid_sy - 1;
         }
         break;
-    case 0x12: // GET EGA INFO
-        cpuSetBX(0x0003);
-        cpuSetCX(0x0000);
-        cpuSetAX(0);
+    case 0x12: // ALT FUNCTION SELECT
+        {
+            int bl = cpuGetBX() & 0xFF;
+            if(bl == 0x10 ) // GET EGA INFO
+            {
+                cpuSetBX(0x0003);
+                cpuSetCX(0x0000);
+                cpuSetAX(0);
+            }
+            else if(bl == 0x30 ) // SET VERTICAL RESOLUTION
+            {
+                // TODO: select 25/28 lines
+                cpuSetAX(0x1212);
+            }
+            else
+                debug(debug_video, "UNHANDLED INT 10, AH=12 BL=%02x\n", bl);
+        }
         break;
     case 0x13: // WRITE STRING
         {
@@ -591,8 +641,8 @@ void int10()
                 memory[addr+30] = 0xD4;
                 memory[addr+31] = 0x03; // CRTC port: 03D4
                 memory[addr+34] = vid_sy;
-                memory[addr+35] = 0x10;
-                memory[addr+35] = 0x00; // bytes/char: 0010
+                memory[addr+35] = vid_font_lines;
+                memory[addr+36] = 0x00; // font lines: 0010
                 memory[addr+39] = 0x10;
                 memory[addr+40] = 0x00; // # of colors: 0010
                 memory[addr+42] = 2; // # of scan-lines - get from vid_sy
