@@ -151,6 +151,15 @@ static void init_video(void)
     atexit(exit_video);
     video_initialized = 1;
 
+    // Fill the functionality table
+    memory[0xC0100] = 0x08;  // Only mode 3 supported
+    memory[0xC0101] = 0x00;
+    memory[0xC0102] = 0x00;
+    memory[0xC0107] = 0x07;  // Support 300, 350 and 400 scanlines
+    memory[0xC0108] = 0x00;  // Active character blocks?
+    memory[0xC0109] = 0x00;  // MAximum character blocks?
+    memory[0xC0108] = 0xFF;  // Support functions
+
     // Set video mode
     set_text_mode(1);
     clear_terminal();
