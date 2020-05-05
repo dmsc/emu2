@@ -11,6 +11,7 @@
 #include "video.h"
 
 #include <errno.h>
+#include <fcntl.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h>
@@ -197,7 +198,17 @@ static void dos_open_file(int create)
         }
     }
     debug(debug_dos, "\topen '%s', '%s', %04x ", fname, mode, h);
-    handles[h] = fopen(fname, mode);
+    if(create == 2)
+    {
+        // Force exclusive access. We could use mode = "x+" in glibc.
+        int fd = open(fname, O_CREAT | O_EXCL | O_RDWR, 0666);
+        if(fd != -1)
+            handles[h] = fdopen(fd, mode);
+        else
+            handles[h] = 0;
+    }
+    else
+        handles[h] = fopen(fname, mode);
     if(!handles[h])
     {
         if(errno != ENOENT)
@@ -477,29 +488,30 @@ static void int21_43(void)
 // Each DTA (Data Transfer Area) in memory can hold a find-first data
 // block. We simply encode our pointer in this area and use this struct
 // to hold the values.
+#define NUM_FIND_FIRST_DTA      64
 static struct find_first_dta {
     // List of files to return and pointer to current.
     struct dos_file_list *find_first_list;
     struct dos_file_list *find_first_ptr;
     // Address of DTA in dos memory - 0 is unused
     unsigned dta_addr;
-} find_first_dta[32];
+} find_first_dta[NUM_FIND_FIRST_DTA];
 
 // Search the list an returns the position
 static struct find_first_dta *get_find_first_dta(void)
 {
     int i;
-    for(i = 0; i < 32; i++)
+    for(i = 0; i < NUM_FIND_FIRST_DTA; i++)
         if(find_first_dta[i].dta_addr == dosDTA)
             break;
-    if(i == 32)
+    if(i == NUM_FIND_FIRST_DTA)
     {
-        for(i = 0; i < 32; i++)
+        for(i = 0; i < NUM_FIND_FIRST_DTA; i++)
             if(!find_first_dta[i].dta_addr)
                 break;
-        if(i == 32)
+        if(i == NUM_FIND_FIRST_DTA)
         {
-            print_error("Too many find-first DTA areas opened");
+            print_error("Too many find-first DTA areas opened\n");
             i = 0;
         }
         find_first_dta[i].dta_addr = dosDTA;
@@ -513,7 +525,7 @@ static struct find_first_dta *get_find_first_dta(void)
 static void clear_find_first_dta(struct find_first_dta *p)
 {
     unsigned x = find_first_dta - p;
-    if(x >= 32)
+    if(x >= NUM_FIND_FIRST_DTA)
         return;
     p->dta_addr = 0;
     p->find_first_ptr = 0;
@@ -995,6 +1007,33 @@ void int21()
     case 0x12: // FIND NEXT FILE USING FCB
         dos_find_next_fcb();
         break;
+    case 0x13: // DELETE FILE USING FCB
+    {
+        dos_show_fcb();
+        /* TODO: Limited support. No wild cards */
+        int fcb_addr = get_fcb();
+        char *fname = dos_unix_path_fcb(fcb_addr, 0);
+        if(!fname)
+        {
+            debug(debug_dos, "\t(file not found)\n");
+            cpuSetAL(0xFF);
+            break;
+        }
+        debug(debug_dos, "\tdelete fcb '%s'\n", fname);
+        int e = unlink(fname);
+        free(fname);
+        if(e)
+        {
+            debug(debug_dos, "\tcould not delete file (%d).\n",errno);
+            cpuSetAL(0xFF);
+        }
+        else
+        {
+            memory[fcb_addr+0x1]=0xE5; // Marker for file deleted
+            cpuSetAL(0x00);
+        }
+        break;
+    }
     case 0x14: // SEQUENTIAL READ USING FCB
         dos_show_fcb();
         cpuSetAL(dos_read_record_fcb(dosDTA, 1));
@@ -1693,6 +1732,9 @@ void int21()
             cpuSetAX(1);
         }
     }
+    case 0x5B: // CREATE NEW FILE
+        dos_open_file(2);
+        break;
     case 0x62: // GET PSP SEGMENT
         cpuSetBX(get_current_PSP());
         break;

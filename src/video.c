@@ -25,6 +25,7 @@ static unsigned term_posx, term_posy, term_color, term_cursor;
 static unsigned term_sx, term_sy;
 // Current emulated video sizes and cursor position
 static unsigned vid_sx, vid_sy, vid_posx, vid_posy, vid_cursor, vid_color;
+static unsigned vid_font_lines, vid_no_blank;
 // Signals that the terminal size needs updating
 static volatile int term_needs_update;
 // Terminal FD, allows video output even with redirection.
@@ -79,6 +80,7 @@ static void update_posxy(void)
 // Clears the terminal data - not the actual terminal screen
 static void clear_terminal(void)
 {
+    debug(debug_video, "clear terminal shadow\n");
     // Clear screen terminal:
     for(int y = 0; y < 64; y++)
         for(int x = 0; x < 256; x++)
@@ -91,13 +93,16 @@ static void clear_terminal(void)
     putc('\r', tty_file); // Go to column 0
 }
 
-static void clear_screen(void)
+static void set_text_mode(int clear)
 {
-    debug(debug_video, "clear video screen\n");
+    debug(debug_video, "set text mode%s\n", clear ? " and clear" : "");
     // Clear video screen
-    uint16_t *vm = (uint16_t *)(memory + 0xB8000);
-    for(int i = 0; i < 16384; i++)
-        vm[i] = 0x0720;
+    if(clear)
+    {
+        uint16_t *vm = (uint16_t *)(memory + 0xB8000);
+        for(int i = 0; i < 16384; i++)
+            vm[i] = 0x0720;
+    }
     vid_posx = 0;
     vid_posy = 0;
     vid_color = 0x07;
@@ -105,6 +110,7 @@ static void clear_screen(void)
     // TODO: support other video modes
     vid_sx = 80;
     vid_sy = 25;
+    vid_font_lines = 16;
     memory[0x449] = 0x03; // video mode
     memory[0x44A] = vid_sx;
     memory[0x484] = vid_sy - 1;
@@ -145,8 +151,17 @@ static void init_video(void)
     atexit(exit_video);
     video_initialized = 1;
 
+    // Fill the functionality table
+    memory[0xC0100] = 0x08;  // Only mode 3 supported
+    memory[0xC0101] = 0x00;
+    memory[0xC0102] = 0x00;
+    memory[0xC0107] = 0x07;  // Support 300, 350 and 400 scanlines
+    memory[0xC0108] = 0x00;  // Active character blocks?
+    memory[0xC0109] = 0x00;  // MAximum character blocks?
+    memory[0xC0108] = 0xFF;  // Support functions
+
     // Set video mode
-    clear_screen();
+    set_text_mode(1);
     clear_terminal();
     term_needs_update = 0;
     term_cursor = 1;
@@ -200,6 +215,9 @@ static void term_goto_xy(unsigned x, unsigned y)
     if(term_posy < y)
     {
         putc('\r', tty_file);
+        // Set background color to black, as some terminals insert lines with
+        // the current background color.
+        set_color(term_color & 0x0F);
         // TODO: Draw new line with background color from video screen
         for(unsigned i = term_posy; i < y; i++)
             putc('\n', tty_file);
@@ -231,8 +249,8 @@ static void term_goto_xy(unsigned x, unsigned y)
 // Outputs a character with the given attributes at the given position
 static void put_vc_xy(uint8_t vc, uint8_t color, unsigned x, unsigned y)
 {
-    set_color(color);
     term_goto_xy(x, y);
+    set_color(color);
 
     put_vc(vc);
     term_posx++;
@@ -333,7 +351,7 @@ static void vid_scroll_up(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1,
 static void vid_scroll_dwn(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1,
                            unsigned n)
 {
-    debug(debug_video, "scroll up %d: (%d, %d) - (%d, %d)\n", n,
+    debug(debug_video, "scroll down %d: (%d, %d) - (%d, %d)\n", n,
           x0, y0, x1, y1);
 
     // Check parameters
@@ -420,16 +438,20 @@ void video_putch(char ch)
 void int10()
 {
     debug(debug_int, "V-10%04X: BX=%04X\n", cpuGetAX(), cpuGetBX());
+    debug(debug_video, "V-10%04X: BX=%04X\n", cpuGetAX(), cpuGetBX());
     if(!video_initialized)
         init_video();
     unsigned ax = cpuGetAX();
     switch(ax >> 8)
     {
     case 0x00: // SET VIDEO MODE
-        if((ax & 0xFF) > 3)
+        if((ax & 0x7F) > 3)
             debug(debug_video, "-> SET GRAPHICS MODE %x<-\n", ax & 0xFF);
         else
-            clear_screen();
+        {
+            set_text_mode((ax & 0x80) == 0);
+            vid_no_blank = ax & 0x80;
+        }
         break;
     case 0x01:                              // SET CURSOR SHAPE
         if((cpuGetCX() & 0x6000) == 0x2000) // Hide cursor
@@ -493,25 +515,74 @@ void int10()
         video_putch(ax);
         break;
     case 0x0F: // GET CURRENT VIDEO MODE
-        cpuSetAX((vid_sx << 8) | 0x0003); // 80x25 mode
+        cpuSetAX((vid_sx << 8) | 0x0003 | vid_no_blank); // 80x25 mode
         cpuSetBX(0);
         break;
     case 0x10:
         if(ax == 0x1002) // TODO: Set pallete registers - ignore
             break;
-        debug(debug_int, "UNHANDLED INT 10, AX=%04x\n", ax);
+        else if(ax == 0x1003) // TODO: Set blinking state
+            break;
+        debug(debug_video, "UNHANDLED INT 10, AX=%04x\n", ax);
         break;
     case 0x11:
         if(ax == 0x1130)
         {
             cpuSetDX((vid_sy - 1) & 0xFF);
-            cpuSetCX(0x0008);
+            cpuSetCX(vid_font_lines);
+        }
+        else if(ax == 0x1104 || ax == 0x1111 || ax == 0x1114)
+        {
+            // Clear end-of-screen
+            unsigned max = get_last_used_row();
+            debug(debug_video, "set 25 lines mode %d\n", max);
+            if (max > 25)
+            {
+                term_goto_xy(0, 24);
+                set_color(0x07);
+                fputs("\x1b[J", tty_file);
+                for(int y = 25; y < 64; y++)
+                    for(int x = 0; x < 256; x++)
+                        term_screen[y][x] = 0x0720;
+                if (output_row > 24)
+                    output_row = 24;
+            }
+            // Set 8x16 font - 80x25 mode:
+            vid_sy = 25;
+            vid_font_lines = 16;
+            memory[0x484] = vid_sy - 1;
+        }
+        else if(ax == 0x1102 || ax == 0x1112)
+        {
+            // Set 8x8 font - 80x43 or 80x50 mode:
+            debug(debug_video, "set 43/50 lines mode\n");
+            // Hack - QBASIC.EXE assumes that the mode is always 50 lines on VGA,
+            // and *sets* the height into the BIOS area!
+            if(memory[0x484]>42)
+                vid_sy = 50;
+            else
+                vid_sy = 43;
+            vid_font_lines = 8;
+            memory[0x484] = vid_sy - 1;
         }
         break;
-    case 0x12: // GET EGA INFO
-        cpuSetBX(0x0003);
-        cpuSetCX(0x0000);
-        cpuSetAX(0);
+    case 0x12: // ALT FUNCTION SELECT
+        {
+            int bl = cpuGetBX() & 0xFF;
+            if(bl == 0x10 ) // GET EGA INFO
+            {
+                cpuSetBX(0x0003);
+                cpuSetCX(0x0000);
+                cpuSetAX(0);
+            }
+            else if(bl == 0x30 ) // SET VERTICAL RESOLUTION
+            {
+                // TODO: select 25/28 lines
+                cpuSetAX(0x1212);
+            }
+            else
+                debug(debug_video, "UNHANDLED INT 10, AH=12 BL=%02x\n", bl);
+        }
         break;
     case 0x13: // WRITE STRING
         {
@@ -579,8 +650,8 @@ void int10()
                 memory[addr+30] = 0xD4;
                 memory[addr+31] = 0x03; // CRTC port: 03D4
                 memory[addr+34] = vid_sy;
-                memory[addr+35] = 0x10;
-                memory[addr+35] = 0x00; // bytes/char: 0010
+                memory[addr+35] = vid_font_lines;
+                memory[addr+36] = 0x00; // font lines: 0010
                 memory[addr+39] = 0x10;
                 memory[addr+40] = 0x00; // # of colors: 0010
                 memory[addr+42] = 2; // # of scan-lines - get from vid_sy
@@ -593,6 +664,40 @@ void int10()
         // Ignored
         break;
     default:
-        debug(debug_int, "UNHANDLED INT 10, AX=%04x\n", ax);
+        debug(debug_video, "UNHANDLED INT 10, AX=%04x\n", ax);
     }
+}
+
+// CRTC port emulation, some software use it to fix "snow" in CGA modes.
+static uint8_t crtc_port;
+static uint16_t crtc_cursor_loc;
+
+uint8_t video_crtc_read(int port)
+{
+    if(port & 1)
+    {
+        if( crtc_port == 0x0E )
+            return crtc_cursor_loc >> 8;
+        if( crtc_port == 0x0F )
+            return crtc_cursor_loc;
+        else
+            return 0;
+    }
+    else
+        return crtc_port;
+}
+
+void video_crtc_write(int port, uint8_t value)
+{
+    if(port & 1)
+    {
+        if( crtc_port == 0x0E )
+            crtc_cursor_loc = (crtc_cursor_loc & 0xFF) | (value << 8);
+        if( crtc_port == 0x0F )
+            crtc_cursor_loc = (crtc_cursor_loc & 0xFF00) | (value);
+        else
+            debug(debug_video, "CRTC port write [%02x] <- %02x\n", crtc_port, value);
+    }
+    else
+        crtc_port = value;
 }
