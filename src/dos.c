@@ -1,5 +1,5 @@
-#include "codepage.h"
 #include "dos.h"
+#include "codepage.h"
 #include "dbg.h"
 #include "dosnames.h"
 #include "emu.h"
@@ -72,7 +72,7 @@ static void init_handles(void)
     handles[3] = 0; // AUX
     handles[4] = 0; // PRN
     // stdin,stdout,stderr: special, eof on input, is device
-    for(int i=0; i<3; i++)
+    for(int i = 0; i < 3; i++)
         devinfo[i] = guess_devinfo(handles[i]);
 }
 
@@ -97,7 +97,7 @@ static int dos_close_file(int h)
     handles[h] = 0;
     devinfo[h] = 0;
     cpuClrFlag(cpuFlag_CF);
-    for(int i=0; i<max_handles; i++)
+    for(int i = 0; i < max_handles; i++)
         if(handles[i] == f)
             return 0; // Still referenced, don't really close
     if(f == stdin || f == stdout || f == stderr)
@@ -110,7 +110,7 @@ static void create_dir(void)
 {
     char *fname = dos_unix_path(cpuGetAddrDS(cpuGetDX()), 1);
     debug(debug_dos, "\tmkdir '%s' ", fname);
-    if( 0 !=  mkdir(fname, 0777) )
+    if(0 != mkdir(fname, 0777))
     {
         free(fname);
         cpuSetFlag(cpuFlag_CF);
@@ -136,7 +136,7 @@ static void remove_dir(void)
 {
     char *fname = dos_unix_path(cpuGetAddrDS(cpuGetDX()), 1);
     debug(debug_dos, "\trmdir '%s' ", fname);
-    if( 0 !=  rmdir(fname) )
+    if(0 != rmdir(fname))
     {
         free(fname);
         cpuSetFlag(cpuFlag_CF);
@@ -168,7 +168,7 @@ static void dos_open_file(int create)
     }
     int name_addr = cpuGetAddrDS(cpuGetDX());
     char *fname = dos_unix_path(name_addr, create);
-    if( !memory[name_addr] || !fname)
+    if(!memory[name_addr] || !fname)
     {
         debug(debug_dos, "\t(file not found)\n");
         cpuSetAX(2);
@@ -230,10 +230,10 @@ static void dos_open_file(int create)
         devinfo[h] = 0x80C4;
     else if(!strcmp(fname, "/dev/tty"))
         devinfo[h] = 0x80D3;
-    else if(memory[name_addr+1] == ':')
+    else if(memory[name_addr + 1] == ':')
     {
         uint8_t c = memory[name_addr];
-        c = (c>='a') ? c-'a' : c-'A';
+        c = (c >= 'a') ? c - 'a' : c - 'A';
         if(c > 26)
             c = dos_get_default_drive();
         devinfo[h] = 0x0000 + c;
@@ -268,11 +268,13 @@ static void dos_show_fcb()
         return;
 
     int addr = cpuGetAddrDS(cpuGetDX());
-    char *name = getstr(addr+1, 11);
-    debug(debug_dos,"\tFCB:"
+    char *name = getstr(addr + 1, 11);
+    debug(debug_dos,
+          "\tFCB:"
           "[d=%02x:n=%.8s.%.3s:bn=%04x:rs=%04x:fs=%08x:h=%04x:rn=%02x:ra=%08x]\n",
-          memory[addr], name, name+8, get16(addr+0x0C), get16(addr+0x0E),
-          get32(addr+0x10),get16(addr+0x18),memory[addr+0x20],get32(addr+0x21));
+          memory[addr], name, name + 8, get16(addr + 0x0C), get16(addr + 0x0E),
+          get32(addr + 0x10), get16(addr + 0x18), memory[addr + 0x20],
+          get32(addr + 0x21));
 }
 
 static void dos_open_file_fcb(int create)
@@ -309,13 +311,13 @@ static void dos_open_file_fcb(int create)
     long sz = ftell(handles[h]);
     fseek(handles[h], 0, SEEK_SET);
     // Set FCB info:
-    put16(fcb_addr+0x0C, 0); // block number
-    put16(fcb_addr+0x0E, 128); // record size
-    put32(fcb_addr+0x10, sz); // file size
-    put16(fcb_addr+0x14, 0); // date of last write
-    put16(fcb_addr+0x16, 0); // time of last write
-    put16(fcb_addr+0x18, h); // reserved - store DOS handle!
-    memory[fcb_addr+0x20] = 0; // current record
+    put16(fcb_addr + 0x0C, 0);   // block number
+    put16(fcb_addr + 0x0E, 128); // record size
+    put32(fcb_addr + 0x10, sz);  // file size
+    put16(fcb_addr + 0x14, 0);   // date of last write
+    put16(fcb_addr + 0x16, 0);   // time of last write
+    put16(fcb_addr + 0x18, h);   // reserved - store DOS handle!
+    memory[fcb_addr + 0x20] = 0; // current record
 
     debug(debug_dos, "OK.\n");
     cpuClrFlag(cpuFlag_CF);
@@ -348,24 +350,24 @@ static int dos_read_record_fcb(int addr, int update)
         return 2; // segment wrap in DTA
     }
     // Seek to block and read
-    if( fseek(f, pos, SEEK_SET) )
+    if(fseek(f, pos, SEEK_SET))
         return 1; // no data read
     // Read
     unsigned n = fread(buf, 1, rsize, f);
     // Update random and block positions
-    if( update )
+    if(update)
     {
         put32(0x21 + fcb, (pos + n) / rsize);
         dos_fcb_rand_to_block(fcb);
     }
 
-    if( n == rsize )
+    if(n == rsize)
         return 0; // read full record
     else if(!n)
         return 1; // EOF
     else
     {
-        for(unsigned i=n; i<rsize; i++)
+        for(unsigned i = n; i < rsize; i++)
             buf[i] = 0;
         return 3; // read partial record
     }
@@ -387,27 +389,25 @@ int dos_write_record_fcb(int addr, int update)
         return 2; // segment wrap in DTA
     }
     // Seek to block and read
-    if( fseek(f, pos, SEEK_SET) )
+    if(fseek(f, pos, SEEK_SET))
         return 1; // no data read
     // Write
     unsigned n = fwrite(buf, 1, rsize, f);
     // Update random and block positions
-    if( update )
+    if(update)
     {
         put32(0x21 + fcb, (pos + n) / rsize);
         dos_fcb_rand_to_block(fcb);
     }
     // Update file size
-    if (pos + n >  get32(fcb+0x10))
-        put32(fcb+0x10, pos+n);
+    if(pos + n > get32(fcb + 0x10))
+        put32(fcb + 0x10, pos + n);
 
-    if( n == rsize )
+    if(n == rsize)
         return 0; // write full record
     else
         return 3; // disk full
 }
-
-
 
 // Converts Unix time_t to DOS time/date
 static uint32_t get_time_date(time_t tm)
@@ -416,8 +416,7 @@ static uint32_t get_time_date(time_t tm)
     if(localtime_r(&tm, &lt))
     {
         unsigned t = (lt.tm_hour << 11) | (lt.tm_min << 5) | (lt.tm_sec / 2);
-        unsigned d =
-            ((lt.tm_year - 80) << 9) | ((lt.tm_mon + 1) << 5) | (lt.tm_mday);
+        unsigned d = ((lt.tm_year - 80) << 9) | ((lt.tm_mon + 1) << 5) | (lt.tm_mday);
         return (d << 16) | t;
     }
     else
@@ -488,8 +487,9 @@ static void int21_43(void)
 // Each DTA (Data Transfer Area) in memory can hold a find-first data
 // block. We simply encode our pointer in this area and use this struct
 // to hold the values.
-#define NUM_FIND_FIRST_DTA      64
-static struct find_first_dta {
+#define NUM_FIND_FIRST_DTA 64
+static struct find_first_dta
+{
     // List of files to return and pointer to current.
     struct dos_file_list *find_first_list;
     struct dos_file_list *find_first_ptr;
@@ -549,29 +549,29 @@ static void dos_find_next(int first)
         debug(debug_dos, "\t'%s' ('%s')\n", d->dosname, d->unixname);
 
         // Fills the Find First Data from a dos/unix name pair
-        if( strcmp("//", d->unixname) )
+        if(strcmp("//", d->unixname))
         {
             // Normal file/directory
             struct stat st;
             if(0 == stat(d->unixname, &st))
             {
-                memory[dosDTA+0x15] = get_attributes(st.st_mode);
-                put32(dosDTA+0x16, get_time_date(st.st_mtime));
-                put32(dosDTA+0x1A, (st.st_size > 0x7FFFFFFF) ? 0x7FFFFFFF : st.st_size);
+                memory[dosDTA + 0x15] = get_attributes(st.st_mode);
+                put32(dosDTA + 0x16, get_time_date(st.st_mtime));
+                put32(dosDTA + 0x1A, (st.st_size > 0x7FFFFFFF) ? 0x7FFFFFFF : st.st_size);
             }
             else
             {
-                memory[dosDTA+0x15] = 0;
-                put32(dosDTA+0x16, 0x10001);
-                put32(dosDTA+0x1A, 0);
+                memory[dosDTA + 0x15] = 0;
+                put32(dosDTA + 0x16, 0x10001);
+                put32(dosDTA + 0x1A, 0);
             }
         }
         else
         {
             // Fills volume label data
-            memory[dosDTA+0x15] = 8;
-            put32(dosDTA+0x16, get_time_date(time(0)));
-            put32(dosDTA+0x1A, 0);
+            memory[dosDTA + 0x15] = 8;
+            put32(dosDTA + 0x16, get_time_date(time(0)));
+            put32(dosDTA + 0x1A, 0);
         }
         // Fills dos file name
         putmem(dosDTA + 0x1E, d->dosname, 13);
@@ -623,39 +623,39 @@ static void dos_find_next_fcb(void)
         int pos = 1;
         for(uint8_t *c = d->dosname; *c; c++)
         {
-            if( *c != '.' )
-                memory[ofcb+pos++] = *c;
+            if(*c != '.')
+                memory[ofcb + pos++] = *c;
             else
                 while(pos < 9)
-                    memory[ofcb+pos++] = ' ';
+                    memory[ofcb + pos++] = ' ';
         }
         while(pos < 12)
-            memory[ofcb+pos++] = ' ';
+            memory[ofcb + pos++] = ' ';
         // Fill drive letter
         memory[ofcb] = memory[get_fcb()];
         // Get file info
-        if( strcmp("//", d->unixname) )
+        if(strcmp("//", d->unixname))
         {
             // Normal file/directory
             struct stat st;
             if(0 == stat(d->unixname, &st))
             {
-                memory[ofcb+0x0C] = get_attributes(st.st_mode);
-                put32(ofcb+0x17, get_time_date(st.st_mtime));
-                put32(ofcb+0x1D, (st.st_size > 0x7FFFFFFF) ? 0x7FFFFFFF : st.st_size);
+                memory[ofcb + 0x0C] = get_attributes(st.st_mode);
+                put32(ofcb + 0x17, get_time_date(st.st_mtime));
+                put32(ofcb + 0x1D, (st.st_size > 0x7FFFFFFF) ? 0x7FFFFFFF : st.st_size);
             }
             else
             {
-                memory[ofcb+0x0C] = 0;
-                put32(ofcb+0x17, 0x10001);
-                put32(ofcb+0x1D, 0);
+                memory[ofcb + 0x0C] = 0;
+                put32(ofcb + 0x17, 0x10001);
+                put32(ofcb + 0x1D, 0);
             }
         }
         else
         {
-            memory[ofcb+0x0C] = 8;
-            put32(ofcb+0x17, get_time_date(time(0)));
-            put32(ofcb+0x1D, 0);
+            memory[ofcb + 0x0C] = 8;
+            put32(ofcb + 0x17, get_time_date(time(0)));
+            put32(ofcb + 0x1D, 0);
         }
         p->find_first_ptr++;
         cpuSetAL(0x00);
@@ -670,7 +670,7 @@ static void dos_find_first_fcb(void)
         dos_free_file_list(p->find_first_list);
 
     int efcb = get_ex_fcb();
-    if( memory[efcb] == 0xFF && memory[efcb+6] == 0x08 )
+    if(memory[efcb] == 0xFF && memory[efcb + 6] == 0x08)
     {
         p->find_first_list = calloc(2, sizeof(struct dos_file_list));
         p->find_first_list[0].unixname = strdup("//");
@@ -726,7 +726,7 @@ static void dos_get_drive_info(uint8_t drive)
     if(!drive)
         drive = dos_get_default_drive();
     else
-        drive --;
+        drive--;
     cpuSetAL(32);     // 16k clusters
     cpuSetCX(512);    // 512 bytes/sector
     cpuSetDX(0xFFFF); // total 1GB
@@ -750,7 +750,7 @@ static void int21_9(void)
 {
     int i = cpuGetAddrDS(cpuGetDX());
 
-    for(; memory[i] != 0x24 && i<0x100000; i++)
+    for(; memory[i] != 0x24 && i < 0x100000; i++)
         dos_putchar(memory[i]);
 
     cpuSetAL(0x24);
@@ -786,7 +786,7 @@ static int run_emulator(char *file, const char *prgname, char *cmdline, char *en
         // Set program name
         setenv(ENV_PROGNAME, prgname, 1);
         // default drive
-        char drv[2] = { 0, 0 };
+        char drv[2] = {0, 0};
         drv[0] = dos_get_default_drive() + 'A';
         setenv(ENV_DEF_DRIVE, drv, 1);
         // and CWD
@@ -840,7 +840,7 @@ static void char_input(int brk)
     static uint16_t last_key;
     fflush(handles[1] ? handles[1] : stdout);
 
-    if( last_key == 0 )
+    if(last_key == 0)
     {
         if(devinfo[0] != 0x80D3 && handles[0])
             last_key = getc(handles[0]);
@@ -849,7 +849,7 @@ static void char_input(int brk)
     }
     debug(debug_dos, "\tgetch = %02x '%c'\n", last_key, (char)last_key);
     cpuSetAL(last_key);
-    if( (last_key & 0xFF) == 0 )
+    if((last_key & 0xFF) == 0)
         last_key = last_key >> 8;
     else
         last_key = 0;
@@ -883,7 +883,7 @@ static void int21_debug(void)
     };
     unsigned ax = cpuGetAX();
     const char *fn;
-    if((ax >> 8) < (sizeof(func_names)/sizeof(func_names[0])))
+    if((ax >> 8) < (sizeof(func_names) / sizeof(func_names[0])))
         fn = func_names[ax >> 8];
     else
         fn = "(unknown)";
@@ -907,12 +907,12 @@ void int21()
         // Fix-up return address, interchanges segment/ip:
         int stack = cpuGetAddress(cpuGetSS(), cpuGetSP());
         put16(stack, ip);
-        put16(stack+2, cs);
-        put16(stack+4, flags);
+        put16(stack + 2, cs);
+        put16(stack + 4, flags);
         // Call ourselves
         int21();
         // Restore AH
-        cpuSetAX( (old_ax & 0xFF00) | (cpuGetAX() & 0xFF) );
+        cpuSetAX((old_ax & 0xFF00) | (cpuGetAX() & 0xFF));
         return;
     }
     debug(debug_int, "D-21%04X: BX=%04X\n", cpuGetAX(), cpuGetBX());
@@ -925,7 +925,7 @@ void int21()
         exit(0);
     case 1: // CHARACTER INPUT WITH ECHO
         char_input(1);
-        dos_putchar(cpuGetAX()&0xFF);
+        dos_putchar(cpuGetAX() & 0xFF);
         break;
     case 2: // PUTCH
         dos_putchar(cpuGetDX() & 0xFF);
@@ -954,17 +954,17 @@ void int21()
         FILE *f = handles[0] ? handles[0] : stdin;
         int addr = cpuGetAddrDS(cpuGetDX());
         unsigned len = memory[addr], i = 2;
-        while(i < len && addr+i<0x100000)
+        while(i < len && addr + i < 0x100000)
         {
             int c = getc(f);
             if(c == '\n' || c == EOF)
                 c = '\r';
-            memory[addr+i] = (char)c;
+            memory[addr + i] = (char)c;
             if(c == '\r')
                 break;
             i++;
         }
-        memory[addr+1] = i - 2;
+        memory[addr + 1] = i - 2;
         break;
     }
     case 0xB: // STDIN STATUS
@@ -989,7 +989,7 @@ void int21()
         }
         break;
     case 0x0E: // SELECT DEFAULT DRIVE
-        dos_set_default_drive(cpuGetDX()&0xFF);
+        dos_set_default_drive(cpuGetDX() & 0xFF);
         // Number of drives = 3, 'A:', 'B:' and 'C:'
         cpuSetAX(0x0E03);
         break;
@@ -1024,12 +1024,12 @@ void int21()
         free(fname);
         if(e)
         {
-            debug(debug_dos, "\tcould not delete file (%d).\n",errno);
+            debug(debug_dos, "\tcould not delete file (%d).\n", errno);
             cpuSetAL(0xFF);
         }
         else
         {
-            memory[fcb_addr+0x1]=0xE5; // Marker for file deleted
+            memory[fcb_addr + 0x1] = 0xE5; // Marker for file deleted
             cpuSetAL(0x00);
         }
         break;
@@ -1072,15 +1072,15 @@ void int21()
         break;
     case 0x26: // Create PSP (allocate segment (singleton), and copy PSP)
     {
-        uint8_t *new_base = getptr(cpuGetAddress(cpuGetDX(),0), 0x100);
-        uint8_t *orig = getptr(cpuGetAddress(get_current_PSP(),0), 0x100);
-        if (!new_base || !orig)
+        uint8_t *new_base = getptr(cpuGetAddress(cpuGetDX(), 0), 0x100);
+        uint8_t *orig = getptr(cpuGetAddress(get_current_PSP(), 0), 0x100);
+        if(!new_base || !orig)
         {
             debug(debug_dos, "\tinvalid new PSP segment %04x.\n", cpuGetDX());
             break;
         }
         // Copy PSP to the new segment, 0x80 is what DOS does - this excludes command line
-        memcpy(new_base,orig, 0x80);
+        memcpy(new_base, orig, 0x80);
         debug(debug_dos, "\tnew PSP segment %04x.\n", cpuGetDX());
         debug(debug_dos, "\tnew PSP size %02x%02x.\n", new_base[7], new_base[6]);
         debug(debug_dos, "\toriginal PSP segment %04x.\n", get_current_PSP());
@@ -1098,17 +1098,17 @@ void int21()
         unsigned e = 0;
         int target = dosDTA;
 
-        while( !e && count )
+        while(!e && count)
         {
-            if( 0x27 == (ax >> 8) )
+            if(0x27 == (ax >> 8))
                 e = dos_read_record_fcb(target, 1);
             else
                 e = dos_write_record_fcb(target, 1);
 
-            if( e == 0 || e == 3 )
+            if(e == 0 || e == 3)
             {
                 target += rsize;
-                count --;
+                count--;
             }
         }
         cpuSetCX(cpuGetCX() - count);
@@ -1200,7 +1200,7 @@ void int21()
         }
         cpuSetSI((si));
         cpuSetAL(ret);
-        debug(debug_dos, "%c:'%.11s'\n", dst[0]?dst[0]+'@':'*',dst+1);
+        debug(debug_dos, "%c:'%.11s'\n", dst[0] ? dst[0] + '@' : '*', dst + 1);
         break;
     }
     case 0x2A: // GET SYSTEM DATE
@@ -1255,7 +1255,7 @@ void int21()
         cpuSetBX(get16(4 * (ax & 0xFF)));
         cpuSetES(get16(4 * (ax & 0xFF) + 2));
         break;
-    case 0x36:            // get free space
+    case 0x36: // get free space
         cpuSetAX(32);     // 16k clusters
         cpuSetBX(0xFFFF); // all free, 1GB
         cpuSetCX(512);    // 512 bytes/sector
@@ -1364,7 +1364,7 @@ void int21()
         }
         if(devinfo[cpuGetBX()] == 0x80D3 && video_active())
         {
-            for(unsigned i=0; i<len; i++)
+            for(unsigned i = 0; i < len; i++)
                 video_putch(buf[i]);
             cpuSetAX(len);
         }
@@ -1412,7 +1412,7 @@ void int21()
         else
             pos = pos + (cpuGetCX() << 16);
 
-        debug(debug_dos, "\tlseek-%02x pos = %ld\n",ax & 0xFF, pos);
+        debug(debug_dos, "\tlseek-%02x pos = %ld\n", ax & 0xFF, pos);
         if(!f)
         {
             cpuSetFlag(cpuFlag_CF);
@@ -1448,7 +1448,8 @@ void int21()
     {
         int h = cpuGetBX();
         int al = ax & 0xFF;
-        if((al < 4 || al == 6 || al == 7 || al == 10 || al == 12 || al == 16) && !handles[h])
+        if((al < 4 || al == 6 || al == 7 || al == 10 || al == 12 || al == 16) &&
+           !handles[h])
         {
             // Show error if it is a file handle.
             debug(debug_dos, "\t(invalid file handle)\n");
@@ -1616,7 +1617,7 @@ void int21()
             debug(debug_dos, "\tload overlay '%s'\n", fname);
             int pb = cpuGetAddrES(cpuGetBX());
             uint16_t load_seg = get16(pb);
-            uint16_t reloc_seg = get16(pb+2);
+            uint16_t reloc_seg = get16(pb + 2);
             FILE *f = fopen(fname, "rb");
             if(!f || dos_read_overlay(f, load_seg, reloc_seg))
             {
@@ -1643,13 +1644,13 @@ void int21()
             {
                 // Sanitize env
                 int eaddr = cpuGetAddress(get16(pb), 0);
-                while( memory[eaddr] != 0 && eaddr < 0xFFFFF )
+                while(memory[eaddr] != 0 && eaddr < 0xFFFFF)
                 {
-                    while( memory[eaddr] != 0 && eaddr < 0xFFFFF )
-                        eaddr ++;
-                    eaddr ++;
+                    while(memory[eaddr] != 0 && eaddr < 0xFFFFF)
+                        eaddr++;
+                    eaddr++;
                 }
-                if( eaddr < 0xFFFFF )
+                if(eaddr < 0xFFFFF)
                     env = (char *)(memory + cpuGetAddress(get16(pb), 0));
             }
             if(run_emulator(fname, prgname, cmdline, env))
@@ -1662,8 +1663,8 @@ void int21()
         }
         else
         {
-            debug(debug_dos, "\texec '%s': type %02xh not supported.\n",
-                  fname, ax & 0xFF);
+            debug(debug_dos, "\texec '%s': type %02xh not supported.\n", fname,
+                  ax & 0xFF);
             cpuSetFlag(cpuFlag_CF);
             cpuSetAX(1);
         }
@@ -1746,40 +1747,40 @@ void int21()
         {
         case 1:
         {
-            static const uint8_t data[] = { 1, 38, 0, 1, 0, 181, 1 };
+            static const uint8_t data[] = {1, 38, 0, 1, 0, 181, 1};
             putmem(addr, data, 7);
-            putmem(addr+7, nls_country_info, 34);
+            putmem(addr + 7, nls_country_info, 34);
             cpuSetCX(41);
             break;
         }
         case 2:
             memory[addr] = 2;
-            put16(addr+1, nls_uppercase_table & 0xF);
-            put16(addr+3, nls_uppercase_table >> 4);
+            put16(addr + 1, nls_uppercase_table & 0xF);
+            put16(addr + 3, nls_uppercase_table >> 4);
             cpuSetCX(5);
             break;
         case 4:
             memory[addr] = 4;
-            put16(addr+1, nls_uppercase_table & 0xF);
-            put16(addr+3, nls_uppercase_table >> 4);
+            put16(addr + 1, nls_uppercase_table & 0xF);
+            put16(addr + 3, nls_uppercase_table >> 4);
             cpuSetCX(5);
             break;
         case 5:
             memory[addr] = 5;
-            put16(addr+1, nls_terminator_table & 0xF);
-            put16(addr+3, nls_terminator_table >> 4);
+            put16(addr + 1, nls_terminator_table & 0xF);
+            put16(addr + 3, nls_terminator_table >> 4);
             cpuSetCX(5);
             break;
         case 6:
             memory[addr] = 6;
-            put16(addr+1, nls_collating_table & 0xF);
-            put16(addr+3, nls_collating_table >> 4);
+            put16(addr + 1, nls_collating_table & 0xF);
+            put16(addr + 3, nls_collating_table >> 4);
             cpuSetCX(5);
             break;
         case 7:
             memory[addr] = 7;
-            put16(addr+1, nls_dbc_set_table & 0xF);
-            put16(addr+3, nls_dbc_set_table >> 4);
+            put16(addr + 1, nls_dbc_set_table & 0xF);
+            put16(addr + 3, nls_dbc_set_table >> 4);
             cpuSetCX(5);
             break;
         default:
@@ -1850,16 +1851,16 @@ static void init_nls_data(void)
     };
     static const uint8_t terminator_table[24] = {
         0x16, 0x00, // size of table = 22 bytes
-        0x01, // ???
-        0x00, // lowest char in filename
-        0xFF, // highest char in filename
-        0x00, // ???
-        0x00, // first excluded char
-        0x20, // last excluded char (all from 00-20 excluded)
-        0x02, // ???
-        0x0E, // number of terminator characters
-        0x2E, 0x22, 0x2F, 0x5C, 0x5B, 0x5D, 0x3A, 0x7C, 0x3C, 0x3E, 0x2B, 0x3D, 0x3B, 0x2C
-    };
+        0x01,       // ???
+        0x00,       // lowest char in filename
+        0xFF,       // highest char in filename
+        0x00,       // ???
+        0x00,       // first excluded char
+        0x20,       // last excluded char (all from 00-20 excluded)
+        0x02,       // ???
+        0x0E,       // number of terminator characters
+        0x2E, 0x22, 0x2F, 0x5C, 0x5B, 0x5D, 0x3A,
+        0x7C, 0x3C, 0x3E, 0x2B, 0x3D, 0x3B, 0x2C};
     static const uint8_t fn_uppercase[16] = {
         0x3C, 0x80,       //     CMP    AL,80
         0x72, 0x0B,       //     JB     xit
@@ -1869,18 +1870,20 @@ static void init_nls_data(void)
         0x2E,             //     CS:
         0x8A, 0x87, 2, 0, //     MOV    AL,[BX+0002] ; offset of uppercase table
         0x5B,             //     POP    BX
-        0xCB              //xit: RETF
+        0xCB              // xit: RETF
     };
     static uint8_t country_info[34] = {
-        1, 0,
-        '$', 0, 0, 0, 0,
-        ',', 0,
-        '.', 0,
-        '-', 0,
-        ':', 0,
-        0, 2, 0,
-        0, 0, 0, 0, // Parch uppercase function address
-        ',', 0,
+        1, 0,            // Date format
+        '$', 0, 0, 0, 0, // Currency symbol string
+        ',', 0,          // Thousands separator
+        '.', 0,          // Decimal separator
+        '-', 0,          // Date separator
+        ':', 0,          // Time separator
+        0,               // Currency format
+        2,               // Digits after decimal in currency
+        0,               // Time format
+        0, 0, 0, 0,      // Uppercase function address - patched in code
+        ',', 0,          // Data list separator
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0
     };
 
@@ -1905,7 +1908,7 @@ static void init_nls_data(void)
     putmem(nls_terminator_table, terminator_table, 24);
 
     // Collating table
-    nls_collating_table = get_static_memory(256+2, 0);
+    nls_collating_table = get_static_memory(256 + 2, 0);
     put16(nls_collating_table, 256); // Length
     putmem(nls_collating_table + 2, collating_table, 256);
 
@@ -1913,8 +1916,6 @@ static void init_nls_data(void)
     nls_dbc_set_table = get_static_memory(4, 0);
     put16(nls_dbc_set_table, 0); // Length
     put16(nls_dbc_set_table, 0); // one entry at least.
-
-
 }
 
 void init_dos(int argc, char **argv)
@@ -1942,18 +1943,18 @@ void init_dos(int argc, char **argv)
 
     // Init memory handling - available start address at 0x800,
     // ending address at 0xA0000.
-    mcb_init(0x80,0xA000);
+    mcb_init(0x80, 0xA000);
 
     // Init SYSVARS
     dos_sysvars = get_static_memory(128, 0);
     put16(dos_sysvars + 22, 0x0080); // First MCB
 
     // Setup default drive
-    if( getenv(ENV_DEF_DRIVE) )
+    if(getenv(ENV_DEF_DRIVE))
     {
         char c = getenv(ENV_DEF_DRIVE)[0];
-        c = (c>='a') ? c-'a' : c-'A';
-        if(c>=0 && c<=25)
+        c = (c >= 'a') ? c - 'a' : c - 'A';
+        if(c >= 0 && c <= 25)
         {
             dos_set_default_drive(c);
             debug(debug_dos, "set default drive = '%c'\n", c + 'A');
@@ -1961,7 +1962,7 @@ void init_dos(int argc, char **argv)
     }
 
     // Setup CWD
-    if( getenv(ENV_CWD) )
+    if(getenv(ENV_CWD))
     {
         char path[64];
         memset(path, 0, 64);
@@ -2000,7 +2001,7 @@ void init_dos(int argc, char **argv)
     }
 
     const char *progname = getenv(ENV_PROGNAME);
-    if( !progname )
+    if(!progname)
         progname = argv[0];
 
     // Create main PSP

@@ -29,15 +29,9 @@ void print_usage(void)
            "  %-18s  DOS current working directory, use 'C:\\' if not given.\n"
            "  %-18s  Set unix path as root of drive 'n', by default all drives\n"
            "\t\t      point to the unix working directory.\n"
-           ". %-18s  Set DOS code-page. Set to '?' to show lost of code-pages.\n"
-           , prog_name
-           , ENV_DBG_NAME
-           , ENV_DBG_OPT
-           , ENV_PROGNAME
-           , ENV_DEF_DRIVE
-           , ENV_CWD
-           , ENV_DRIVE "n"
-           , ENV_CODEPAGE);
+           ". %-18s  Set DOS code-page. Set to '?' to show lost of code-pages.\n",
+           prog_name, ENV_DBG_NAME, ENV_DBG_OPT, ENV_PROGNAME, ENV_DEF_DRIVE, ENV_CWD,
+           ENV_DRIVE "n", ENV_CODEPAGE);
     exit(EXIT_SUCCESS);
 }
 
@@ -76,8 +70,7 @@ static FILE *open_log_file(const char *base, const char *type)
     }
     if(fd == -1)
         print_error("can't open debug log '%s'\n", log_name);
-    fprintf(stderr, "%s: %s debug log on file '%s'.\n", prog_name, type,
-            log_name);
+    fprintf(stderr, "%s: %s debug log on file '%s'.\n", prog_name, type, log_name);
     return fdopen(fd, "w");
 }
 

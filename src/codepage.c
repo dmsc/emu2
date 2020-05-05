@@ -204,8 +204,9 @@ static int read_codepage_file(const char *fname)
             if(ucode < 32 || ucode > 0xFFFF)
             {
                 fclose(f);
-                print_error("reading codepage '%s', line '%s', invalid unicode value %d\n",
-                            fname, line, ucode);
+                print_error(
+                    "reading codepage '%s', line '%s', invalid unicode value %d\n", fname,
+                    line, ucode);
             }
             new_table[dcode] = ucode;
         }
@@ -232,8 +233,7 @@ void set_codepage(const char *cp_name)
         }
     }
     if(!read_codepage_file(cp_name))
-        print_error("missing or unknown codepage '%s', use '?' for a list.\n",
-                    cp_name);
+        print_error("missing or unknown codepage '%s', use '?' for a list.\n", cp_name);
 }
 
 static void list_codepages(void)
@@ -271,4 +271,3 @@ int get_dos_char(int uc)
     // Assume space is always valid
     return ' ';
 }
-
