@@ -11,6 +11,7 @@
 #include "video.h"
 
 #include <errno.h>
+#include <fcntl.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h>
@@ -197,7 +198,17 @@ static void dos_open_file(int create)
         }
     }
     debug(debug_dos, "\topen '%s', '%s', %04x ", fname, mode, h);
-    handles[h] = fopen(fname, mode);
+    if(create == 2)
+    {
+        // Force exclusive access. We could use mode = "x+" in glibc.
+        int fd = open(fname, O_CREAT | O_EXCL | O_RDWR, 0666);
+        if(fd != -1)
+            handles[h] = fdopen(fd, mode);
+        else
+            handles[h] = 0;
+    }
+    else
+        handles[h] = fopen(fname, mode);
     if(!handles[h])
     {
         if(errno != ENOENT)
@@ -1720,6 +1731,9 @@ void int21()
             cpuSetAX(1);
         }
     }
+    case 0x5B: // CREATE NEW FILE
+        dos_open_file(2);
+        break;
     case 0x62: // GET PSP SEGMENT
         cpuSetBX(get_current_PSP());
         break;
