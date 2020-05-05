@@ -48,17 +48,18 @@ void cmdline_to_fcb(const char *cmd_line, uint8_t *fcb1, uint8_t *fcb2) {
     memset(fcb1 + 1, ' ', 11);
     memset(fcb2 + 1, ' ', 11);
     while (cmd_line[i]) {
+        int c=cmd_line[i];
+        if(FCB_PARSE_DOS == 1 && c==';') {
+            c='+';
+        }
         switch (state) {
         case FCB_PARSE_INIT:
         case FCB_PARSE_INIT_PLUS:
-            switch (cmd_line[i]) {
+            switch (c) {
             case '.':
                 offset = fcb1 + 9;
                 state = FCB_PARSE_FCB1_EXT;
                 break;
-#if FCB_PARSE_DOS == 1 
-            case ';':
-#endif
             case '+':
                if (state == FCB_PARSE_INIT) {
                     state = FCB_PARSE_INIT_PLUS;
@@ -74,21 +75,21 @@ void cmdline_to_fcb(const char *cmd_line, uint8_t *fcb1, uint8_t *fcb2) {
                 offset = fcb1 + 9;
                 break;
             default:
-                if (valid_fcb_sep(cmd_line[i])) {
+                if (valid_fcb_sep(c)) {
                     if(FCB_PARSE_DOS > 1 && state == FCB_PARSE_INIT_PLUS 
-                        && (FCB_PARSE_DOS>2 || !isspace(cmd_line[i]))) {
+                        && (FCB_PARSE_DOS>2 || !isspace(c))) {
                         offset = fcb2 + 1;
                         state = FCB_PARSE_SEP_PURGE;
                         i--;                
                     }
                     break;
                 }
-                if (valid_fcb_char(cmd_line[i])) {
+                if (valid_fcb_char(c)) {
                     if (cmd_line[i + 1] == ':') {
-                        *fcb1 = toupper(cmd_line[i]) - 'A' + 1;
+                        *fcb1 = toupper(c) - 'A' + 1;
                         i++;
                     } else {
-                        *offset = toupper(cmd_line[i]);
+                        *offset = toupper(c);
                         offset++;
                     }
                     state = FCB_PARSE_FCB1;
@@ -104,7 +105,7 @@ void cmdline_to_fcb(const char *cmd_line, uint8_t *fcb1, uint8_t *fcb2) {
             } 
             break;
         case FCB_PARSE_FCB1:
-            switch (cmd_line[i]) {
+            switch (c) {
             case '.':
                 offset = fcb1 + 9;
                 state = FCB_PARSE_FCB1_EXT;
@@ -127,12 +128,12 @@ void cmdline_to_fcb(const char *cmd_line, uint8_t *fcb1, uint8_t *fcb2) {
                 break;
 #endif
             default:
-                if (valid_fcb_sep(cmd_line[i])) {
+                if (valid_fcb_sep(c)) {
                     offset = fcb2 + 1;
                     state = FCB_PARSE_SEP;
                     break;
                 }
-                if (!valid_fcb_char(cmd_line[i])) {
+                if (!valid_fcb_char(c)) {
                     offset = fcb2 + 1;
                     if(FCB_PARSE_DOS == 1) {
                         state = FCB_PARSE_EXIT;
@@ -143,14 +144,14 @@ void cmdline_to_fcb(const char *cmd_line, uint8_t *fcb1, uint8_t *fcb2) {
                     break;
                 }
                 if (offset - fcb1 - 1 < 8) {
-                    *offset = toupper(cmd_line[i]);
+                    *offset = toupper(c);
                     offset++;
                 }
                 break;
             }
             break;
         case FCB_PARSE_FCB1_EXT:
-            switch (cmd_line[i]) {
+            switch (c) {
             case '.':
                 if(FCB_PARSE_DOS == 1) {
                     offset = fcb2 + 9;
@@ -178,12 +179,12 @@ void cmdline_to_fcb(const char *cmd_line, uint8_t *fcb1, uint8_t *fcb2) {
                 break;
 #endif
             default:
-                if (valid_fcb_sep(cmd_line[i])) {
+                if (valid_fcb_sep(c)) {
                     offset = fcb2 + 1;
                     state = FCB_PARSE_SEP;
                     break;
                 }
-                if (!valid_fcb_char(cmd_line[i])) {
+                if (!valid_fcb_char(c)) {
                     if(FCB_PARSE_DOS == 1) {
                         state = FCB_PARSE_EXIT;
                     } else {
@@ -193,14 +194,14 @@ void cmdline_to_fcb(const char *cmd_line, uint8_t *fcb1, uint8_t *fcb2) {
                     break;
                 }
                 if (offset - fcb1 - 9 < 3) {
-                    *offset = toupper(cmd_line[i]);
+                    *offset = toupper(c);
                     offset++;
                 }
                 break;
             }
             break;
         case FCB_PARSE_SEP_PURGE:
-            if (valid_fcb_sep(cmd_line[i])) {
+            if (valid_fcb_sep(c)) {
                 state = FCB_PARSE_SEP;
                 i--;
                 break;
@@ -208,15 +209,12 @@ void cmdline_to_fcb(const char *cmd_line, uint8_t *fcb1, uint8_t *fcb2) {
             break;
         case 3:
         case 13:
-            switch (cmd_line[i]) {
+            switch (c) {
             case '.':
                 offset = fcb2 + 9;
                 state = FCB_PARSE_FCB2_EXT;
                 break;
             case '+':
-#if FCB_PARSE_DOS == 1
-            case ';':
-#endif 
                 if (state == FCB_PARSE_SEP) {
                     state = FCB_PARSE_SEP_PLUS;
                 } else {
@@ -229,18 +227,18 @@ void cmdline_to_fcb(const char *cmd_line, uint8_t *fcb1, uint8_t *fcb2) {
                 }
                 break;
             default:
-                if (valid_fcb_sep(cmd_line[i])) {
+                if (valid_fcb_sep(c)) {
                     if(FCB_PARSE_DOS > 2 && state == FCB_PARSE_SEP_PLUS) {
                         state = FCB_PARSE_EXIT;
                     }
                     break;
                 }
-                if (valid_fcb_char(cmd_line[i])) {
+                if (valid_fcb_char(c)) {
                     if (cmd_line[i + 1] == ':') {
-                        *fcb2 = toupper(cmd_line[i]) - 'A' + 1;
+                        *fcb2 = toupper(c) - 'A' + 1;
                         i++;
                     } else {
-                        *offset = toupper(cmd_line[i]);
+                        *offset = toupper(c);
                         offset++;
                     }
                     state = FCB_PARSE_FCB2;
@@ -251,7 +249,7 @@ void cmdline_to_fcb(const char *cmd_line, uint8_t *fcb1, uint8_t *fcb2) {
             }
             break;
         case FCB_PARSE_FCB2:
-           switch (cmd_line[i]) {
+           switch (c) {
             case '.':
                 offset = fcb2 + 9;
                 state = FCB_PARSE_FCB2_EXT;
@@ -268,23 +266,23 @@ void cmdline_to_fcb(const char *cmd_line, uint8_t *fcb1, uint8_t *fcb2) {
                 state = FCB_PARSE_EXIT;
                 break;
             default:
-                if (valid_fcb_sep(cmd_line[i])) {
+                if (valid_fcb_sep(c)) {
                     state = FCB_PARSE_EXIT;
                     break;
                 }
-                if (!valid_fcb_char(cmd_line[i])) {
+                if (!valid_fcb_char(c)) {
                     state = FCB_PARSE_EXIT;
                     break;
                 }
                 if (offset - fcb2 - 1 < 8) {
-                    *offset = toupper(cmd_line[i]);
+                    *offset = toupper(c);
                     offset++;
                 }
                 break;
             }
             break;
         case FCB_PARSE_FCB2_EXT:
-            switch (cmd_line[i]) {
+            switch (c) {
             case '*':
                 while (offset - fcb2 - 9 < 3) {
                     *offset = '?';
@@ -299,16 +297,16 @@ void cmdline_to_fcb(const char *cmd_line, uint8_t *fcb1, uint8_t *fcb2) {
                 state = FCB_PARSE_EXIT;
                 break;
             default:
-                if (valid_fcb_sep(cmd_line[i])) {
+                if (valid_fcb_sep(c)) {
                     state = FCB_PARSE_EXIT;
                     break;
                 }
-                if (!valid_fcb_char(cmd_line[i])) {
+                if (!valid_fcb_char(c)) {
                     state = FCB_PARSE_EXIT;
                     break;
                 }
                 if (offset - fcb2 - 9 < 3) {
-                    *offset = toupper(cmd_line[i]);
+                    *offset = toupper(c);
                     offset++;
                 }
                 break;
