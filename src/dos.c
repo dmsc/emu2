@@ -995,6 +995,33 @@ void int21()
     case 0x12: // FIND NEXT FILE USING FCB
         dos_find_next_fcb();
         break;
+    case 0x13: // DELETE FILE USING FCB
+    {
+        dos_show_fcb();
+        /* TODO: Limited support. No wild cards */
+        int fcb_addr = get_fcb();
+        char *fname = dos_unix_path_fcb(fcb_addr, 0);
+        if(!fname)
+        {
+            debug(debug_dos, "\t(file not found)\n");
+            cpuSetAL(0xFF);
+            break;
+        }
+        debug(debug_dos, "\tdelete fcb '%s'\n", fname);
+        int e = unlink(fname);
+        free(fname);
+        if(e)
+        {
+            debug(debug_dos, "\tcould not delete file (%d).\n",errno);
+            cpuSetAL(0xFF);
+        }
+        else
+        {
+            memory[fcb_addr+0x1]=0xE5; // Marker for file deleted
+            cpuSetAL(0x00);
+        }
+        break;
+    }
     case 0x14: // SEQUENTIAL READ USING FCB
         dos_show_fcb();
         cpuSetAL(dos_read_record_fcb(dosDTA, 1));
