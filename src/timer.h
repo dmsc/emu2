@@ -8,4 +8,3 @@ uint32_t get_bios_timer(void);
 void int1A(void);
 uint8_t port_timer_read(uint16_t port);
 void port_timer_write(uint16_t port, uint8_t val);
-

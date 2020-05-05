@@ -1,7 +1,7 @@
 #include "keyb.h"
+#include "codepage.h"
 #include "dbg.h"
 #include "emu.h"
-#include "codepage.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -235,7 +235,7 @@ static int get_esc_secuence(void)
         {
             if(n1 == 0 && n2 == 0)
                 return alt_char(ch); // it is an ALT+'[' or ALT+'O'
-            return 0;    // ERROR!
+            return 0;                // ERROR!
         }
         if(cn >= '0' && cn <= '9')
             n2 = n2 * 10 + (cn - '0');
@@ -338,8 +338,7 @@ static int read_key(void)
         if(read(tty_fd, &ch1, 1) == 0 || (ch1 & 0xC0) != 0x80 ||
            read(tty_fd, &ch2, 1) == 0 || (ch2 & 0xC0) != 0x80)
             return -1; // INVALID UTF-8
-        return get_dos_char(((ch & 0x0F) << 12) | ((ch1 & 0x3F) << 6) |
-                            (ch2 & 0x3F));
+        return get_dos_char(((ch & 0x0F) << 12) | ((ch1 & 0x3F) << 6) | (ch2 & 0x3F));
     }
     else if((ch & 0xF8) == 0xF0)
     {
@@ -417,7 +416,7 @@ int getch(int detect_brk)
     int ret;
     while(queued_key == -1)
     {
-        if( kbhit() )
+        if(kbhit())
             break;
         usleep(1000000);
         waiting_key = 1;

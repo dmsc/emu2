@@ -117,9 +117,13 @@ static void PushWord(uint16_t w)
 }
 
 #ifdef CPU_PUSH_80286
-#  define PUSH_SP() PushWord(wregs[SP]); break;
+#define PUSH_SP()                                                              \
+    PushWord(wregs[SP]);                                                       \
+    break;
 #else
-#  define PUSH_SP() PushWord(wregs[SP] - 2); break;
+#define PUSH_SP()                                                              \
+    PushWord(wregs[SP] - 2);                                                   \
+    break;
 #endif
 
 static uint16_t PopWord(void)
@@ -129,8 +133,12 @@ static uint16_t PopWord(void)
     return tmp;
 }
 
-#define PUSH_WR(reg) PushWord(wregs[reg]); break;
-#define POP_WR(reg) wregs[reg] = PopWord(); break;
+#define PUSH_WR(reg)                                                           \
+    PushWord(wregs[reg]);                                                      \
+    break;
+#define POP_WR(reg)                                                            \
+    wregs[reg] = PopWord();                                                    \
+    break;
 
 #define XCHG_AX_WR(reg)                                                        \
     {                                                                          \
@@ -453,7 +461,7 @@ static void handle_irq(void)
         if(bit)
         {
             uint8_t bp[16] = {0, 1, 2, 5, 3, 9, 6, 11, 15, 4, 8, 10, 14, 7, 13, 12};
-            uint8_t irqn = bp[(bit * 0x9af)>>12];
+            uint8_t irqn = bp[(bit * 0x9af) >> 12];
             debug(debug_int, "handle irq, mask=$%04x irq=%d\n", irq_mask, irqn);
             irq_mask &= ~bit;
             if(irqn < 8)
@@ -680,9 +688,15 @@ static void handle_irq(void)
     }                                                                          \
     break;
 
-#define MOV_BRH(reg) wregs[reg] = ((0x00FF & wregs[reg]) | (FETCH_B() << 8)); break;
-#define MOV_BRL(reg) wregs[reg] = ((0xFF00 & wregs[reg]) | FETCH_B()); break;
-#define MOV_WRi(reg) wregs[reg] = FETCH_W(); break;
+#define MOV_BRH(reg)                                                           \
+    wregs[reg] = ((0x00FF & wregs[reg]) | (FETCH_B() << 8));                   \
+    break;
+#define MOV_BRL(reg)                                                           \
+    wregs[reg] = ((0xFF00 & wregs[reg]) | FETCH_B());                          \
+    break;
+#define MOV_WRi(reg)                                                           \
+    wregs[reg] = FETCH_W();                                                    \
+    break;
 
 #define SEG_OVERRIDE(seg)                                                      \
     {                                                                          \
@@ -1733,8 +1747,7 @@ static void i_aad(void)
 
 static void i_xlat(void)
 {
-    wregs[AX] =
-        (wregs[AX] & 0xFF00) | GetMemDSB(wregs[BX] + (wregs[AX] & 0xFF));
+    wregs[AX] = (wregs[AX] & 0xFF00) | GetMemDSB(wregs[BX] + (wregs[AX] & 0xFF));
 }
 
 static void i_escape(void)
@@ -2261,18 +2274,14 @@ static void debug_instruction(void)
     unsigned nip = (cpuGetIP() + 0xFFFF) & 0xFFFF; // substract 1!
     const uint8_t *ip = memory + sregs[CS] * 16 + nip;
 
-    debug(debug_cpu, "AX=%04X BX=%04X CX=%04X DX=%04X SP=%04X BP=%04X "
-                     "SI=%04X DI=%04X ",
-          cpuGetAX(), cpuGetBX(), cpuGetCX(), cpuGetDX(), cpuGetSP(),
-          cpuGetBP(), cpuGetSI(), cpuGetDI());
-    debug(debug_cpu, "DS=%04X ES=%04X SS=%04X CS=%04X IP=%04X %s %s %s "
-                     "%s %s %s %s %s ",
+    debug(debug_cpu, "AX=%04X BX=%04X CX=%04X DX=%04X SP=%04X BP=%04X SI=%04X DI=%04X ",
+          cpuGetAX(), cpuGetBX(), cpuGetCX(), cpuGetDX(), cpuGetSP(), cpuGetBP(),
+          cpuGetSI(), cpuGetDI());
+    debug(debug_cpu, "DS=%04X ES=%04X SS=%04X CS=%04X IP=%04X %s %s %s %s %s %s %s %s ",
           cpuGetDS(), cpuGetES(), cpuGetSS(), cpuGetCS(), nip, OF ? "OV" : "NV",
-          DF ? "DN" : "UP", IF ? "EI" : "DI", SF ? "NG" : "PL",
-          ZF ? "ZR" : "NZ", AF ? "AC" : "NA", PF ? "PE" : "PO",
-          CF ? "CY" : "NC");
-    debug(debug_cpu, "%04X:%04X %s\n", sregs[CS], nip,
-          disa(ip, nip, segment_override));
+          DF ? "DN" : "UP", IF ? "EI" : "DI", SF ? "NG" : "PL", ZF ? "ZR" : "NZ",
+          AF ? "AC" : "NA", PF ? "PE" : "PO", CF ? "CY" : "NC");
+    debug(debug_cpu, "%04X:%04X %s\n", sregs[CS], nip, disa(ip, nip, segment_override));
 }
 
 static void do_instruction(uint8_t code)
@@ -2634,6 +2643,5 @@ uint16_t cpuGetStack(uint16_t disp)
 
 void cpuTriggerIRQ(int num)
 {
-    irq_mask |= (1<<num);
+    irq_mask |= (1 << num);
 }
-

@@ -10,23 +10,18 @@ static char buf[128];
 #define IPOS (buf + 17)
 #define EPOS (buf + 127)
 
-static const char *byte_reg[] = {"AL", "CL", "DL", "BL",
-                                 "AH", "CH", "DH", "BH"};
-static const char *word_reg[] = {"AX", "CX", "DX", "BX",
-                                 "SP", "BP", "SI", "DI"};
+static const char *byte_reg[] = {"AL", "CL", "DL", "BL", "AH", "CH", "DH", "BH"};
+static const char *word_reg[] = {"AX", "CX", "DX", "BX", "SP", "BP", "SI", "DI"};
 static const char *seg_reg[] = {"ES", "CS", "SS", "DS"};
 static const char *index_reg[] = {"BX+SI", "BX+DI", "BP+SI", "BP+DI",
                                   "SI",    "DI",    "BP",    "BX"};
-static const char *table_dx[] = {"ROL", "ROR", "RCL", "RCR",
-                                 "SHL", "SHR", "SHL", "SAR"};
+static const char *table_dx[] = {"ROL", "ROR", "RCL", "RCR", "SHL", "SHR", "SHL", "SAR"};
 static const char *table_f6[] = {"TEST", "ILL",  "NOT", "NEG",
                                  "MUL",  "IMUL", "DIV", "IDIV"};
-static const char *table_fe[] = {"INC", "DEC", "ILL", "ILL",
-                                 "ILL", "ILL", "ILL", "ILL"};
+static const char *table_fe[] = {"INC", "DEC", "ILL", "ILL", "ILL", "ILL", "ILL", "ILL"};
 static const char *table_ff[] = {"INC", "DEC", "CALL", "CALL",
                                  "JMP", "JMP", "PUSH", "ILL"};
-static const char *table_8x[] = {"ADD", "OR",  "ADC", "SBB",
-                                 "AND", "SUB", "XOR", "CMP"};
+static const char *table_8x[] = {"ADD", "OR", "ADC", "SBB", "AND", "SUB", "XOR", "CMP"};
 
 #define BREG byte_reg[(ModRM & 0x38) >> 3]
 #define WREG word_reg[(ModRM & 0x38) >> 3]
@@ -55,8 +50,7 @@ static char *get_mem(unsigned ModRM, const uint8_t *ip, const char *rg[],
         if((ModRM & 0x07) != 6)
             sprintf(buffer, "%s%s[%s]", cast, seg_names[seg_over], IXREG);
         else
-            sprintf(buffer, "%s%s[%02X%02X]", cast, seg_names[seg_over], ip[2],
-                    ip[1]);
+            sprintf(buffer, "%s%s[%02X%02X]", cast, seg_names[seg_over], ip[2], ip[1]);
         break;
     case 0x40:
         if((num = ip[1]) > 127)
@@ -66,8 +60,7 @@ static char *get_mem(unsigned ModRM, const uint8_t *ip, const char *rg[],
         }
         else
             ch = '+';
-        sprintf(buffer, "%s%s[%s%c%02X]", cast, seg_names[seg_over], IXREG, ch,
-                num);
+        sprintf(buffer, "%s%s[%s%c%02X]", cast, seg_names[seg_over], IXREG, ch, num);
         break;
     case 0x80:
         if((num = (ip[2] * 256 + ip[1])) > 0x7fff)
@@ -77,8 +70,7 @@ static char *get_mem(unsigned ModRM, const uint8_t *ip, const char *rg[],
         }
         else
             ch = '+';
-        sprintf(buffer, "%s%s[%s%c%04X]", cast, seg_names[seg_over], IXREG, ch,
-                num);
+        sprintf(buffer, "%s%s[%s%c%04X]", cast, seg_names[seg_over], IXREG, ch, num);
         break;
     case 0xc0:
         strcpy(buffer, rg[ModRM & 7]);
@@ -91,10 +83,14 @@ static int get_mem_len(unsigned ModRM)
 {
     switch(ModRM & 0xc0)
     {
-    case 0x00: return ((ModRM & 0x07) == 6) ? 2 : 0;
-    case 0x40: return 1;
-    case 0x80: return 2;
-    default:   return 0;
+    case 0x00:
+        return ((ModRM & 0x07) == 6) ? 2 : 0;
+    case 0x40:
+        return 1;
+    case 0x80:
+        return 2;
+    default:
+        return 0;
     }
 }
 
@@ -119,8 +115,7 @@ static const char *decode_wordreg(const uint8_t *ip, const char *ins)
     return buf;
 }
 
-static const char *decode_jump(const uint8_t *ip, const char *ins,
-                               uint16_t reg_ip)
+static const char *decode_jump(const uint8_t *ip, const char *ins, uint16_t reg_ip)
 {
     reg_ip += 3 + ip[2] * 256 + ip[1];
     fillbytes(ip, 3);
@@ -128,8 +123,7 @@ static const char *decode_jump(const uint8_t *ip, const char *ins,
     return buf;
 }
 
-static const char *decode_jump8(const uint8_t *ip, const char *ins,
-                                uint16_t reg_ip)
+static const char *decode_jump8(const uint8_t *ip, const char *ins, uint16_t reg_ip)
 {
     if(ip[1] < 0x80)
         reg_ip += 2 + ip[1];
@@ -143,54 +137,43 @@ static const char *decode_jump8(const uint8_t *ip, const char *ins,
 static const char *decode_far(const uint8_t *ip, const char *ins)
 {
     fillbytes(ip, 5);
-    sprintf(IPOS, "%-7s %04X:%04X", ins, ip[4] * 256 + ip[3],
-            ip[2] * 256 + ip[1]);
+    sprintf(IPOS, "%-7s %04X:%04X", ins, ip[4] * 256 + ip[3], ip[2] * 256 + ip[1]);
     return buf;
 }
 
-static const char *decode_far_ind(const uint8_t *ip, const char *ins,
-                                  int seg_over)
+static const char *decode_far_ind(const uint8_t *ip, const char *ins, int seg_over)
 {
     unsigned ModRM = ip[1];
     fillbytes(ip, 2 + get_mem_len(ModRM));
-    sprintf(IPOS, "%-7s FAR %s", ins,
-            get_mem(ModRM, ip + 1, word_reg, "", seg_over));
+    sprintf(IPOS, "%-7s FAR %s", ins, get_mem(ModRM, ip + 1, word_reg, "", seg_over));
     return buf;
 }
 
-static const char *decode_memal(const uint8_t *ip, const char *ins,
-                                int seg_over)
+static const char *decode_memal(const uint8_t *ip, const char *ins, int seg_over)
 {
     fillbytes(ip, 3);
-    sprintf(IPOS, "%-7s %s[%02X%02X],AL", ins, seg_names[seg_over], ip[2],
-            ip[1]);
+    sprintf(IPOS, "%-7s %s[%02X%02X],AL", ins, seg_names[seg_over], ip[2], ip[1]);
     return buf;
 }
 
-static const char *decode_memax(const uint8_t *ip, const char *ins,
-                                int seg_over)
+static const char *decode_memax(const uint8_t *ip, const char *ins, int seg_over)
 {
     fillbytes(ip, 3);
-    sprintf(IPOS, "%-7s %s[%02X%02X],AX", ins, seg_names[seg_over], ip[2],
-            ip[1]);
+    sprintf(IPOS, "%-7s %s[%02X%02X],AX", ins, seg_names[seg_over], ip[2], ip[1]);
     return buf;
 }
 
-static const char *decode_almem(const uint8_t *ip, const char *ins,
-                                int seg_over)
+static const char *decode_almem(const uint8_t *ip, const char *ins, int seg_over)
 {
     fillbytes(ip, 3);
-    sprintf(IPOS, "%-7s AL,%s[%02X%02X]", ins, seg_names[seg_over], ip[2],
-            ip[1]);
+    sprintf(IPOS, "%-7s AL,%s[%02X%02X]", ins, seg_names[seg_over], ip[2], ip[1]);
     return buf;
 }
 
-static const char *decode_axmem(const uint8_t *ip, const char *ins,
-                                int seg_over)
+static const char *decode_axmem(const uint8_t *ip, const char *ins, int seg_over)
 {
     fillbytes(ip, 3);
-    sprintf(IPOS, "%-7s AX,%s[%02X%02X]", ins, seg_names[seg_over], ip[2],
-            ip[1]);
+    sprintf(IPOS, "%-7s AX,%s[%02X%02X]", ins, seg_names[seg_over], ip[2], ip[1]);
     return buf;
 }
 
@@ -285,8 +268,8 @@ static const char *decode_br8(const uint8_t *ip, const char *ins, int seg_over)
 {
     unsigned ModRM = ip[1];
     fillbytes(ip, 2 + get_mem_len(ModRM));
-    sprintf(IPOS, "%-7s %s,%s", ins,
-            get_mem(ModRM, ip + 1, byte_reg, "", seg_over), BREG);
+    sprintf(IPOS, "%-7s %s,%s", ins, get_mem(ModRM, ip + 1, byte_reg, "", seg_over),
+            BREG);
     return buf;
 }
 
@@ -305,8 +288,7 @@ static const char *decode_bd8(const uint8_t *ip, const char *ins, int seg_over)
     int ln = get_mem_len(ModRM);
     fillbytes(ip, 3 + ln);
     sprintf(IPOS, "%-7s %s,%02X", ins,
-            get_mem(ModRM, ip + 1, byte_reg, "BYTE PTR ", seg_over),
-            ip[ln + 2]);
+            get_mem(ModRM, ip + 1, byte_reg, "BYTE PTR ", seg_over), ip[ln + 2]);
     return buf;
 }
 
@@ -323,8 +305,8 @@ static const char *decode_ws(const uint8_t *ip, const char *ins, int seg_over)
 {
     unsigned ModRM = ip[1];
     fillbytes(ip, 2 + get_mem_len(ModRM));
-    sprintf(IPOS, "%-7s %s,%s", ins,
-            get_mem(ModRM, ip + 1, word_reg, "", seg_over), SREG);
+    sprintf(IPOS, "%-7s %s,%s", ins, get_mem(ModRM, ip + 1, word_reg, "", seg_over),
+            SREG);
     return buf;
 }
 
@@ -350,8 +332,8 @@ static const char *decode_wr16(const uint8_t *ip, const char *ins, int seg_over)
 {
     unsigned ModRM = ip[1];
     fillbytes(ip, 2 + get_mem_len(ModRM));
-    sprintf(IPOS, "%-7s %s,%s", ins,
-            get_mem(ModRM, ip + 1, word_reg, "", seg_over), WREG);
+    sprintf(IPOS, "%-7s %s,%s", ins, get_mem(ModRM, ip + 1, word_reg, "", seg_over),
+            WREG);
     return buf;
 }
 
@@ -381,25 +363,22 @@ static const char *decode_wd8(const uint8_t *ip, const char *ins, int seg_over)
     int ln = get_mem_len(ModRM);
     fillbytes(ip, 3 + ln);
     sprintf(IPOS, "%-7s %s,%02X", ins,
-            get_mem(ModRM, ip + 1, word_reg, "WORD PTR ", seg_over),
-            ip[ln + 2]);
+            get_mem(ModRM, ip + 1, word_reg, "WORD PTR ", seg_over), ip[ln + 2]);
     return buf;
 }
 
-static const char *decode_imul_b(const uint8_t *ip, const char *ins,
-                                 int seg_over)
+static const char *decode_imul_b(const uint8_t *ip, const char *ins, int seg_over)
 {
     unsigned ModRM = ip[1];
     uint8_t d1 = ip[2 + get_mem_len(ModRM)];
     fillbytes(ip, 3 + get_mem_len(ModRM));
     sprintf(IPOS, "%-7s %s,%s,%c%02X", ins, WREG,
-            get_mem(ModRM, ip + 1, word_reg, "", seg_over),
-            d1 > 0x7F ? '-' : '+', d1 > 0x7F ? 0x100 - d1 : d1);
+            get_mem(ModRM, ip + 1, word_reg, "", seg_over), d1 > 0x7F ? '-' : '+',
+            d1 > 0x7F ? 0x100 - d1 : d1);
     return buf;
 }
 
-static const char *decode_imul_w(const uint8_t *ip, const char *ins,
-                                 int seg_over)
+static const char *decode_imul_w(const uint8_t *ip, const char *ins, int seg_over)
 {
     unsigned ModRM = ip[1];
     uint8_t d1 = ip[2 + get_mem_len(ModRM)];
@@ -416,8 +395,7 @@ static const char *decode_bbitd8(const uint8_t *ip, int seg_over)
     int ln = get_mem_len(ModRM);
     fillbytes(ip, 3 + ln);
     sprintf(IPOS, "%-7s %s,%2x", table_dx[(ModRM & 0x38) >> 3],
-            get_mem(ModRM, ip + 1, byte_reg, "BYTE PTR ", seg_over),
-            ip[ln + 2]);
+            get_mem(ModRM, ip + 1, byte_reg, "BYTE PTR ", seg_over), ip[ln + 2]);
     return buf;
 }
 
@@ -427,8 +405,7 @@ static const char *decode_wbitd8(const uint8_t *ip, int seg_over)
     int ln = get_mem_len(ModRM);
     fillbytes(ip, 3 + ln);
     sprintf(IPOS, "%-7s %s,%02x", table_dx[(ModRM & 0x38) >> 3],
-            get_mem(ModRM, ip + 1, word_reg, "WORD PTR ", seg_over),
-            ip[ln + 2]);
+            get_mem(ModRM, ip + 1, word_reg, "WORD PTR ", seg_over), ip[ln + 2]);
     return buf;
 }
 
@@ -499,7 +476,7 @@ static const char *show_io(const uint8_t *ip, const char *ins, const char *regs)
 {
     fillbytes(ip, 1);
     strcpy(IPOS, ins);
-    strcpy(IPOS+8, regs);
+    strcpy(IPOS + 8, regs);
     return buf;
 }
 
@@ -510,8 +487,7 @@ static const char *show(const uint8_t *ip, const char *ins)
     return buf;
 }
 
-static const char *show_str(const uint8_t *ip, const char *ins,
-                            int segment_override)
+static const char *show_str(const uint8_t *ip, const char *ins, int segment_override)
 {
     fillbytes(ip, 1);
     int ln = strlen(seg_names[segment_override]);

@@ -1,7 +1,7 @@
 #include "video.h"
+#include "codepage.h"
 #include "dbg.h"
 #include "emu.h"
-#include "codepage.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -147,18 +147,18 @@ static void init_video(void)
         print_error("error at open TTY, %s\n", strerror(errno));
         exit(1);
     }
-    tty_file = fdopen(tty_fd,"w");
+    tty_file = fdopen(tty_fd, "w");
     atexit(exit_video);
     video_initialized = 1;
 
     // Fill the functionality table
-    memory[0xC0100] = 0x08;  // Only mode 3 supported
+    memory[0xC0100] = 0x08; // Only mode 3 supported
     memory[0xC0101] = 0x00;
     memory[0xC0102] = 0x00;
-    memory[0xC0107] = 0x07;  // Support 300, 350 and 400 scanlines
-    memory[0xC0108] = 0x00;  // Active character blocks?
-    memory[0xC0109] = 0x00;  // MAximum character blocks?
-    memory[0xC0108] = 0xFF;  // Support functions
+    memory[0xC0107] = 0x07; // Support 300, 350 and 400 scanlines
+    memory[0xC0108] = 0x00; // Active character blocks?
+    memory[0xC0109] = 0x00; // MAximum character blocks?
+    memory[0xC0108] = 0xFF; // Support functions
 
     // Set video mode
     set_text_mode(1);
@@ -179,7 +179,7 @@ static void set_color(uint8_t c)
     {
         static char cn[8] = "04261537";
         fprintf(tty_file, "\x1b[%c;3%c;4%cm", (c & 0x08) ? '1' : '0', cn[c & 7],
-               cn[(c >> 4) & 7]);
+                cn[(c >> 4) & 7]);
         term_color = c;
     }
 }
@@ -303,11 +303,9 @@ void check_screen(void)
     fflush(tty_file);
 }
 
-static void vid_scroll_up(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1,
-                          int n)
+static void vid_scroll_up(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1, int n)
 {
-    debug(debug_video, "scroll up %d: (%d, %d) - (%d, %d)\n", n,
-          x0, y0, x1, y1);
+    debug(debug_video, "scroll up %d: (%d, %d) - (%d, %d)\n", n, x0, y0, x1, y1);
 
     // Check parameters
     if(x1 >= vid_sx)
@@ -348,11 +346,9 @@ static void vid_scroll_up(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1,
             vm[x + y * vid_sx] = (vid_color << 8) + 0x20;
 }
 
-static void vid_scroll_dwn(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1,
-                           unsigned n)
+static void vid_scroll_dwn(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1, unsigned n)
 {
-    debug(debug_video, "scroll down %d: (%d, %d) - (%d, %d)\n", n,
-          x0, y0, x1, y1);
+    debug(debug_video, "scroll down %d: (%d, %d) - (%d, %d)\n", n, x0, y0, x1, y1);
 
     // Check parameters
     if(x1 >= vid_sx)
@@ -405,7 +401,7 @@ static void video_putchar(uint8_t ch, uint16_t at)
     else if(ch == 0x08)
     {
         if(vid_posx > 0)
-            vid_posx --;
+            vid_posx--;
     }
     else
     {
@@ -497,14 +493,14 @@ void int10()
         uint16_t px = vid_posx;
         uint16_t py = vid_posy;
         vid_color = cpuGetBX() & 0xFF;
-        for(int i = cpuGetCX(); i>0; i--)
+        for(int i = cpuGetCX(); i > 0; i--)
         {
             set_xy(px, py, (ax & 0xFF) + (vid_color << 8), 0);
-            px ++;
+            px++;
             if(px >= vid_sx)
             {
                 px = 0;
-                py ++;
+                py++;
                 if(py >= vid_sy)
                     py = 0;
             }
@@ -536,7 +532,7 @@ void int10()
             // Clear end-of-screen
             unsigned max = get_last_used_row();
             debug(debug_video, "set 25 lines mode %d\n", max);
-            if (max > 25)
+            if(max > 25)
             {
                 term_goto_xy(0, 24);
                 set_color(0x07);
@@ -544,7 +540,7 @@ void int10()
                 for(int y = 25; y < 64; y++)
                     for(int x = 0; x < 256; x++)
                         term_screen[y][x] = 0x0720;
-                if (output_row > 24)
+                if(output_row > 24)
                     output_row = 24;
             }
             // Set 8x16 font - 80x25 mode:
@@ -558,7 +554,7 @@ void int10()
             debug(debug_video, "set 43/50 lines mode\n");
             // Hack - QBASIC.EXE assumes that the mode is always 50 lines on VGA,
             // and *sets* the height into the BIOS area!
-            if(memory[0x484]>42)
+            if(memory[0x484] > 42)
                 vid_sy = 50;
             else
                 vid_sy = 43;
@@ -567,62 +563,62 @@ void int10()
         }
         break;
     case 0x12: // ALT FUNCTION SELECT
+    {
+        int bl = cpuGetBX() & 0xFF;
+        if(bl == 0x10) // GET EGA INFO
         {
-            int bl = cpuGetBX() & 0xFF;
-            if(bl == 0x10 ) // GET EGA INFO
-            {
-                cpuSetBX(0x0003);
-                cpuSetCX(0x0000);
-                cpuSetAX(0);
-            }
-            else if(bl == 0x30 ) // SET VERTICAL RESOLUTION
-            {
-                // TODO: select 25/28 lines
-                cpuSetAX(0x1212);
-            }
-            else
-                debug(debug_video, "UNHANDLED INT 10, AH=12 BL=%02x\n", bl);
+            cpuSetBX(0x0003);
+            cpuSetCX(0x0000);
+            cpuSetAX(0);
         }
-        break;
+        else if(bl == 0x30) // SET VERTICAL RESOLUTION
+        {
+            // TODO: select 25/28 lines
+            cpuSetAX(0x1212);
+        }
+        else
+            debug(debug_video, "UNHANDLED INT 10, AH=12 BL=%02x\n", bl);
+    }
+    break;
     case 0x13: // WRITE STRING
+    {
+        vid_posx = cpuGetDX() & 0xFF;
+        vid_posy = cpuGetDX() >> 8;
+        if(vid_posx >= vid_sx)
+            vid_posx = vid_sx - 1;
+        if(vid_posy >= vid_sy)
+            vid_posy = vid_sy - 1;
+        int save_posx = vid_posx;
+        int save_posy = vid_posy;
+        int addr = cpuGetAddrES(cpuGetBP());
+        int cnt = cpuGetCX();
+        if(ax & 2)
         {
-            vid_posx = cpuGetDX() & 0xFF;
-            vid_posy = cpuGetDX() >> 8;
-            if(vid_posx >= vid_sx)
-                vid_posx = vid_sx - 1;
-            if(vid_posy >= vid_sy)
-                vid_posy = vid_sy - 1;
-            int save_posx = vid_posx;
-            int save_posy = vid_posy;
-            int addr = cpuGetAddrES(cpuGetBP());
-            int cnt = cpuGetCX();
-            if(ax&2)
+            while(cnt && addr < 0xFFFFF)
             {
-                while(cnt && addr < 0xFFFFF)
-                {
-                    video_putchar(memory[addr], memory[addr+1]);
-                    addr += 2;
-                    cnt --;
-                }
+                video_putchar(memory[addr], memory[addr + 1]);
+                addr += 2;
+                cnt--;
             }
-            else
-            {
-                uint8_t at = cpuGetBX() >> 8;
-                while(cnt && addr <= 0xFFFFF)
-                {
-                    video_putchar(memory[addr], at);
-                    addr ++;
-                    cnt --;
-                }
-            }
-            if(!(ax & 1))
-            {
-                vid_posx = save_posx;
-                vid_posy = save_posy;
-            }
-            update_posxy();
         }
-        break;
+        else
+        {
+            uint8_t at = cpuGetBX() >> 8;
+            while(cnt && addr <= 0xFFFFF)
+            {
+                video_putchar(memory[addr], at);
+                addr++;
+                cnt--;
+            }
+        }
+        if(!(ax & 1))
+        {
+            vid_posx = save_posx;
+            vid_posy = save_posy;
+        }
+        update_posxy();
+    }
+    break;
     case 0x1A: // GET/SET DISPLAY COMBINATION CODE
         cpuSetAX(0x001A);
         cpuSetBX(0x0008); // VGA + analog color display
@@ -635,27 +631,27 @@ void int10()
             {
                 // Store state information
                 memset(memory + addr, 0, 64);
-                memory[addr+0] = 0x00;
-                memory[addr+1] = 0x01;
-                memory[addr+2] = 0x00;
-                memory[addr+3] = 0xC0; // static-func table at C000:0000
-                memory[addr+4] = 0x03; // Video mode
-                memory[addr+5] = vid_sx;
-                memory[addr+6] = vid_sx >> 8;
-                memory[addr+11] = vid_posx; // page 0
-                memory[addr+12] = vid_posy;
-                memory[addr+27] = vid_cursor * 6; // cursor start scanline
-                memory[addr+28] = vid_cursor * 7; // cursor end scanline
-                memory[addr+29] = 0; // current page
-                memory[addr+30] = 0xD4;
-                memory[addr+31] = 0x03; // CRTC port: 03D4
-                memory[addr+34] = vid_sy;
-                memory[addr+35] = vid_font_lines;
-                memory[addr+36] = 0x00; // font lines: 0010
-                memory[addr+39] = 0x10;
-                memory[addr+40] = 0x00; // # of colors: 0010
-                memory[addr+42] = 2; // # of scan-lines - get from vid_sy
-                memory[addr+49] = 3; // 256k memory
+                memory[addr + 0] = 0x00;
+                memory[addr + 1] = 0x01;
+                memory[addr + 2] = 0x00;
+                memory[addr + 3] = 0xC0; // static-func table at C000:0000
+                memory[addr + 4] = 0x03; // Video mode
+                memory[addr + 5] = vid_sx;
+                memory[addr + 6] = vid_sx >> 8;
+                memory[addr + 11] = vid_posx; // page 0
+                memory[addr + 12] = vid_posy;
+                memory[addr + 27] = vid_cursor * 6; // cursor start scanline
+                memory[addr + 28] = vid_cursor * 7; // cursor end scanline
+                memory[addr + 29] = 0;              // current page
+                memory[addr + 30] = 0xD4;
+                memory[addr + 31] = 0x03; // CRTC port: 03D4
+                memory[addr + 34] = vid_sy;
+                memory[addr + 35] = vid_font_lines;
+                memory[addr + 36] = 0x00; // font lines: 0010
+                memory[addr + 39] = 0x10;
+                memory[addr + 40] = 0x00; // # of colors: 0010
+                memory[addr + 42] = 2;    // # of scan-lines - get from vid_sy
+                memory[addr + 49] = 3;    // 256k memory
                 cpuSetAX(0x1B1B);
             }
         }
@@ -676,9 +672,9 @@ uint8_t video_crtc_read(int port)
 {
     if(port & 1)
     {
-        if( crtc_port == 0x0E )
+        if(crtc_port == 0x0E)
             return crtc_cursor_loc >> 8;
-        if( crtc_port == 0x0F )
+        if(crtc_port == 0x0F)
             return crtc_cursor_loc;
         else
             return 0;
@@ -691,9 +687,9 @@ void video_crtc_write(int port, uint8_t value)
 {
     if(port & 1)
     {
-        if( crtc_port == 0x0E )
+        if(crtc_port == 0x0E)
             crtc_cursor_loc = (crtc_cursor_loc & 0xFF) | (value << 8);
-        if( crtc_port == 0x0F )
+        if(crtc_port == 0x0F)
             crtc_cursor_loc = (crtc_cursor_loc & 0xFF00) | (value);
         else
             debug(debug_video, "CRTC port write [%02x] <- %02x\n", crtc_port, value);

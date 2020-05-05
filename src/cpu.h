@@ -1,22 +1,11 @@
-/****************************************************************************
-*                                                                           *
-*                            Third Year Project                             *
-*                                                                           *
-*                            An IBM PC Emulator                             *
-*                          For Unix and X Windows                           *
-*                                                                           *
-*                             By David Hedley                               *
-*                                                                           *
-*                                                                           *
-* This program is Copyrighted.  Consult the file COPYRIGHT for more details *
-*                                                                           *
-****************************************************************************/
+/*
+ * This is based on code by David Hedley, from pcemu.
+ *
+ * Most of the CPU emulation was rewritten and code was extended to support
+ * 80186 and some 81280 instructions.
+ */
 
-/* This is CPU.H  it contains definitions for cpu.c */
-
-#ifndef CPU_H
-#define CPU_H
-
+#pragma once
 #include <stdint.h>
 
 // Enable/disable 80286 stack emulation, 80286 and higher push the old value of
@@ -75,5 +64,3 @@ enum
         DF = ((f)&1024) == 1024;                                               \
         OF = (f)&2048;                                                         \
     }
-
-#endif

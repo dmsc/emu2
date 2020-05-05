@@ -68,9 +68,7 @@ static void int12(void)
 }
 
 // Network access, ignored.
-static void int2a(void)
-{
-}
+static void int2a(void) {}
 
 // System Reset
 static void int19(void)
@@ -142,8 +140,7 @@ static void check_exit_mem(void)
     {
         if(chk_mem_arr[i] != memory[i])
         {
-            fprintf(stderr,
-                    "%s: check memory: differ at byte %X, %02X != %02X\n",
+            fprintf(stderr, "%s: check memory: differ at byte %X, %02X != %02X\n",
                     prog_name, i, chk_mem_arr[i], memory[i]);
             break;
         }
@@ -239,8 +236,7 @@ int main(int argc, char **argv)
             break;
         case 'r':
             bin_load_seg = strtol(opt, &ep, 0);
-            if((*ep != 0 && *ep != ':') || bin_load_seg < 0 ||
-               bin_load_seg > 0xFFFF)
+            if((*ep != 0 && *ep != ':') || bin_load_seg < 0 || bin_load_seg > 0xFFFF)
                 print_usage_error("binary run segment '%s' invalid.", opt);
             if(*ep == 0)
             {
@@ -263,8 +259,7 @@ int main(int argc, char **argv)
             {
                 chk_mem_arr = malloc(1024 * 1024);
                 chk_mem_len = fread(chk_mem_arr, 1, 1024 * 1024, cf);
-                fprintf(stderr, "%s: will check %X bytes.\n", argv[0],
-                        chk_mem_len);
+                fprintf(stderr, "%s: will check %X bytes.\n", argv[0], chk_mem_len);
                 atexit(check_exit_mem);
             }
         }

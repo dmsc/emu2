@@ -1,10 +1,10 @@
 #include "loader.h"
 #include "dbg.h"
 #include "emu.h"
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <ctype.h>
 
 // Main Memory (17 * 64K, no overlap)
 uint8_t memory[0x110000];
@@ -15,19 +15,22 @@ uint8_t mcb_alloc_st = 0;
 // PSP (Program Segment Prefix) location
 uint16_t current_PSP;
 
+// MS-DOS version to emulate on FCB command line parsing.
 #define FCB_PARSE_DOS (3)
 
-int valid_fcb_sep(int i)
+static int valid_fcb_sep(int i)
 {
-    return isspace(i) || i == ',' || i=='=' || i==';';
+    return isspace(i) || i == ',' || i == '=' || i == ';';
 }
 
-int valid_fcb_char(int i)
+static int valid_fcb_char(int i)
 {
     return isalnum(i) || (i > 127 && i < 229) || (i > 229) ||
-           (i == '\\' && FCB_PARSE_DOS == 1) || strchr("!#$%&'()-@^_`{}~?<>", i);
+           (i == '\\' && FCB_PARSE_DOS == 1) ||
+           strchr("!#$%&'()-@^_`{}~?<>", i);
 }
 
+// The FCB parsing states.
 #define FCB_PARSE_INIT 0
 #define FCB_PARSE_INIT_PLUS 10
 #define FCB_PARSE_FCB1 1
@@ -39,7 +42,8 @@ int valid_fcb_char(int i)
 #define FCB_PARSE_FCB2_EXT 5
 #define FCB_PARSE_EXIT 6
 
-void cmdline_to_fcb(const char *cmd_line, uint8_t *fcb1, uint8_t *fcb2) {
+static void cmdline_to_fcb(const char *cmd_line, uint8_t *fcb1, uint8_t *fcb2)
+{
     int i = 0;
     int state = FCB_PARSE_INIT;
     uint8_t *offset = fcb1 + 1;
@@ -47,57 +51,77 @@ void cmdline_to_fcb(const char *cmd_line, uint8_t *fcb1, uint8_t *fcb2) {
     *fcb2 = 0;
     memset(fcb1 + 1, ' ', 11);
     memset(fcb2 + 1, ' ', 11);
-    while (cmd_line[i]) {
-        int c=cmd_line[i];
-        if(FCB_PARSE_DOS == 1 && c==';') {
-            c='+';
+    while(cmd_line[i])
+    {
+        int c = cmd_line[i];
+        if(FCB_PARSE_DOS == 1 && c == ';')
+        {
+            c = '+';
         }
-        switch (state) {
+        switch(state)
+        {
         case FCB_PARSE_INIT:
         case FCB_PARSE_INIT_PLUS:
-            switch (c) {
+            switch(c)
+            {
             case '.':
                 offset = fcb1 + 9;
                 state = FCB_PARSE_FCB1_EXT;
                 break;
             case '+':
-               if (state == FCB_PARSE_INIT) {
+                if(state == FCB_PARSE_INIT)
+                {
                     state = FCB_PARSE_INIT_PLUS;
-                } else {
+                }
+                else
+                {
                     offset = fcb2 + 1;
-                    state = (FCB_PARSE_DOS == 1)?FCB_PARSE_SEP:FCB_PARSE_SEP_PURGE;
+                    state = (FCB_PARSE_DOS == 1) ? FCB_PARSE_SEP
+                                                 : FCB_PARSE_SEP_PURGE;
                 }
                 break;
             case '*':
-                for (int j = 0; j < 8; j++) {
+                for(int j = 0; j < 8; j++)
+                {
                     fcb1[j + 1] = '?';
                 }
                 offset = fcb1 + 9;
                 break;
             default:
-                if (valid_fcb_sep(c)) {
-                    if(FCB_PARSE_DOS > 1 && state == FCB_PARSE_INIT_PLUS
-                        && (FCB_PARSE_DOS>2 || !isspace(c))) {
+                if(valid_fcb_sep(c))
+                {
+                    if(FCB_PARSE_DOS > 1 && state == FCB_PARSE_INIT_PLUS &&
+                       (FCB_PARSE_DOS > 2 || !isspace(c)))
+                    {
                         offset = fcb2 + 1;
                         state = FCB_PARSE_SEP_PURGE;
                         i--;
                     }
                     break;
                 }
-                if (valid_fcb_char(c)) {
-                    if (cmd_line[i + 1] == ':') {
+                if(valid_fcb_char(c))
+                {
+                    if(cmd_line[i + 1] == ':')
+                    {
                         *fcb1 = toupper(c) - 'A' + 1;
                         i++;
-                    } else {
+                    }
+                    else
+                    {
                         *offset = toupper(c);
                         offset++;
                     }
                     state = FCB_PARSE_FCB1;
-                } else {
-                    if(FCB_PARSE_DOS == 1) {
+                }
+                else
+                {
+                    if(FCB_PARSE_DOS == 1)
+                    {
                         state = FCB_PARSE_EXIT;
-                    } else {
-                        offset = fcb2 +1;
+                    }
+                    else
+                    {
+                        offset = fcb2 + 1;
                         state = FCB_PARSE_SEP_PURGE;
                     }
                 }
@@ -105,48 +129,56 @@ void cmdline_to_fcb(const char *cmd_line, uint8_t *fcb1, uint8_t *fcb2) {
             }
             break;
         case FCB_PARSE_FCB1:
-            switch (c) {
+            switch(c)
+            {
             case '.':
                 offset = fcb1 + 9;
                 state = FCB_PARSE_FCB1_EXT;
                 break;
             case '*':
-                while (offset - fcb1 - 1 < 8) {
+                while(offset - fcb1 - 1 < 8)
+                {
                     *offset = '?';
                     offset++;
                 }
                 break;
             case '+':
-                if (FCB_PARSE_DOS == 1)
+                if(FCB_PARSE_DOS == 1)
                 {
                     offset = fcb2 + 1;
                     state = FCB_PARSE_SEP_PLUS;
                     break;
                 }
             case ':':
-                if (FCB_PARSE_DOS == 1)
+                if(FCB_PARSE_DOS == 1)
                 {
                     offset = fcb2 + 1;
                     state = FCB_PARSE_FCB2;
                     break;
                 }
             default:
-                if (valid_fcb_sep(c)) {
+                if(valid_fcb_sep(c))
+                {
                     offset = fcb2 + 1;
                     state = FCB_PARSE_SEP;
                     break;
                 }
-                if (!valid_fcb_char(c)) {
+                if(!valid_fcb_char(c))
+                {
                     offset = fcb2 + 1;
-                    if(FCB_PARSE_DOS == 1) {
+                    if(FCB_PARSE_DOS == 1)
+                    {
                         state = FCB_PARSE_EXIT;
-                    } else {
+                    }
+                    else
+                    {
                         offset = fcb2 + 1;
                         state = FCB_PARSE_SEP_PURGE;
                     }
                     break;
                 }
-                if (offset - fcb1 - 1 < 8) {
+                if(offset - fcb1 - 1 < 8)
+                {
                     *offset = toupper(c);
                     offset++;
                 }
@@ -154,52 +186,63 @@ void cmdline_to_fcb(const char *cmd_line, uint8_t *fcb1, uint8_t *fcb2) {
             }
             break;
         case FCB_PARSE_FCB1_EXT:
-            switch (c) {
+            switch(c)
+            {
             case '.':
-                if(FCB_PARSE_DOS == 1) {
+                if(FCB_PARSE_DOS == 1)
+                {
                     offset = fcb2 + 9;
                     state = FCB_PARSE_FCB2_EXT;
-                } else {
+                }
+                else
+                {
                     offset = fcb2 + 1;
                     state = FCB_PARSE_SEP_PURGE;
                 }
                 break;
             case '*':
-                while (offset - fcb1 - 9 < 3) {
+                while(offset - fcb1 - 9 < 3)
+                {
                     *offset = '?';
                     offset++;
                 }
                 break;
             case '+':
-                if (FCB_PARSE_DOS == 1)
+                if(FCB_PARSE_DOS == 1)
                 {
                     offset = fcb2 + 1;
                     state = FCB_PARSE_SEP_PLUS;
                     break;
                 }
             case ':':
-                if (FCB_PARSE_DOS == 1)
+                if(FCB_PARSE_DOS == 1)
                 {
                     offset = fcb2 + 1;
                     state = FCB_PARSE_FCB2;
                     break;
                 }
             default:
-                if (valid_fcb_sep(c)) {
+                if(valid_fcb_sep(c))
+                {
                     offset = fcb2 + 1;
                     state = FCB_PARSE_SEP;
                     break;
                 }
-                if (!valid_fcb_char(c)) {
-                    if(FCB_PARSE_DOS == 1) {
+                if(!valid_fcb_char(c))
+                {
+                    if(FCB_PARSE_DOS == 1)
+                    {
                         state = FCB_PARSE_EXIT;
-                    } else {
+                    }
+                    else
+                    {
                         offset = fcb2 + 1;
                         state = FCB_PARSE_SEP_PURGE;
                     }
                     break;
                 }
-                if (offset - fcb1 - 9 < 3) {
+                if(offset - fcb1 - 9 < 3)
+                {
                     *offset = toupper(c);
                     offset++;
                 }
@@ -207,7 +250,8 @@ void cmdline_to_fcb(const char *cmd_line, uint8_t *fcb1, uint8_t *fcb2) {
             }
             break;
         case FCB_PARSE_SEP_PURGE:
-            if (valid_fcb_sep(c)) {
+            if(valid_fcb_sep(c))
+            {
                 state = FCB_PARSE_SEP;
                 i--;
                 break;
@@ -215,53 +259,68 @@ void cmdline_to_fcb(const char *cmd_line, uint8_t *fcb1, uint8_t *fcb2) {
             break;
         case 3:
         case 13:
-            switch (c) {
+            switch(c)
+            {
             case '.':
                 offset = fcb2 + 9;
                 state = FCB_PARSE_FCB2_EXT;
                 break;
             case '+':
-                if (state == FCB_PARSE_SEP) {
+                if(state == FCB_PARSE_SEP)
+                {
                     state = FCB_PARSE_SEP_PLUS;
-                } else {
-                   state = FCB_PARSE_EXIT;
+                }
+                else
+                {
+                    state = FCB_PARSE_EXIT;
                 }
                 break;
             case '*':
-                for (int j = 0; j < 8; j++) {
+                for(int j = 0; j < 8; j++)
+                {
                     fcb2[j + 1] = '?';
                 }
                 break;
             default:
-                if (valid_fcb_sep(c)) {
-                    if(FCB_PARSE_DOS > 2 && state == FCB_PARSE_SEP_PLUS) {
+                if(valid_fcb_sep(c))
+                {
+                    if(FCB_PARSE_DOS > 2 && state == FCB_PARSE_SEP_PLUS)
+                    {
                         state = FCB_PARSE_EXIT;
                     }
                     break;
                 }
-                if (valid_fcb_char(c)) {
-                    if (cmd_line[i + 1] == ':') {
+                if(valid_fcb_char(c))
+                {
+                    if(cmd_line[i + 1] == ':')
+                    {
                         *fcb2 = toupper(c) - 'A' + 1;
                         i++;
-                    } else {
+                    }
+                    else
+                    {
                         *offset = toupper(c);
                         offset++;
                     }
                     state = FCB_PARSE_FCB2;
-                } else {
+                }
+                else
+                {
                     state = FCB_PARSE_EXIT;
                 }
                 break;
             }
             break;
         case FCB_PARSE_FCB2:
-           switch (c) {
+            switch(c)
+            {
             case '.':
                 offset = fcb2 + 9;
                 state = FCB_PARSE_FCB2_EXT;
                 break;
             case '*':
-                while (offset - fcb2 - 1 < 8) {
+                while(offset - fcb2 - 1 < 8)
+                {
                     *offset = '?';
                     offset++;
                 }
@@ -272,15 +331,18 @@ void cmdline_to_fcb(const char *cmd_line, uint8_t *fcb1, uint8_t *fcb2) {
                 state = FCB_PARSE_EXIT;
                 break;
             default:
-                if (valid_fcb_sep(c)) {
+                if(valid_fcb_sep(c))
+                {
                     state = FCB_PARSE_EXIT;
                     break;
                 }
-                if (!valid_fcb_char(c)) {
+                if(!valid_fcb_char(c))
+                {
                     state = FCB_PARSE_EXIT;
                     break;
                 }
-                if (offset - fcb2 - 1 < 8) {
+                if(offset - fcb2 - 1 < 8)
+                {
                     *offset = toupper(c);
                     offset++;
                 }
@@ -288,9 +350,11 @@ void cmdline_to_fcb(const char *cmd_line, uint8_t *fcb1, uint8_t *fcb2) {
             }
             break;
         case FCB_PARSE_FCB2_EXT:
-            switch (c) {
+            switch(c)
+            {
             case '*':
-                while (offset - fcb2 - 9 < 3) {
+                while(offset - fcb2 - 9 < 3)
+                {
                     *offset = '?';
                     offset++;
                 }
@@ -303,15 +367,18 @@ void cmdline_to_fcb(const char *cmd_line, uint8_t *fcb1, uint8_t *fcb2) {
                 state = FCB_PARSE_EXIT;
                 break;
             default:
-                if (valid_fcb_sep(c)) {
+                if(valid_fcb_sep(c))
+                {
                     state = FCB_PARSE_EXIT;
                     break;
                 }
-                if (!valid_fcb_char(c)) {
+                if(!valid_fcb_char(c))
+                {
                     state = FCB_PARSE_EXIT;
                     break;
                 }
-                if (offset - fcb2 - 9 < 3) {
+                if(offset - fcb2 - 9 < 3)
+                {
                     *offset = toupper(c);
                     offset++;
                 }
@@ -321,7 +388,8 @@ void cmdline_to_fcb(const char *cmd_line, uint8_t *fcb1, uint8_t *fcb2) {
         default:
             break;
         }
-        if (state == FCB_PARSE_EXIT) {
+        if(state == FCB_PARSE_EXIT)
+        {
             break;
         }
         i++;
@@ -550,8 +618,8 @@ Offset  Length  Description
 81h     127     Command line string  */
 
 // Creates main PSP
-uint16_t create_PSP(const char *cmdline, const char *environment,
-                    int env_size, const char *progname)
+uint16_t create_PSP(const char *cmdline, const char *environment, int env_size,
+                    const char *progname)
 {
     // Put environment before PSP and program name, use rounded up environment size:
     int max;
@@ -589,7 +657,7 @@ uint16_t create_PSP(const char *cmdline, const char *environment,
     uint8_t *dosPSP = memory + psp_seg * 16;
     memset(dosPSP, 0, 256);
 
-    dosPSP[0] = 0xCD; // 00: int20
+    dosPSP[0] = 0xCD;                   // 00: int20
     dosPSP[1] = 0x20;
     dosPSP[2] = 0x00;                   // 02: memory end segment
     dosPSP[3] = 0x00;                   //
@@ -606,7 +674,7 @@ uint16_t create_PSP(const char *cmdline, const char *environment,
     unsigned l = strlen(cmdline);
     if(l > 126)
         l = 126;
-    dosPSP[128] = l; // 80: Cmd line len
+    dosPSP[128] = l;                    // 80: Cmd line len
     memcpy(dosPSP + 129, cmdline, l);
     dosPSP[129 + l] = 0x00d;            // Adds an ENTER at the end
     // Copy environment:
@@ -621,7 +689,7 @@ uint16_t create_PSP(const char *cmdline, const char *environment,
             l = 63;
         memcpy(memory + env_seg * 16 + env_size + 2, progname, l);
     }
-    cmdline_to_fcb(cmdline,dosPSP+0x5C,dosPSP+0x6C);
+    cmdline_to_fcb(cmdline, dosPSP + 0x5C, dosPSP + 0x6C);
     return psp_mcb;
 }
 
@@ -738,7 +806,7 @@ int dos_load_exe(FILE *f, uint16_t psp_mcb)
     // An EXE file, read rest of blocks
     int head_size = g16(buf + 8) * 16;
     int data_blocks = g16(buf + 4);
-    if(data_blocks&0xF800)
+    if(data_blocks & 0xF800)
     {
         debug(debug_dos, "\tinvalid number of blocks ($%04x), fixing.\n",
               data_blocks);
@@ -758,7 +826,7 @@ int dos_load_exe(FILE *f, uint16_t psp_mcb)
         max_sz = 0xFFFF;
 
     // Try to resize PSP MCB
-    int psp_sz =mcb_resize(psp_mcb, max_sz);
+    int psp_sz = mcb_resize(psp_mcb, max_sz);
     if(psp_sz < min_sz && psp_sz < max_sz)
     {
         debug(debug_dos, "\texe read, not enough memory!\n");

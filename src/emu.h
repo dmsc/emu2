@@ -94,7 +94,7 @@ static inline void put16(int addr, int v)
 static inline void put32(int addr, unsigned v)
 {
     put16(addr, v & 0xFFFF);
-    put16(addr+2, v >> 16);
+    put16(addr + 2, v >> 16);
 }
 
 // Write 16 bit number
@@ -106,7 +106,7 @@ static inline int get16(int addr)
 // Write 32 bit number
 static inline unsigned get32(int addr)
 {
-    return get16(addr) + (get16(addr+2) << 16);
+    return get16(addr) + (get16(addr + 2) << 16);
 }
 
 // Copy data to CPU memory

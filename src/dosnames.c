@@ -1,8 +1,8 @@
 
 #define _GNU_SOURCE
 
-#include "dbg.h"
 #include "dosnames.h"
+#include "dbg.h"
 #include "emu.h"
 #include "env.h"
 #include <dirent.h>
@@ -21,8 +21,8 @@ static char dos_valid_char(char c)
     if(c >= 'A' && c <= 'Z')
         return c;
     if(c == '!' || c == '#' || c == '$' || c == '%' || c == '&' || c == '\'' ||
-       c == '(' || c == ')' || c == '-' || c == '@' || c == '^' || c == '_' ||
-       c == '{' || c == '}' || c == '~')
+       c == '(' || c == ')' || c == '-' || c == '@' || c == '^' || c == '_' || c == '{' ||
+       c == '}' || c == '~')
         return c;
     if(c >= 'a' && c <= 'z')
         return c - 'a' + 'A';
@@ -262,7 +262,7 @@ void dos_free_file_list(struct dos_file_list *dl)
 // Transforms a string to uppercase
 static void str_ucase(char *str)
 {
-    for(;*str;str++)
+    for(; *str; str++)
         if(*str >= 'a' && *str <= 'z')
             *str = *str - ('a' - 'A');
 }
@@ -270,7 +270,7 @@ static void str_ucase(char *str)
 // Transforms a string to lowercase
 static void str_lcase(char *str)
 {
-    for(;*str;str++)
+    for(; *str; str++)
         if(*str >= 'A' && *str <= 'Z')
             *str = *str + ('a' - 'A');
 }
@@ -376,7 +376,7 @@ int dos_get_default_drive(void)
 // Checks if char is a valid path name character
 static int char_valid(unsigned char c)
 {
-    if(c<32 || c=='/' || c=='\\')
+    if(c < 32 || c == '/' || c == '\\')
         return 0;
     else
         return 1;
@@ -385,7 +385,7 @@ static int char_valid(unsigned char c)
 // Checks if char is a valid path separato
 static int char_pathsep(unsigned char c)
 {
-    if(c=='/' || c=='\\')
+    if(c == '/' || c == '\\')
         return 1;
     else
         return 0;
@@ -400,7 +400,7 @@ static int dos_path_normalize(char *path)
     // Force nul terminated
     path[63] = 0;
 
-    if( path[0] && path[1] == ':' )
+    if(path[0] && path[1] == ':')
     {
         drive = path[0];
         if(drive >= 'A' && drive <= 'Z')
@@ -409,20 +409,20 @@ static int dos_path_normalize(char *path)
             drive = drive - 'a';
         else
             drive = dos_default_drive;
-        memmove(path, path+2,62);
+        memmove(path, path + 2, 62);
         path[62] = path[63] = 0;
     }
 
     // Copy CWD to base
     char base[64];
-    memcpy(base,dos_cwd[drive],64);
+    memcpy(base, dos_cwd[drive], 64);
     // Test for absolute path
     if(path[0] == '\\' || path[0] == '/')
-        memset(base,0,64);
+        memset(base, 0, 64);
 
     // Process each component of path
     int beg, end = 0;
-    while(end<63 && path[end])
+    while(end < 63 && path[end])
     {
         beg = end;
         while(char_valid(path[end]))
@@ -430,33 +430,33 @@ static int dos_path_normalize(char *path)
 
         if(path[end] && !char_pathsep(path[end]))
             break;
-        if(!path[end] && end<63)
-            path[end+1] = 0;
+        if(!path[end] && end < 63)
+            path[end + 1] = 0;
 
         // Test path
         path[end] = 0;
-        if(!strcmp(&path[beg],".."))
+        if(!strcmp(&path[beg], ".."))
         {
             // Up a directory
             int e = strlen(base) - 1;
-            while(e>=0 && !char_pathsep(base[e]))
+            while(e >= 0 && !char_pathsep(base[e]))
                 e--;
-            while(e>=0 && char_pathsep(base[e]))
+            while(e >= 0 && char_pathsep(base[e]))
                 e--;
-            base[e+1] = 0;
+            base[e + 1] = 0;
         }
-        else if(path[beg] && strcmp(&path[beg],"."))
+        else if(path[beg] && strcmp(&path[beg], "."))
         {
             // Standard path, add to base
             int e = strlen(base);
-            if(e<63)
+            if(e < 63)
             {
                 if(e)
                 {
                     base[e] = '\\';
                     e++;
                 }
-                while(e<62 && path[beg])
+                while(e < 62 && path[beg])
                 {
                     base[e] = path[beg];
                     e++;
@@ -477,7 +477,7 @@ static const char *get_base_path(int drive)
 {
     char env[15] = ENV_DRIVE "\0\0";
     env[strlen(env)] = drive + 'A';
-    char * base = getenv(env);
+    char *base = getenv(env);
     if(!base)
         return ".";
     return base;
@@ -485,7 +485,7 @@ static const char *get_base_path(int drive)
 
 const uint8_t *dos_get_cwd(int drive)
 {
-    drive = drive?drive-1:dos_default_drive;
+    drive = drive ? drive - 1 : dos_default_drive;
     return dos_cwd[drive];
 }
 
@@ -511,7 +511,7 @@ int dos_change_cwd(char *path)
 // changes CWD
 int dos_change_dir(int addr)
 {
-    return dos_change_cwd(getstr(addr,63));
+    return dos_change_cwd(getstr(addr, 63));
 }
 
 // Converts a DOS full path to equivalent Unix filename
@@ -520,9 +520,9 @@ char *dos_unix_path(int addr, int force)
     char *path = getstr(addr, 63);
     debug(debug_dos, "\tconvert dos path '%s'\n", path);
     // Check for standard paths:
-    if( *path && (!strcasecmp(path, "NUL") || !strcasecmp(path+1,":NUL")) )
+    if(*path && (!strcasecmp(path, "NUL") || !strcasecmp(path + 1, ":NUL")))
         return strdup("/dev/null");
-    if( *path && (!strcasecmp(path, "CON") || !strcasecmp(path+1,":CON")) )
+    if(*path && (!strcasecmp(path, "CON") || !strcasecmp(path + 1, ":CON")))
         return strdup("/dev/tty");
     // Normalize
     int drive = dos_path_normalize(path);
@@ -538,12 +538,12 @@ char *dos_unix_path_fcb(int addr, int force)
     int opos = 0;
     // Copy drive number from the FCB structure:
     int drive = memory[addr] & 0xFF;
-    if( !drive )
+    if(!drive)
         drive = dos_default_drive;
     else
         drive = drive - 1;
     // And copy file name
-    char *fcb_name = getstr(addr+1, 11);
+    char *fcb_name = getstr(addr + 1, 11);
     debug(debug_dos, "\tconvert dos fcb name %c:'%s'\n", drive + 'A', fcb_name);
 
     // Build complete path, copy current directory and add FCB file name
@@ -551,17 +551,17 @@ char *dos_unix_path_fcb(int addr, int force)
     memcpy(path, dos_cwd[drive], 64);
     opos = strlen(path);
 
-    for(int pos=0; pos<8 && opos<63; pos++, opos++)
-        if( fcb_name[pos] == '?' )
+    for(int pos = 0; pos < 8 && opos < 63; pos++, opos++)
+        if(fcb_name[pos] == '?')
             path[opos] = '?';
-        else if( 0 == (path[opos] = dos_valid_char(fcb_name[pos])) )
+        else if(0 == (path[opos] = dos_valid_char(fcb_name[pos])))
             break;
-    if(opos<63 && (dos_valid_char(fcb_name[8]) || fcb_name[8] == '?') )
+    if(opos < 63 && (dos_valid_char(fcb_name[8]) || fcb_name[8] == '?'))
         path[opos++] = '.';
-    for(int pos=8; pos<11 && opos<63; pos++, opos++)
-        if( fcb_name[pos] == '?' )
+    for(int pos = 8; pos < 11 && opos < 63; pos++, opos++)
+        if(fcb_name[pos] == '?')
             path[opos] = '?';
-        else if( 0 == (path[opos] = dos_valid_char(fcb_name[pos])) )
+        else if(0 == (path[opos] = dos_valid_char(fcb_name[pos])))
             break;
     path[opos] = 0;
 
@@ -571,7 +571,6 @@ char *dos_unix_path_fcb(int addr, int force)
     // Adds CWD if path is not absolute
     return dos_unix_path_rec(base, path, force);
 }
-
 
 ////////////////////////////////////////////////////////////////////
 // Implements FindFirstFile

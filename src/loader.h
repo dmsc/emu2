@@ -1,7 +1,7 @@
 #pragma once
 
-#include <stdio.h>
 #include <stdint.h>
+#include <stdio.h>
 
 // EXE loader
 uint16_t create_PSP(const char *cmdline, const char *environment, int env_size,
