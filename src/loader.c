@@ -15,21 +15,17 @@ uint8_t mcb_alloc_st = 0;
 // PSP (Program Segment Prefix) location
 uint16_t current_PSP;
 
-//#define FCB_DOS11
-//#define FCB_DOS20
+#define FCB_PARSE_DOS (3)
 
-int valid_fcb_sep(int i) { return isspace(i) || i == ',' || i=='=' 
-#if !defined(FCB_DOS11) 
-    || i==';'
-#endif
-    ;}
-int valid_fcb_char(int i) {
+int valid_fcb_sep(int i)
+{
+    return isspace(i) || i == ',' || i=='=' || (FCB_PARSE_DOS > 1 && i==';');
+}
+
+int valid_fcb_char(int i)
+{
     return isalnum(i) || (i > 127 && i < 229) || (i > 229) ||
-#if defined(FCB_DOS11) 
-           strchr("!#$%&'()-@^_`{}~?\\<>", i);
-#else
-           strchr("!#$%&'()-@^_`{}~?<>", i);
-#endif
+           (i == '\\' && FCB_PARSE_DOS == 1) || strchr("!#$%&'()-@^_`{}~?<>", i);
 }
 
 #define FCB_PARSE_INIT 0
@@ -60,7 +56,7 @@ void cmdline_to_fcb(const char *cmd_line, uint8_t *fcb1, uint8_t *fcb2) {
                 offset = fcb1 + 9;
                 state = FCB_PARSE_FCB1_EXT;
                 break;
-#if defined(FCB_DOS11) 
+#if FCB_PARSE_DOS == 1 
             case ';':
 #endif
             case '+':
@@ -68,11 +64,7 @@ void cmdline_to_fcb(const char *cmd_line, uint8_t *fcb1, uint8_t *fcb2) {
                     state = FCB_PARSE_INIT_PLUS;
                 } else {
                     offset = fcb2 + 1;
-#if defined(FCB_DOS11)
-                    state = FCB_PARSE_SEP;
-#else
-                    state = FCB_PARSE_SEP_PURGE;
-#endif
+                    state = (FCB_PARSE_DOS == 1)?FCB_PARSE_SEP:FCB_PARSE_SEP_PURGE;
                 }
                 break;
             case '*':
@@ -83,20 +75,12 @@ void cmdline_to_fcb(const char *cmd_line, uint8_t *fcb1, uint8_t *fcb2) {
                 break;
             default:
                 if (valid_fcb_sep(cmd_line[i])) {
-#if !defined(FCB_DOS11) && !defined(FCB_DOS20)
-                    if(state == FCB_PARSE_INIT_PLUS) {
+                    if(FCB_PARSE_DOS > 1 && state == FCB_PARSE_INIT_PLUS 
+                        && (FCB_PARSE_DOS>2 || !isspace(cmd_line[i]))) {
                         offset = fcb2 + 1;
                         state = FCB_PARSE_SEP_PURGE;
-                        i--;
+                        i--;                
                     }
-#endif
-#if defined(FCB_DOS20)
-                    if(state == FCB_PARSE_INIT_PLUS && !(isspace(cmd_line[i]))) {
-                        offset = fcb2 + 1;
-                        state = FCB_PARSE_SEP_PURGE;
-                        i--;
-                    }
-#endif
                     break;
                 }
                 if (valid_fcb_char(cmd_line[i])) {
@@ -109,12 +93,12 @@ void cmdline_to_fcb(const char *cmd_line, uint8_t *fcb1, uint8_t *fcb2) {
                     }
                     state = FCB_PARSE_FCB1;
                 } else {
-#if defined(FCB_DOS11) 
-                    state = FCB_PARSE_EXIT;
-#else
-                    offset = fcb2 +1;
-                    state = FCB_PARSE_SEP_PURGE;
-#endif
+                    if(FCB_PARSE_DOS == 1) {
+                        state = FCB_PARSE_EXIT;
+                    } else {
+                        offset = fcb2 +1;
+                        state = FCB_PARSE_SEP_PURGE;
+                    }
                 }
                 break;
             } 
@@ -131,7 +115,7 @@ void cmdline_to_fcb(const char *cmd_line, uint8_t *fcb1, uint8_t *fcb2) {
                     offset++;
                 }
                 break;
-#if defined(FCB_DOS11)
+#if FCB_PARSE_DOS == 1
             case '+':
             case ';':
                 offset = fcb2 + 1;
@@ -150,12 +134,12 @@ void cmdline_to_fcb(const char *cmd_line, uint8_t *fcb1, uint8_t *fcb2) {
                 }
                 if (!valid_fcb_char(cmd_line[i])) {
                     offset = fcb2 + 1;
-#if defined(FCB_DOS11) 
-                    state = FCB_PARSE_EXIT;
-#else
-                    offset = fcb2 + 1;
-                    state = FCB_PARSE_SEP_PURGE;
-#endif
+                    if(FCB_PARSE_DOS == 1) {
+                        state = FCB_PARSE_EXIT;
+                    } else {
+                        offset = fcb2 + 1;
+                        state = FCB_PARSE_SEP_PURGE;
+                    }
                     break;
                 }
                 if (offset - fcb1 - 1 < 8) {
@@ -168,13 +152,13 @@ void cmdline_to_fcb(const char *cmd_line, uint8_t *fcb1, uint8_t *fcb2) {
         case FCB_PARSE_FCB1_EXT:
             switch (cmd_line[i]) {
             case '.':
-#if defined(FCB_DOS11)
-                offset = fcb2 + 9;
-                state = FCB_PARSE_FCB2_EXT;
-#else
-                offset = fcb2 + 1;
-                state = FCB_PARSE_SEP_PURGE;
-#endif
+                if(FCB_PARSE_DOS == 1) {
+                    offset = fcb2 + 9;
+                    state = FCB_PARSE_FCB2_EXT;
+                } else {
+                    offset = fcb2 + 1;
+                    state = FCB_PARSE_SEP_PURGE;
+                }
                 break;
             case '*':
                 while (offset - fcb1 - 9 < 3) {
@@ -182,7 +166,7 @@ void cmdline_to_fcb(const char *cmd_line, uint8_t *fcb1, uint8_t *fcb2) {
                     offset++;
                 }
                 break;
-#if defined(FCB_DOS11)
+#if FCB_PARSE_DOS == 1
             case ';':
             case '+':
                 offset = fcb2 + 1;
@@ -200,12 +184,12 @@ void cmdline_to_fcb(const char *cmd_line, uint8_t *fcb1, uint8_t *fcb2) {
                     break;
                 }
                 if (!valid_fcb_char(cmd_line[i])) {
-#if defined(FCB_DOS11)
-                    state = FCB_PARSE_EXIT;
-#else
-                    offset = fcb2 + 1;
-                    state = FCB_PARSE_SEP_PURGE;
-#endif
+                    if(FCB_PARSE_DOS == 1) {
+                        state = FCB_PARSE_EXIT;
+                    } else {
+                        offset = fcb2 + 1;
+                        state = FCB_PARSE_SEP_PURGE;
+                    }
                     break;
                 }
                 if (offset - fcb1 - 9 < 3) {
@@ -215,7 +199,6 @@ void cmdline_to_fcb(const char *cmd_line, uint8_t *fcb1, uint8_t *fcb2) {
                 break;
             }
             break;
-#if !defined(FCB_DOS11)
         case FCB_PARSE_SEP_PURGE:
             if (valid_fcb_sep(cmd_line[i])) {
                 state = FCB_PARSE_SEP;
@@ -223,7 +206,6 @@ void cmdline_to_fcb(const char *cmd_line, uint8_t *fcb1, uint8_t *fcb2) {
                 break;
             }
             break;
-#endif
         case 3:
         case 13:
             switch (cmd_line[i]) {
@@ -232,7 +214,7 @@ void cmdline_to_fcb(const char *cmd_line, uint8_t *fcb1, uint8_t *fcb2) {
                 state = FCB_PARSE_FCB2_EXT;
                 break;
             case '+':
-#if defined(FCB_DOS11)
+#if FCB_PARSE_DOS == 1
             case ';':
 #endif 
                 if (state == FCB_PARSE_SEP) {
@@ -248,11 +230,9 @@ void cmdline_to_fcb(const char *cmd_line, uint8_t *fcb1, uint8_t *fcb2) {
                 break;
             default:
                 if (valid_fcb_sep(cmd_line[i])) {
-#if !defined(FCB_DOS11) && !defined(FCB_DOS20)
-                    if(state == FCB_PARSE_SEP_PLUS) {
+                    if(FCB_PARSE_DOS > 2 && state == FCB_PARSE_SEP_PLUS) {
                         state = FCB_PARSE_EXIT;
                     }
-#endif                    
                     break;
                 }
                 if (valid_fcb_char(cmd_line[i])) {
