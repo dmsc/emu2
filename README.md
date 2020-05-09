@@ -33,11 +33,14 @@ The available environment variables are:
 - `EMU2_DEBUG`         List of debug options to activate, from the following:
                        `cpu`, `int`, `port`, `dos`, `video`.
 
-- `EMU2_PROGNAME`      DOS program name, if not given use the unix name.
+- `EMU2_PROGNAME`      DOS program name, if not given try to convert the unix
+                       name to an equivalent DOS path.
 
 - `EMU2_DEFAULT_DRIVE` DOS default (current) drive letter, if not given use `C:`
 
-- `EMU2_CWD`           DOS current working directory, use `C:\` if not given.
+- `EMU2_CWD`           DOS current working directory, if not given tries to convert
+                       the current directory to the equivalent DOS path inside the
+                       DOS default drive, or `C:\` if not possible.
 
 - `EMU2_DRIVE_`n       Set unix path as root of drive `n`, by default all drives
                        point to the unix working directory.
@@ -196,7 +199,7 @@ To install, let's first copy all the contents to one directory:
 
 And now, run the emulator giving the correct paths to simulate a floppy drive:
 
-    $ EMU2_DEFAULT_DRIVE=A EMU2_DRIVE_A=all EMU2_PROGNAME=A:INSTALL.EXE emu2 all/INSTALL.EXE
+    $ EMU2_DEFAULT_DRIVE=A EMU2_DRIVE_A=all emu2 all/INSTALL.EXE
 
 ![Image of TP55 INSTALL.EXE](doc/tp55.inst-1.png)
 
@@ -207,7 +210,7 @@ we copied all the content to one drive. Simply type "S" to skip all errors.
 After the installation is finished, we must run the install again, to copy the missing files
 from before, with the same command line:
 
-    $ EMU2_DEFAULT_DRIVE=A EMU2_DRIVE_A=all EMU2_PROGNAME=A:INSTALL.EXE emu2 all/INSTALL.EXE
+    $ EMU2_DEFAULT_DRIVE=A EMU2_DRIVE_A=all emu2 all/INSTALL.EXE
 
 ![Image of TP55 INSTALL.EXE at the end](doc/tp55.inst-2.png)
 
@@ -216,7 +219,7 @@ without errors.
 
 You can now compile from the command line, as:
 
-    $ EMU2_PROGNAME='C:\TP\TPC.EXE' emu2 tp/tpc.exe -- 'PATH=C:\TP'
+    $ emu2 tp/tpc.exe -- 'PATH=C:\TP'
     Turbo Pascal Version 5.5  Copyright (c) 1983,89 Borland International
     Syntax: TPC [options] filename [options]
     /B	Build all units		/$A-	No word alignment
@@ -235,7 +238,7 @@ You can now compile from the command line, as:
     /Uxxx	Unit directories
     /V	EXE debug information
 
-    $ EMU2_PROGNAME='C:\TP\TPC.EXE' emu2 tp/tpc.exe tp\\qsort.pas -- 'PATH=C:\TP'
+    $ emu2 tp/tpc.exe tp\\qsort.pas -- 'PATH=C:\TP'
     Turbo Pascal Version 5.5  Copyright (c) 1983,89 Borland International
     TP\QSORT.PAS(66)
     66 lines, 4384 bytes code, 2668 bytes data.
@@ -245,7 +248,7 @@ You can now compile from the command line, as:
 
 And for the IDE, you can use:
 
-    EMU2_PROGNAME='C:\TP\TURBO.EXE' emu2 tp/turbo.exe  -- 'PATH=C:\TP'
+    emu2 tp/turbo.exe  -- 'PATH=C:\TP'
 
 ![Image of TP55 environment](doc/tp55.turbo.png)
 
