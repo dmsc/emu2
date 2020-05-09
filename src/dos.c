@@ -1969,6 +1969,18 @@ void init_dos(int argc, char **argv)
         strncpy(path, getenv(ENV_CWD), 63);
         dos_change_cwd(path);
     }
+    else
+    {
+        // No CWD given, translate from base path of default drive
+        char *cwd = dos_real_path(dos_get_default_drive(), ".");
+        if(cwd)
+        {
+            dos_change_cwd(cwd);
+            free(cwd);
+        }
+        else
+            debug(debug_dos, "\tWARNING: working directory outside default drive\n");
+    }
 
     // Concat rest of arguments
     int i;
@@ -2002,7 +2014,11 @@ void init_dos(int argc, char **argv)
 
     const char *progname = getenv(ENV_PROGNAME);
     if(!progname)
-        progname = argv[0];
+    {
+        progname = dos_real_path(dos_get_default_drive(), argv[0]);
+        if(!progname)
+            progname = argv[0];
+    }
 
     // Create main PSP
     int psp_mcb = create_PSP(args, environ, p - environ + 1, progname);

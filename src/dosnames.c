@@ -74,6 +74,17 @@ static int dos_search_name(const struct dos_file_list *dl, const uint8_t *name)
     return 0;
 }
 
+static const struct dos_file_list *dos_search_unix_name(const struct dos_file_list *dl,
+                                                        const char *name)
+{
+    for(; dl && dl->unixname; dl++)
+    {
+        if(!strcmp(dl->unixname, name))
+            return dl;
+    }
+    return 0;
+}
+
 // Sort unix entries so that '~' and '.' comes before other chars
 static int dos_unix_sort(const struct dirent **s1, const struct dirent **s2)
 {
@@ -607,4 +618,68 @@ struct dos_file_list *dos_find_first_file(int addr)
 struct dos_file_list *dos_find_first_file_fcb(int addr)
 {
     return find_first_file(dos_unix_path_fcb(addr, 1));
+}
+
+char *dos_real_path(char drive, const char *unix_path)
+{
+    char *ret = 0;
+    // Start by normalizing both base and given paths
+    char *base = realpath(get_base_path(drive), 0);
+    if(!base)
+        return 0;
+    char *path = realpath(unix_path, 0);
+    if(!path)
+    {
+        free(base);
+        return 0;
+    }
+    debug(debug_dos, "dos_real_path: base='%s' path='%s'\n", base, path);
+    // Now, see if the path is actually a descendent of base
+    size_t l = strlen(base), k = strlen(path);
+    if(strncmp(base, path, l) || (path[l] != '/' && path[l]))
+    {
+        debug(debug_dos, "dos_real_path: no common base\n");
+    }
+    else if(k - l > 62)
+    {
+        debug(debug_dos, "dos_real_path: path too long for DOS\n");
+    }
+    else
+    {
+        // Convert remaining components
+        ret = calloc(1, 64);
+        strncat(ret, "C:", 64);
+
+        path[l] = 0;
+        while(++l < k)
+        {
+            // Extract one component
+            char *sep = strchr(path + l, '/');
+            // Cut string there
+            if(!sep)
+                sep = path + k;
+            else
+                *sep = 0;
+            // And search the DOS path name
+            struct dos_file_list *fl = dos_read_dir(path, "*.*");
+            path[l - 1] = '/';
+            const struct dos_file_list *sl = dos_search_unix_name(fl, path);
+            if(!sl)
+            {
+                dos_free_file_list(fl);
+                debug(debug_dos, "dos_real_path: path not found: '%s' in '%s'\n",
+                      path + l, path);
+                free(base);
+                free(path);
+                return 0;
+            }
+            strncat(ret, "\\", 64);
+            strncat(ret, (const char *)sl->dosname, 64);
+            dos_free_file_list(fl);
+            l = sep - path;
+        }
+    }
+    free(base);
+    free(path);
+    return ret;
 }
