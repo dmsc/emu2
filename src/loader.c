@@ -666,6 +666,20 @@ uint16_t create_PSP(const char *cmdline, const char *environment, int env_size,
     dosPSP[7] = 0xFE;                   //     this jumps to 0xC0, where an
     dosPSP[8] = 0x1D;                   //     INT 21h is patched.
     dosPSP[9] = 0xF0;
+    dosPSP[10] = 0x22;                  // Handler for INT 22h
+    dosPSP[11] = 0x00;
+    dosPSP[12] = 0x00;
+    dosPSP[13] = 0x00;
+    dosPSP[14] = 0x23;                  // Handler for INT 23h
+    dosPSP[15] = 0x00;
+    dosPSP[16] = 0x00;
+    dosPSP[17] = 0x00;
+    dosPSP[18] = 0x24;                  // Handler for INT 24h
+    dosPSP[19] = 0x00;
+    dosPSP[20] = 0x00;
+    dosPSP[21] = 0x00;
+    dosPSP[22] = 0xFE;                  // 16: Parent PSP, use special value of FFFE
+    dosPSP[23] = 0xFF;                  //     to signal no parent DOS process
     dosPSP[44] = 0xFF & env_seg;        // 2C: environment segment
     dosPSP[45] = 0xFF & (env_seg >> 8); //
     dosPSP[80] = 0xCD;                  // 50: INT 21h / RETF
@@ -696,6 +710,11 @@ uint16_t create_PSP(const char *cmdline, const char *environment, int env_size,
 unsigned get_current_PSP(void)
 {
     return current_PSP;
+}
+
+void set_current_PSP(unsigned psp_seg)
+{
+    current_PSP = psp_seg;
 }
 
 static int g16(uint8_t *buf)

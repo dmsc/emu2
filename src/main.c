@@ -84,6 +84,8 @@ void bios_routine(unsigned inum)
         int21();
     else if(inum == 0x20)
         int20();
+    else if(inum == 0x22)
+        int22();
     else if(inum == 0x1A)
         int1A();
     else if(inum == 0x19)
