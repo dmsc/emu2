@@ -855,6 +855,69 @@ static void char_input(int brk)
         last_key = 0;
 }
 
+static int line_input(FILE *f, uint8_t *buf, int max)
+{
+    if(video_active())
+    {
+        int len = 0;
+        while(len < max - 1)
+        {
+            char key = getch(1);
+            if(key == '\r')
+            {
+                video_putch('\r');
+                video_putch('\n');
+                buf[len] = '\r';
+                buf[len+1] = '\n';
+                len += 2;
+                break;
+            }
+            else if(key == 8)
+            {
+                if(len)
+                {
+                    len--;
+                    video_putch(key);
+                    video_putch(' ');
+                    video_putch(key);
+                }
+            }
+            else if(len < max && video_get_col() < 79)
+            {
+                video_putch(key);
+                buf[len] = key;
+                len++;
+            }
+        }
+        return len;
+    }
+    else
+    {
+        int i, cr = 0;
+        for(i = 0; i < max; i++)
+        {
+            int c = fgetc(f);
+            if(c < 0)
+                break;
+            if(c == '\n' && !cr && i < max)
+            {
+                cr = 1;
+                buf[i] = '\r';
+                i++;
+            }
+            else if(c == '\r')
+                cr = 1;
+            buf[i] = c;
+            if(c == '\n')
+            {
+                i++;
+                break;
+            }
+        }
+        return i;
+    }
+}
+
 static void int21_debug(void)
 {
     static const char *func_names[] =
@@ -1319,29 +1382,8 @@ void int21()
         // If read from "CON", reads up to the first "CR":
         if(devinfo[cpuGetBX()] == 0x80D3)
         {
-            int i, max = cpuGetCX(), cr = 0;
             suspend_keyboard();
-            for(i = 0; i < max; i++)
-            {
-                int c = fgetc(f);
-                if(c < 0)
-                    break;
-                if(c == '\n' && !cr && i < max)
-                {
-                    cr = 1;
-                    buf[i] = '\r';
-                    i++;
-                }
-                else if(c == '\r')
-                    cr = 1;
-                buf[i] = c;
-                if(c == '\n')
-                {
-                    i++;
-                    break;
-                }
-            }
-            cpuSetAX(i);
+            cpuSetAX(line_input(f, buf, cpuGetCX()));
         }
         else
         {

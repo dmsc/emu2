@@ -697,3 +697,8 @@ void video_crtc_write(int port, uint8_t value)
     else
         crtc_port = value;
 }
+
+int video_get_col(void)
+{
+    return vid_posx;
+}
