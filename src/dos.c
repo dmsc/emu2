@@ -1320,6 +1320,7 @@ void int21()
         if(devinfo[cpuGetBX()] == 0x80D3)
         {
             int i, max = cpuGetCX(), cr = 0;
+            suspend_keyboard();
             for(i = 0; i < max; i++)
             {
                 int c = fgetc(f);

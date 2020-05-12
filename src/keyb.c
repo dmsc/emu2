@@ -392,8 +392,14 @@ static void init_keyboard(void)
             exit(1);
         }
         atexit(exit_keyboard);
-        set_raw_term(1);
     }
+    set_raw_term(1);
+}
+
+// Disables keyboard support - will be enabled again if needed
+void suspend_keyboard(void)
+{
+    set_raw_term(0);
 }
 
 int kbhit(void)
