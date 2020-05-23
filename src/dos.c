@@ -2052,7 +2052,12 @@ void init_dos(int argc, char **argv)
 
     // Init memory handling - available start address at 0x800,
     // ending address at 0xA0000.
-    mcb_init(0x80, 0xA000);
+    // We limit here memory to less than 512K to fix some old programs
+    // that check memori using "JLE" instead of "JBE".
+    if(getenv(ENV_LOWMEM))
+        mcb_init(0x80, 0x7FFF);
+    else
+        mcb_init(0x80, 0xA000);
 
     // Init SYSVARS
     dos_sysvars = get_static_memory(128, 0);

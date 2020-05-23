@@ -55,6 +55,12 @@ The available environment variables are:
                        output, but does not change the DOS NLS information.
                        The default code-page is CP437.
 
+- `EMU2_LOWMEM`        Limits main memory to 512KB, this fixes some old DOS
+                       programs with a bug that checks available memory using
+                       "signed" comparison insructions (JLE instead of JBE).
+                       This is needed at least for MASM versions 1.0 and 1.10.
+
+
 Simple Example
 --------------
 
