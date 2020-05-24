@@ -8,3 +8,4 @@
 #define ENV_CWD       "EMU2_CWD"
 #define ENV_DRIVE     "EMU2_DRIVE_"
 #define ENV_CODEPAGE  "EMU2_CODEPAGE"
+#define ENV_LOWMEM    "EMU2_LOWMEM"

@@ -855,6 +855,69 @@ static void char_input(int brk)
         last_key = 0;
 }
 
+static int line_input(FILE *f, uint8_t *buf, int max)
+{
+    if(video_active())
+    {
+        int len = 0;
+        while(len < max - 1)
+        {
+            char key = getch(1);
+            if(key == '\r')
+            {
+                video_putch('\r');
+                video_putch('\n');
+                buf[len] = '\r';
+                buf[len+1] = '\n';
+                len += 2;
+                break;
+            }
+            else if(key == 8)
+            {
+                if(len)
+                {
+                    len--;
+                    video_putch(key);
+                    video_putch(' ');
+                    video_putch(key);
+                }
+            }
+            else if(len < max && video_get_col() < 79)
+            {
+                video_putch(key);
+                buf[len] = key;
+                len++;
+            }
+        }
+        return len;
+    }
+    else
+    {
+        int i, cr = 0;
+        for(i = 0; i < max; i++)
+        {
+            int c = fgetc(f);
+            if(c < 0)
+                break;
+            if(c == '\n' && !cr && i < max)
+            {
+                cr = 1;
+                buf[i] = '\r';
+                i++;
+            }
+            else if(c == '\r')
+                cr = 1;
+            buf[i] = c;
+            if(c == '\n')
+            {
+                i++;
+                break;
+            }
+        }
+        return i;
+    }
+}
+
 static void int21_debug(void)
 {
     static const char *func_names[] =
@@ -892,7 +955,7 @@ static void int21_debug(void)
           ax, fn, cpuGetBX(), cpuGetCX(), cpuGetDX(), cpuGetDI(), cpuGetDS(), cpuGetES());
 }
 
-// DOS int
+// DOS int 21
 void int21()
 {
     // Check CP/M call, INT 21h from address 0x000C0
@@ -918,8 +981,19 @@ void int21()
     debug(debug_int, "D-21%04X: BX=%04X\n", cpuGetAX(), cpuGetBX());
     if(debug_active(debug_dos))
         int21_debug();
-    unsigned ax = cpuGetAX();
-    switch(ax >> 8)
+
+    // Process interrupt
+    unsigned ax = cpuGetAX(), ah = ax >> 8;
+
+    // Store SS:SP into PSP, used at return from child process
+    // According to DOSBOX, only set for certain functions:
+    if(ah != 0x50 && ah != 0x51 && ah != 0x62 && ah != 0x64 && ah < 0x6c)
+    {
+        put16(cpuGetAddress(get_current_PSP(), 0x2E), cpuGetSP());
+        put16(cpuGetAddress(get_current_PSP(), 0x30), cpuGetSS());
+    }
+
+    switch(ah)
     {
     case 0: // TERMINATE PROGRAM
         exit(0);
@@ -1070,22 +1144,17 @@ void int21()
         put16(4 * (ax & 0xFF), cpuGetDX());
         put16(4 * (ax & 0xFF) + 2, cpuGetDS());
         break;
-    case 0x26: // Create PSP (allocate segment (singleton), and copy PSP)
+    case 0x26: // Create PSP (duplicate current PSP)
     {
-        uint8_t *new_base = getptr(cpuGetAddress(cpuGetDX(), 0), 0x100);
-        uint8_t *orig = getptr(cpuGetAddress(get_current_PSP(), 0), 0x100);
-        if(!new_base || !orig)
+        uint8_t *new_psp = getptr(cpuGetAddress(cpuGetDX(), 0), 0x100);
+        uint8_t *orig_psp = getptr(cpuGetAddress(get_current_PSP(), 0), 0x100);
+        if(!new_psp || !orig_psp)
         {
             debug(debug_dos, "\tinvalid new PSP segment %04x.\n", cpuGetDX());
             break;
         }
         // Copy PSP to the new segment, 0x80 is what DOS does - this excludes command line
-        memcpy(new_base, orig, 0x80);
-        debug(debug_dos, "\tnew PSP segment %04x.\n", cpuGetDX());
-        debug(debug_dos, "\tnew PSP size %02x%02x.\n", new_base[7], new_base[6]);
-        debug(debug_dos, "\toriginal PSP segment %04x.\n", get_current_PSP());
-        debug(debug_dos, "\toriginal PSP size %02x%02x.\n", orig[7], orig[6]);
-        // TODO: Initialize PSP values: int 22h, 23h, 24h and parent PSP segment to 0
+        memcpy(new_psp, orig_psp, 0x80);
         break;
     }
     case 0x27: // BLOCK READ FROM FCB
@@ -1313,28 +1382,8 @@ void int21()
         // If read from "CON", reads up to the first "CR":
         if(devinfo[cpuGetBX()] == 0x80D3)
         {
-            int i, max = cpuGetCX(), cr = 0;
-            for(i = 0; i < max; i++)
-            {
-                int c = fgetc(f);
-                if(c < 0)
-                    break;
-                if(c == '\n' && !cr && i < max)
-                {
-                    cr = 1;
-                    buf[i] = '\r';
-                    i++;
-                }
-                else if(c == '\r')
-                    cr = 1;
-                buf[i] = c;
-                if(c == '\n')
-                {
-                    i++;
-                    break;
-                }
-            }
-            cpuSetAX(i);
+            suspend_keyboard();
+            cpuSetAX(line_input(f, buf, cpuGetCX()));
         }
         else
         {
@@ -1672,7 +1721,37 @@ void int21()
         break;
     }
     case 0x4C: // EXIT
-        exit(ax & 0xFF);
+        // Detect if our PSP is last one
+        debug(debug_dos, "\texit PSP:'%04x', PARENT:%04x.\n", get_current_PSP(),
+              get16(cpuGetAddress(get_current_PSP(), 22)));
+        if(0xFFFE == get16(cpuGetAddress(get_current_PSP(), 22)))
+            exit(ax & 0xFF);
+        else
+        {
+            // Exit to parent
+            // TODO: we must close all child file descriptors and dealocate
+            //       child memory.
+            return_code = cpuGetAX() & 0xFF;
+            // Patch INT 22h, 23h and 24h addresses to the ones saved in new PSP
+            put16(0x88, get16(cpuGetAddress(get_current_PSP(), 10)));
+            put16(0x8A, get16(cpuGetAddress(get_current_PSP(), 12)));
+            put16(0x8C, get16(cpuGetAddress(get_current_PSP(), 14)));
+            put16(0x8E, get16(cpuGetAddress(get_current_PSP(), 16)));
+            put16(0x90, get16(cpuGetAddress(get_current_PSP(), 18)));
+            put16(0x92, get16(cpuGetAddress(get_current_PSP(), 20)));
+            // Set PSP to parent
+            set_current_PSP(get16(cpuGetAddress(get_current_PSP(), 22)));
+            // Get last stack
+            cpuSetSS(get16(cpuGetAddress(get_current_PSP(), 0x30)));
+            cpuSetSP(get16(cpuGetAddress(get_current_PSP(), 0x2E)));
+            int stack = cpuGetAddress(cpuGetSS(), cpuGetSP());
+            // Fixup interrupt return
+            put16(stack, get16(0x22 * 4));
+            put16(stack + 2, get16(0x22 * 4 + 2));
+            put16(stack + 4, 0xf202);
+            // And exit!
+        }
+        break;
     case 0x4D: // GET RETURN CODE (ERRORLEVEL)
         cpuSetAX(return_code);
         return_code = 0;
@@ -1684,11 +1763,33 @@ void int21()
     case 0x4F: // FIND NEXT MATCHING FILE
         dos_find_next(0);
         break;
+    case 0x50: // SET CURRENT PSP
+        set_current_PSP(cpuGetBX());
+        break;
+    case 0x51: // GET CURRENT PSP
+        cpuSetBX(get_current_PSP());
+        break;
     case 0x52: // GET SYSVARS
         cpuSetES(dos_sysvars >> 4);
         cpuSetBX((dos_sysvars & 0xF) + 24);
-        cpuClrFlag(cpuFlag_CF);
         break;
+    case 0x55: // Create CHILD PSP
+    {
+        uint8_t *new_psp = getptr(cpuGetAddress(cpuGetDX(), 0), 0x100);
+        uint8_t *orig_psp = getptr(cpuGetAddress(get_current_PSP(), 0), 0x100);
+        if(!new_psp || !orig_psp)
+        {
+            debug(debug_dos, "\tinvalid new PSP segment %04x.\n", cpuGetDX());
+            break;
+        }
+        // Copy PSP to the new segment, 0x80 is what DOS does - this excludes command line
+        memcpy(new_psp, orig_psp, 0x80);
+        // Set parent PSP to the current one
+        new_psp[22] = get_current_PSP() & 0xFF;
+        new_psp[23] = get_current_PSP() >> 8;
+        set_current_PSP(cpuGetDX());
+        break;
+    }
     case 0x56: // RENAME
     {
         char *fname1 = dos_unix_path(cpuGetAddrDS(cpuGetDX()), 0);
@@ -1804,6 +1905,14 @@ void int21()
         cpuSetFlag(cpuFlag_CF);
         cpuSetAX(ax & 0xFF00);
     }
+}
+
+// DOS int 22 - TERMINATE ADDRESS
+void int22()
+{
+    debug(debug_dos, "D-22: TERMINATE HANDLER CALLED\n");
+    // If we reached here, we must terminate now
+    exit(return_code & 0xFF);
 }
 
 static char *addstr(char *dst, const char *src, int limit)
@@ -1943,7 +2052,12 @@ void init_dos(int argc, char **argv)
 
     // Init memory handling - available start address at 0x800,
     // ending address at 0xA0000.
-    mcb_init(0x80, 0xA000);
+    // We limit here memory to less than 512K to fix some old programs
+    // that check memori using "JLE" instead of "JBE".
+    if(getenv(ENV_LOWMEM))
+        mcb_init(0x80, 0x7FFF);
+    else
+        mcb_init(0x80, 0xA000);
 
     // Init SYSVARS
     dos_sysvars = get_static_memory(128, 0);

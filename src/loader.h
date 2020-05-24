@@ -7,6 +7,7 @@
 uint16_t create_PSP(const char *cmdline, const char *environment, int env_size,
                     const char *progname);
 unsigned get_current_PSP(void);
+void set_current_PSP(unsigned psp_seg);
 
 // DOS Memory handling
 int mem_resize_segment(int seg, int size);
