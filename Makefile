@@ -1,7 +1,7 @@
 CC=gcc
 CFLAGS=-O3 -flto -Wall -g -Werror=implicit-function-declaration -Werror=int-conversion
 LDLIBS=-lm
-INSTALL=install -c
+INSTALL=install
 PREFIX=/usr
 
 OBJS=\
@@ -34,11 +34,12 @@ clean:
 	rm -f emu2
 	rmdir obj
 
-install: 
-	${INSTALL} emu2 ${PREFIX}/bin
+install: emu2
+	$(INSTALL) -d $(DESTDIR)${PREFIX}/bin
+	$(INSTALL) -s emu2 $(DESTDIR)${PREFIX}/bin
 
-uninstall: 
-	rm -f ${PREFIX}/bin/emu2
+uninstall:
+	rm -f $(DESTDIR)${PREFIX}/bin/emu2
 
 # Generated with gcc -MM src/*.c
 obj/codepage.o: src/codepage.c src/codepage.h src/dbg.h src/env.h
