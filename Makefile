@@ -38,7 +38,7 @@ install:
 	${INSTALL} emu2 ${PREFIX}/bin
 
 uninstall: 
-	rm -f ${PREFIX}/bin
+	rm -f ${PREFIX}/bin/emu2
 
 # Generated with gcc -MM src/*.c
 obj/codepage.o: src/codepage.c src/codepage.h src/dbg.h src/env.h
