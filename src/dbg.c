@@ -1,5 +1,6 @@
 #include "dbg.h"
 #include "env.h"
+#include "version.h"
 #include <fcntl.h>
 #include <stdarg.h>
 #include <stdlib.h>
@@ -9,7 +10,7 @@ char *prog_name;
 
 void print_usage(void)
 {
-    printf("Simple x86 + DOS Emulator\n"
+    printf("EMU2 - Simple x86 + DOS Emulator, version " EMU2_VERSION "\n"
            "\n"
            "Usage: %s [options] <prog.exe> [args...] [-- environment vars]\n"
            "\n"
@@ -29,8 +30,8 @@ void print_usage(void)
            "  %-18s  DOS current working directory, use 'C:\\' if not given.\n"
            "  %-18s  Set unix path as root of drive 'n', by default all drives\n"
            "\t\t      point to the unix working directory.\n"
-           ". %-18s  Set DOS code-page. Set to '?' to show lost of code-pages.\n"
-           ". %-18s  Limit DOS memory to 512KB, fixes some old buggy programs.\n",
+           "  %-18s  Set DOS code-page. Set to '?' to show lost of code-pages.\n"
+           "  %-18s  Limit DOS memory to 512KB, fixes some old buggy programs.\n",
            prog_name, ENV_DBG_NAME, ENV_DBG_OPT, ENV_PROGNAME, ENV_DEF_DRIVE, ENV_CWD,
            ENV_DRIVE "n", ENV_CODEPAGE, ENV_LOWMEM);
     exit(EXIT_SUCCESS);

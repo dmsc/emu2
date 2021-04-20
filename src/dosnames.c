@@ -647,7 +647,7 @@ char *dos_real_path(char drive, const char *unix_path)
     else
     {
         // Convert remaining components
-        ret = calloc(1, 64);
+        ret = calloc(1, 65);
         strncat(ret, "C:", 64);
 
         path[l] = 0;
