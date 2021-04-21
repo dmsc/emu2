@@ -589,7 +589,7 @@ char *dos_unix_path_fcb(int addr, int force)
 static struct dos_file_list *find_first_file(char *fspec)
 {
     // Now, separate the path to the spec
-    char *glob, *unixpath, *p = rindex(fspec, '/');
+    char *glob, *unixpath, *p = strrchr(fspec, '/');
     if(!p)
     {
         glob = fspec;
