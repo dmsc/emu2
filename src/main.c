@@ -8,6 +8,8 @@
 #include "keyb.h"
 #include "timer.h"
 #include "video.h"
+#include "term.h"
+#include "ems.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -51,7 +53,9 @@ void emulator_update(void)
 {
     debug(debug_int, "emu update cycle\n");
     update_timer();
-    check_screen();
+    //check_screen();
+    if(flag_s == 0)
+        b8_to_term();
     update_keyb();
 }
 
@@ -116,8 +120,16 @@ void bios_routine(unsigned inum)
         debug(debug_int, "W-2F1680: sleep\n");
         usleep(33000);
     }
+    else if(inum == 0x67)
+        int67();
+    else if(inum == 0x15)
+    {
+        cpuSetFlag(cpuFlag_CF);
+    }
     else
+    {
         debug(debug_int, "UNHANDLED INT %02x, AX=%04x\n", inum, cpuGetAX());
+    }
 }
 
 static int load_binary_prog(const char *name, int bin_load_addr)
@@ -229,6 +241,12 @@ int main(int argc, char **argv)
         {
         case 'h':
             print_usage();
+        case 'c':
+            flag_c=1;
+            break;
+        case 's':
+            flag_s=1;
+            break;
         case 'b':
             bin_load_addr = strtol(opt, &ep, 0);
             if(*ep || bin_load_addr < 0 || bin_load_addr > 0xFFFF0)
@@ -283,6 +301,7 @@ int main(int argc, char **argv)
     // Init debug facilities
     init_debug(argv[1]);
     init_cpu();
+    init_video2();
 
     if(bin_load_addr >= 0)
     {

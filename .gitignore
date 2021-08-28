@@ -1,2 +1,9 @@
 emu2
 obj/
+src/tags
+__*
+*.exe
+*.com
+*.log
+sample/
+lala*
