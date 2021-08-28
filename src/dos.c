@@ -9,6 +9,7 @@
 #include "timer.h"
 #include "utils.h"
 #include "video.h"
+#include "term.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -268,7 +269,7 @@ static void dos_show_fcb()
         return;
 
     int addr = cpuGetAddrDS(cpuGetDX());
-    char *name = getstr(addr + 1, 11);
+    char *name = emu_getstr(addr + 1, 11);
     debug(debug_dos,
           "\tFCB:"
           "[d=%02x:n=%.8s.%.3s:bn=%04x:rs=%04x:fs=%08x:h=%04x:rn=%02x:ra=%08x]\n",
@@ -1188,7 +1189,7 @@ void int21()
     case 0x29: // PARSE FILENAME TO FCB
     {
         // TODO: length could be more than 64 bytes!
-        char *fname = getstr(cpuGetAddrDS(cpuGetSI()), 64);
+        char *fname = emu_getstr(cpuGetAddrDS(cpuGetSI()), 64);
         char *orig = fname;
         uint8_t *dst = getptr(cpuGetAddrES(cpuGetDI()), 37);
         if(!dst)
@@ -1681,12 +1682,12 @@ void int21()
         {
             debug(debug_dos, "\texec: '%s'\n", fname);
             // Get executable file name:
-            char *prgname = getstr(cpuGetAddrDS(cpuGetDX()), 64);
+            char *prgname = emu_getstr(cpuGetAddrDS(cpuGetDX()), 64);
             // Read command line parameters:
             int pb = cpuGetAddrES(cpuGetBX());
             int cmd_addr = cpuGetAddress(get16(pb + 4), get16(pb + 2));
             int clen = memory[cmd_addr];
-            char *cmdline = getstr(cmd_addr + 1, clen);
+            char *cmdline = emu_getstr(cmd_addr + 1, clen);
             debug(debug_dos, "\texec command line: '%s %.*s'\n", prgname, clen, cmdline);
             char *env = "\0\0";
             if(get16(pb) != 0)
@@ -1828,11 +1829,17 @@ void int21()
             cpuSetAX(mem_get_alloc_strategy());
         else if(1 == al)
             mem_set_alloc_strategy(cpuGetBX());
+        else if(2 == al)
+        {
+            cpuSetFlag(cpuFlag_CF);
+            cpuSetAX(1);
+        }
         else if(3 == al)
         {
             cpuSetFlag(cpuFlag_CF);
             cpuSetAX(1);
         }
+        break; // XXX added
     }
     case 0x5B: // CREATE NEW FILE
         dos_open_file(2);

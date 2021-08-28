@@ -128,7 +128,9 @@ static inline uint8_t *getptr(uint32_t addr, unsigned size)
 
 // Get a copy of CPU memory forcing a nul byte at end.
 // Four static buffers are used, so at most 4 results can be in use.
-static inline char *getstr(uint32_t addr, unsigned size)
+// XXX renamed function from getstr to emu_getstr to avoid conflict
+// with ncurses
+static inline char *emu_getstr(uint32_t addr, unsigned size)
 {
     static int cbuf = 0;
     static char buf[4][256];

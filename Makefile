@@ -1,8 +1,8 @@
 CC=gcc
 CFLAGS=-O3 -flto -Wall -g -Werror=implicit-function-declaration -Werror=int-conversion
-LDLIBS=-lm
+LDLIBS=-lm -lncursesw
 INSTALL=install
-PREFIX=/usr
+PREFIX=/usr/local
 
 OBJS=\
  cpu.o\
@@ -16,7 +16,9 @@ OBJS=\
  dbg.o\
  timer.o\
  utils.o\
- video.o\
+ ems.o\
+ term.o\
+ int10c.o\
 
 
 all: obj emu2
