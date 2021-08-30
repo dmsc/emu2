@@ -13,10 +13,10 @@ static int curses_initialized=0;
 static int video_initialized=0;
 int flag_s=0, flag_c=0;
 
-void get_cursor_pos(int* x, int* y);
+//void get_cursor_pos(int* x, int* y);
 void b8_to_term();
 
-// transform pc attr|chr to ncursesw...
+// transform pc (attr+chr) to ncursesw cchar_t (attr+chr)
 static cchar_t *mk_cchar(uint16_t x)
 {
     static cchar_t y0 = (cchar_t){ 0, { 0 }};
@@ -70,7 +70,7 @@ static void init_curses()
     if(curses_initialized)
         return;
     setlocale(LC_ALL,"");
-    set_codepage("437");
+    set_codepage("437"); // XXX should be configurable
     stdscr=initscr();
     savetty();
 
@@ -78,7 +78,7 @@ static void init_curses()
     start_color();
     int i,j;
     for(i=0;i<8;i++)
-        for(j=0;j<8;j++) init_pair((c[i]<<3)|c[j],j,i);
+        for(j=0;j<8;j++) init_pair( (c[i]<<3)|c[j], j, i);
 
     //keypad(stdscr,TRUE);
     //meta(stdscr,TRUE);
@@ -98,23 +98,23 @@ typedef struct bios_info      //video-bios-gegevens (256 bytes)
     uint8_t _xx1[0x45];
     uint32_t fncty_tab;     // "functionality" table
     uint8_t vid_mode;       // video mode
-    uint16_t scr_brt;       // screen width
-    uint16_t vbufsize;      // grootte van 1 schempagina
-    uint16_t vbufoffs;      // begin van actuele vpagina
-    uint16_t cursor[8];     // voor elke pagina een cursor
-    uint16_t cursor_shape;  // type van de cursor
-    uint8_t vpage;          // scherm-pagina
-    uint16_t vport;         // video poort-adres ...
+    uint16_t scr_w;         // screen width
+    uint16_t vbufsize;      // size of a 1 screen page
+    uint16_t vbufoffs;      // offset of actual page
+    uint16_t cursor[8];     // cursors for 8 pages
+    uint16_t cursor_shape;  // shape/size of the cursor
+    uint8_t vpage;          // screen-page
+    uint16_t vport;         // video port-address ...
     uint16_t _xx2;
     uint8_t _xx3[0x1d];
-    uint8_t scr_hgt;        // scherm hoogte -1
+    uint8_t scr_h;          // screen height -1
     uint16_t chr_hgt;       // char height
     uint16_t _yy;
     uint8_t _xx4[0x77];
 } bios_info;
 #pragma pack()
 
-static bios_info *_bi;
+static bios_info *bi;
 static void init_functionality_table(void);
 static uint16_t b_get_cursor(uint8_t page);
 
@@ -131,10 +131,10 @@ void init_video2(void)
         return;
     if(!curses_initialized)
         if(!flag_s) init_curses();
-    _bi=(bios_info *)(memory+0x400);
-    _bi->vid_mode=3;
-    _bi->vbufsize=0x8000; // ?
-    _bi->vbufoffs=0;
+    bi=(bios_info *)(memory+0x400);
+    bi->vid_mode=3;
+    bi->vbufsize=0x8000; // ?
+    bi->vbufoffs=0;
     init_functionality_table(); // ???
     init_b8();
     int x,y;
@@ -142,36 +142,35 @@ void init_video2(void)
     {
         reset_shell_mode();
         getyx(stdscr,y,x); // XXX doesn't work...
-        _bi->cursor[0]=(y<<8)|x;
+        bi->cursor[0]=(y<<8)|x;
         debug(debug_video, "\tsetting cursor to y=%d, x=%d\n", y, x);
         reset_prog_mode();
-        _bi->vpage=0;
+        bi->vpage=0;
         getmaxyx(stdscr,y,x);
-        _bi->scr_brt=x; // getmaxyx ?
-        _bi->scr_hgt=y-1;
+        bi->scr_w=x; // getmaxyx ?
+        bi->scr_h=y-1;
         debug(debug_video, "\tsetting screen to %d rows, %d cols\n", y, x);
     }
     else
     {
-        _bi->scr_brt=80;
-        _bi->scr_hgt=24;
+        bi->scr_w=80;
+        bi->scr_h=24;
     }
     video_initialized=1;
 }
 
 void b8_to_term()
 {
-    // more must be done to find the right pointer XXX ???
-    // using the right page from bios
+    // used to map b8000 to a curses screen
     if(flag_s) return; // ignore in stdio mode
-    if(flag_c) return;
+    if(flag_c) return; // not used if int10 API is translated to curses
     if(!video_initialized)
         init_video2();
     if(!curses_initialized)
         init_curses();
-    int page=_bi->vpage;
+    int page=bi->vpage;
     _write_box_curses_W((uint16_t*)(memory+0xb8000+page*0x1000),
-            0,0,_bi->scr_hgt+1,_bi->scr_brt);
+            0,0,bi->scr_h+1,bi->scr_w);
     // we also need to handle the cursor
     unsigned cursor=b_get_cursor(page);
     move((cursor>>8), (cursor&0xff));
@@ -181,27 +180,27 @@ void b8_to_term()
 
 static uint8_t b_get_page(void)
 {
-    return _bi->vpage;
+    return bi->vpage;
 }
 static uint16_t b_get_cols(void)
 {
-    return _bi->scr_brt;
+    return bi->scr_w;
 }
 static uint16_t b_get_vmode(void)
 {
-    return _bi->vid_mode;
+    return bi->vid_mode;
 }
 static uint16_t b_get_cursor(uint8_t page)
 {
-    return _bi->cursor[page];
+    return bi->cursor[page];
 }
 static uint16_t b_get_cshape(uint8_t page)
 {
-    return _bi->cursor_shape;
+    return bi->cursor_shape;
 }
 static void b_set_cursor(uint8_t page, uint16_t cursor)
 {
-    _bi->cursor[page]=cursor;
+    bi->cursor[page]=cursor;
 }
 static void b_move(int page, int y, int x)
 {
@@ -209,18 +208,18 @@ static void b_move(int page, int y, int x)
 }
 static void b_set_cshape(uint8_t page, uint16_t shape)
 {
-    _bi->cursor_shape=shape;
+    bi->cursor_shape=shape;
 }
 static void b_set_page(uint8_t page)
 {
-    _bi->vpage=page;
-    _bi->vbufoffs=page*0x1000; // ? en meer dan 25 regels...
+    bi->vpage=page;
+    bi->vbufoffs=page*0x1000; // XXX not always 0x1000
 }
 
 static void b_scrollup(
     uint8_t page, uint16_t top, uint16_t bot, uint8_t battr, uint8_t nlines)
 {
-    int w=_bi->scr_brt, h=_bi->scr_hgt;
+    int w=bi->scr_w, h=bi->scr_h;
     int top_x=top&0xff, bot_x=bot&0xff;
     if((top_x==0) && (bot_x==w) && (nlines==1))
     {
@@ -228,7 +227,7 @@ static void b_scrollup(
         memmove(base, base+w, w*h*2);
         // and add empty line...
         uint16_t *ptr = base + w*h;
-        for(int i=0; i<_bi->scr_brt; i++)
+        for(int i=0; i<bi->scr_w; i++)
             ptr[i]=(battr<<8)|0x20;
     }
     else
@@ -240,7 +239,7 @@ static void b_scrollup(
 static void b_scrolldown(
     uint8_t page, uint16_t top, uint16_t bot, uint8_t battr, uint8_t nlines)
 {
-    int w=_bi->scr_brt, h=_bi->scr_hgt;
+    int w=bi->scr_w, h=bi->scr_h;
     int top_x=top&0xff, bot_x=bot&0xff;
     if((top_x==0) && (bot_x==w) && (nlines==1))
     {
@@ -248,7 +247,7 @@ static void b_scrolldown(
         memmove(base+w, base, w*h*2);
         // and add empty line...
         uint16_t *ptr = base;
-        for(int i=0; i<_bi->scr_brt; i++)
+        for(int i=0; i<bi->scr_w; i++)
             ptr[i]=(battr<<8)|0x20;
     }
     else
@@ -261,7 +260,7 @@ static void b_scrolldown(
 static uint16_t b_inch(int page)
 {
     uint16_t cursor=b_get_cursor(page);
-    int idx=(cursor&0xff) + (cursor>>8)*_bi->scr_brt;
+    int idx=(cursor&0xff) + (cursor>>8)*bi->scr_w;
     int offset=page*0x1000;
     uint16_t *ptr=(uint16_t *)(memory+0xb8000+offset+idx*2);
     return *ptr;
@@ -269,16 +268,17 @@ static uint16_t b_inch(int page)
 static void b_addch(int page, uint16_t cha, int rep)
 {
     uint16_t cursor=b_get_cursor(page);
-    int idx=(cursor&0xff) + (cursor>>8)*_bi->scr_brt;
+    int idx=(cursor&0xff) + (cursor>>8)*bi->scr_w;
     int offset=page*0x1000;
     uint16_t *ptr=(uint16_t *)(memory+0xb8000+offset+idx*2);
     for(int i=0; i<rep; i++)
         *(ptr++)=cha;
 }
+// XXX should preserve original attributes
 static void b_putch(int page, uint8_t ch, int rep)
 {
     uint16_t cursor=b_get_cursor(page);
-    int idx=(cursor&0xff) + (cursor>>8)*_bi->scr_brt;
+    int idx=(cursor&0xff) + (cursor>>8)*bi->scr_w;
     int offset=page*0x1000;
     uint16_t *ptr=(uint16_t *)(memory+0xb8000+offset+idx*2);
     for(int i=0; i<rep; i++)
@@ -289,13 +289,13 @@ static void b_putch(int page, uint8_t ch, int rep)
     }
 }
 
-void b_putchar(int page, uint16_t ch)
+static void b_putchar(int page, uint16_t ch)
 {
     page &= 7;
     // scroll params:
     int scr_attr=0x07;
     uint16_t scr_beg=1<<8;
-    uint16_t scr_end=((_bi->scr_hgt+1)<<8) | _bi->scr_brt;
+    uint16_t scr_end=((bi->scr_h+1)<<8) | bi->scr_w;
     uint16_t cursor=b_get_cursor(page);
     int y=(cursor>>8), x=(cursor&0xff);
     switch(ch&0xff)
@@ -344,7 +344,7 @@ void int10_t()
     unsigned dx = cpuGetDX();
     //unsigned dh=dx>>8, dl=dx&0xff;
     
-    debug(debug_video, "\tint 0x10.%02x, rows=%d\n", ah, _bi->scr_hgt+1);
+    debug(debug_video, "\tint 0x10.%02x, rows=%d\n", ah, bi->scr_h+1);
     switch(ah)
     {
     case 0x00: // SET VIDEO MODE
@@ -420,7 +420,7 @@ void int10_t()
         // 1130: dl returns screen rows...
         if(ax==0x1130)
         {
-            cpuSetDX((dx&0xff00)|_bi->scr_hgt);
+            cpuSetDX((dx&0xff00)|bi->scr_h);
             // cx ? XXX
             // es:bp ? table
         }
@@ -506,7 +506,7 @@ int video_active(void)
 }
 void video_putch(char ch)
 {
-    int page=_bi->vpage;
+    int page=bi->vpage;
     if(!flag_c) b_putchar(page, 0x0700|ch);
     else
     {

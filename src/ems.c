@@ -17,6 +17,22 @@ struct ems_move
 void ems_to_frame(int fys, int handle, int log);
 void ems_move(struct ems_move *ptr);
 
+uint32_t ems_spc;
+uint32_t get_ems_spc()
+{
+    return ((ems_spc&0xffff0)<<12);
+}
+void init_ems(void)
+{
+    ems_spc=get_static_memory(64,16);
+    memcpy(memory+ems_spc+10,"EMMXXXX0",8);
+    printf("ems-space: %x\n",ems_spc);
+    //put32(4*0x67, ems_spc);
+    // ** setting interrupt vects doesn't work well **
+    //put16(4*0x67, 0);
+    //put16(4*0x67+2, ems_spc>>4);
+}
+
 void int67(void)
 {
     unsigned ax = cpuGetAX();
@@ -38,6 +54,9 @@ void int67(void)
         // handle not used yet
         ems_to_frame(al, cpuGetDX(), cpuGetBX());
         cpuSetAX(ax & 0xff); // OK
+        break;
+    case 0x46:
+        cpuSetAX(0x40);
         break;
     case 0x43: // get handle & alloc (DUMMY)
     case 0x5a: // get handle & alloc std/raw (DUMMY)
@@ -76,7 +95,7 @@ void int67(void)
         cpuSetAX(ax & 0xff); // OK
         break;
     default:
-        printf("Not implemented: %02x!", ah);
+        printf("Not implemented: %02x!\n", ah);
         break;
     }
 }

@@ -10,6 +10,7 @@
 #include "utils.h"
 #include "video.h"
 #include "term.h"
+#include "ems.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -35,7 +36,7 @@ static uint32_t dos_sysvars;
 static int dosDTA;
 
 // Allocates memory for static DOS tables, from "rom" memory
-static uint32_t get_static_memory(uint16_t bytes, uint16_t align)
+uint32_t get_static_memory(uint16_t bytes, uint16_t align)
 {
     static uint32_t current = 0xFE000; // Start allocating at F000:0000
     // Align
@@ -1322,8 +1323,17 @@ void int21()
             cpuSetDX((cpuGetDX() & 0xFF00) | 1); // Ignore new state
         break;
     case 0x35: // get interrupt vector
-        cpuSetBX(get16(4 * (ax & 0xFF)));
-        cpuSetES(get16(4 * (ax & 0xFF) + 2));
+        if(ax==0x3567)
+        {
+            int ems=get_ems_spc();
+            cpuSetES(ems>>16);
+            cpuSetBX(ems&0xffff);
+        }
+        else
+        {
+            cpuSetBX(get16(4 * (ax & 0xFF)));
+            cpuSetES(get16(4 * (ax & 0xFF) + 2));
+        }
         break;
     case 0x36: // get free space
         cpuSetAX(32);     // 16k clusters

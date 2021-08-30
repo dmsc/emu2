@@ -330,6 +330,7 @@ int main(int argc, char **argv)
     itv.it_value.tv_usec = 54925;
     setitimer(ITIMER_REAL, &itv, 0);
     init_bios_mem();
+    init_ems();
     while(1)
     {
         exit_cpu = 0;
