@@ -140,11 +140,13 @@ void init_video2(void)
     int x,y;
     if(curses_initialized)
     {
+        /*
         reset_shell_mode();
         getyx(stdscr,y,x); // XXX doesn't work...
         bi->cursor[0]=(y<<8)|x;
         debug(debug_video, "\tsetting cursor to y=%d, x=%d\n", y, x);
         reset_prog_mode();
+        */
         bi->vpage=0;
         getmaxyx(stdscr,y,x);
         bi->scr_w=x; // getmaxyx ?
@@ -168,12 +170,13 @@ void b8_to_term()
         init_video2();
     if(!curses_initialized)
         init_curses();
+    scrollok(stdscr,0); // don't scroll XXX: redundant -> is already set
     int page=bi->vpage;
-    _write_box_curses_W((uint16_t*)(memory+0xb8000+page*0x1000),
-            0,0,bi->scr_h+1,bi->scr_w);
+    uint16_t *vbuf = (uint16_t *)(memory+0xb8000+page*0x1000);
+    _write_box_curses_W(vbuf, 0, 0, bi->scr_h+1, bi->scr_w);
     // we also need to handle the cursor
     unsigned cursor=b_get_cursor(page);
-    move((cursor>>8), (cursor&0xff));
+    move( (cursor>>8), (cursor&0xff) );
     curs_set(1);
     refresh();
 }
@@ -288,9 +291,11 @@ static void b_putch(int page, uint8_t ch, int rep)
         ptr++;
     }
 }
-
+// HAPPY 1: suppress scroll na char output
+#define HAPPY 0
 static void b_putchar(int page, uint16_t ch)
 {
+    int h=bi->scr_h+1, w=bi->scr_w;
     page &= 7;
     // scroll params:
     int scr_attr=0x07;
@@ -305,7 +310,7 @@ static void b_putchar(int page, uint16_t ch)
         break;
     case 0xa:
         y++;
-        while(y>=25)
+        while(y>=h)
         {
             b_scrollup(page, scr_beg, scr_end, scr_attr, 1);
             y--;
@@ -319,8 +324,9 @@ static void b_putchar(int page, uint16_t ch)
     default:
         b_addch(page, ch, 1);
         x++;
-        if(x>=80) y++, x-=80;
-        while(y>=25)
+        if(x>=w) y++, x-=w;
+        if(y>=h && (HAPPY&1)) return; // XXX HAPPY magic
+        while(y>=h)
         {
             b_scrollup(page, scr_beg, scr_end, scr_attr, 1);
             y--;
@@ -451,16 +457,22 @@ void int10_t()
         // bh=page dh=row dl=col
         // al=write-mode bl=attr(mode<2)
         debug(debug_video, "testing INT 10, AX=%04x\n", ax);
-        int sy,sx; getyx(stdscr,sy,sx);
+        int page=bh;
+        int saved_cursor=b_get_cursor(page);
         uint8_t *strptr_b = memory + (cpuGetES()<<4) + cpuGetBP();
         uint16_t *strptr_w=(uint16_t *)strptr_b;
-        move(dx>>8,dx&0xff);
+        b_set_cursor(page, dx);
+        int j_max= bi->scr_w * (bi->scr_h+1) -1;
         for(int i=0; i<cx; i++)
+        {
+            int _cur=b_get_cursor(page);
+            int j = (_cur>>8) * bi->scr_w + (_cur&0xff);
+            if( j >= j_max && !(al&1) ) break;
+            // TODO: the case j=j_max...
             if(!(al&2)) b_putchar(bh, (bl<<8)|strptr_b[i]);
             else b_putchar(bh, strptr_w[i]);
-        if(!(al&1))
-            move(sy,sx);
-        refresh();
+        }
+        if(!(al&1)) b_set_cursor(page, saved_cursor);
         break;
     }
     case 0x1A: // GET/SET DISPLAY COMBINATION CODE

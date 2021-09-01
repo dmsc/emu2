@@ -11,7 +11,8 @@
 
 void xx_putchar(uint16_t ch)
 {
-    int x,y; getyx(stdscr,y,x);
+    int y,x; getyx(stdscr,y,x);
+    int h,w; getmaxyx(stdscr,h,w);
     switch(ch&0xff)
     {
     case 0xd:
@@ -19,7 +20,7 @@ void xx_putchar(uint16_t ch)
         break;
     case 0xa:
         y++;
-        while(y>=25)
+        while(y>=h)
         {
             wscrl(stdscr,1);
             y--;
@@ -32,7 +33,7 @@ void xx_putchar(uint16_t ch)
     default:
         xx_addch(ch); // XXX if scroll?
         getyx(stdscr,y,x);
-        while(y>=25)
+        while(y>=h)
         {
             wscrl(stdscr,1);
             y--;
@@ -191,14 +192,21 @@ void int10_c()
         // al=write-mode bl=attr(mode<2)
         debug(debug_video, "testing INT 10, AX=%04x\n", ax);
         int sy,sx; getyx(stdscr,sy,sx);
+        int my,mx; getmaxyx(stdscr,my,mx);
         uint8_t *strptr_b = memory + (cpuGetES()<<4) + cpuGetBP();
         uint16_t *strptr_w=(uint16_t *)strptr_b;
-        move(dx>>8,dx&0xff);
+        move(dx>>8, dx&0xff);
+        int j_max=my*mx-1;
         for(int i=0; i<cx; i++)
+        {
+            int y,x; getyx(stdscr,y,x);
+            int j = y*mx + x;
+            if( j >= j_max && !(al&1) ) break;
+            // XXX what to do for j==j_max?
             if(!(al&2)) xx_putchar((bl<<8)|strptr_b[i]);
             else xx_putchar(strptr_w[i]);
-        if(!(al&1))
-            move(sy,sx);
+        }
+        if(!(al&1)) move(sy,sx);
         refresh();
         break;
     }
