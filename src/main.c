@@ -301,6 +301,7 @@ int main(int argc, char **argv)
     // Init debug facilities
     init_debug(argv[1]);
     init_cpu();
+    init_video2();
 
     if(bin_load_addr >= 0)
     {

@@ -26,6 +26,10 @@ Options (should be placed *before* the DOS program name):
 
 - `-r <seg>:<ip>`  Specify a run address to start execution (only for binary loaded data).
 
+- `-s`         Use stdio only
+
+- `-c`          Use only int10 to render text on terminal.
+
 The available environment variables are:
 - `EMU2_DEBUG_NAME`    Base name of a file to write the debug log, defaults to
                        the exe name if not given.
