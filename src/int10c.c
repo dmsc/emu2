@@ -9,11 +9,26 @@
 #include <sys/ioctl.h>
 #include <locale.h>
 
-void xx_putchar(uint16_t ch)
+static int dummy; // used to make a warning go away...
+
+void xx_putchar(uint16_t ch, int happy)
 {
     int y,x; getyx(stdscr,y,x);
-    int h,w; getmaxyx(stdscr,h,w);
-    switch(ch&0xff)
+    int h; getmaxyx(stdscr,h,dummy);
+    int switch_ch;
+    switch(happy)
+    {
+    case 1:
+        switch_ch=ch;
+        break;
+    case 2:
+        switch_ch=0xff;
+        break;
+    default:
+        switch_ch=ch&0xff;
+        break;
+    }
+    switch(switch_ch)
     {
     case 0xd:
         x=0;
@@ -43,7 +58,6 @@ void xx_putchar(uint16_t ch)
     move(y,x);
 }
 
-static int dummy; // used to make a warning go away...
 
 // VIDEO int
 // try to translate int 0x10 to curses calls
@@ -132,7 +146,7 @@ void int10_c()
         // in: al=char bh=page
         // cursor moves
         // control chars handled
-        xx_putchar(al); // XXX attr behaviour...
+        xx_putchar(al,0); // XXX attr behaviour...
         refresh();
         break;
     case 0x0F: // GET VIDEO STATE
@@ -192,19 +206,19 @@ void int10_c()
         // al=write-mode bl=attr(mode<2)
         debug(debug_video, "testing INT 10, AX=%04x\n", ax);
         int sy,sx; getyx(stdscr,sy,sx);
-        int my,mx; getmaxyx(stdscr,my,mx);
+        //int my,mx; getmaxyx(stdscr,my,mx);
         uint8_t *strptr_b = memory + (cpuGetES()<<4) + cpuGetBP();
         uint16_t *strptr_w=(uint16_t *)strptr_b;
         move(dx>>8, dx&0xff);
-        int j_max=my*mx-1;
+        //int j_max=my*mx-1;
         for(int i=0; i<cx; i++)
         {
-            int y,x; getyx(stdscr,y,x);
-            int j = y*mx + x;
-            if( j >= j_max && !(al&1) ) break;
+            //int y,x; getyx(stdscr,y,x);
+            //int j = y*mx + x;
+            //if( j >= j_max && !(al&1) ) break;
             // XXX what to do for j==j_max?
-            if(!(al&2)) xx_putchar((bl<<8)|strptr_b[i]);
-            else xx_putchar(strptr_w[i]);
+            if(!(al&2)) xx_putchar((bl<<8)|strptr_b[i], 0);
+            else xx_putchar(strptr_w[i], 0);
         }
         if(!(al&1)) move(sy,sx);
         refresh();

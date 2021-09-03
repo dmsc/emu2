@@ -462,12 +462,12 @@ void int10_t()
         uint8_t *strptr_b = memory + (cpuGetES()<<4) + cpuGetBP();
         uint16_t *strptr_w=(uint16_t *)strptr_b;
         b_set_cursor(page, dx);
-        int j_max= bi->scr_w * (bi->scr_h+1) -1;
+        //int j_max= bi->scr_w * (bi->scr_h+1) -1;
         for(int i=0; i<cx; i++)
         {
-            int _cur=b_get_cursor(page);
-            int j = (_cur>>8) * bi->scr_w + (_cur&0xff);
-            if( j >= j_max && !(al&1) ) break;
+            //int _cur=b_get_cursor(page);
+            //int j = (_cur>>8) * bi->scr_w + (_cur&0xff);
+            //if( j >= j_max && !(al&1) ) break;
             // TODO: the case j=j_max...
             if(!(al&2)) b_putchar(bh, (bl<<8)|strptr_b[i]);
             else b_putchar(bh, strptr_w[i]);
@@ -522,7 +522,7 @@ void video_putch(char ch)
     if(!flag_c) b_putchar(page, 0x0700|ch);
     else
     {
-        xx_putchar(0x700|(ch&0xff));
+        xx_putchar(0x700|(ch&0xff), 0);
         refresh();
     }
     if(flag_s) putchar(ch);

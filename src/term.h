@@ -6,6 +6,6 @@ void int10_c();
 
 void xx_addch(uint16_t x);
 uint16_t xx_inch(void);
-void xx_putchar(uint16_t x);
+void xx_putchar(uint16_t x, int happy);
 
 extern int flag_s, flag_c;
