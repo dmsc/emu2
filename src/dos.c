@@ -331,7 +331,7 @@ static void dos_fcb_rand_to_block(int fcb)
     // Update block position from random position
     unsigned rnum = get32(0x21 + fcb);
     memory[0x20 + fcb] = rnum & 127;
-    put16(0x0C, rnum / 128);
+    put16(0x0C + fcb, rnum / 128);
 }
 
 static int dos_read_record_fcb(int addr, int update)
