@@ -318,6 +318,7 @@ static void dos_open_file_fcb(int create)
     put16(fcb_addr + 0x16, 0);   // time of last write
     put16(fcb_addr + 0x18, h);   // reserved - store DOS handle!
     memory[fcb_addr + 0x20] = 0; // current record
+    put32(fcb_addr + 0x21, 0);   // random position
 
     debug(debug_dos, "OK.\n");
     cpuClrFlag(cpuFlag_CF);
@@ -326,12 +327,22 @@ static void dos_open_file_fcb(int create)
     free(fname);
 }
 
+static void dos_fcb_block_to_rand(void)
+{
+    // Update random position from the block position
+    int fcb = get_fcb();
+    unsigned recnum = memory[0x20 + fcb];
+    unsigned bnum = get16(0x0C + fcb);
+    unsigned rand = recnum + 128 * bnum;
+    put32(0x21 + fcb, rand);
+}
+
 static void dos_fcb_rand_to_block(int fcb)
 {
     // Update block position from random position
     unsigned rnum = get32(0x21 + fcb);
     memory[0x20 + fcb] = rnum & 127;
-    put16(0x0C, rnum / 128);
+    put16(0x0C + fcb, rnum / 128);
 }
 
 static int dos_read_record_fcb(int addr, int update)
@@ -1109,10 +1120,12 @@ void int21()
         break;
     }
     case 0x14: // SEQUENTIAL READ USING FCB
+        dos_fcb_block_to_rand();
         dos_show_fcb();
         cpuSetAL(dos_read_record_fcb(dosDTA, 1));
         break;
     case 0x15: // SEQUENTIAL WRITE USING FCB
+        dos_fcb_block_to_rand();
         dos_show_fcb();
         cpuSetAL(dos_write_record_fcb(dosDTA, 1));
         break;
