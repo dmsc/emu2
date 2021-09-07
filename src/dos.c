@@ -318,7 +318,8 @@ static void dos_open_file_fcb(int create)
     put16(fcb_addr + 0x16, 0);   // time of last write
     put16(fcb_addr + 0x18, h);   // reserved - store DOS handle!
     memory[fcb_addr + 0x20] = 0; // current record
-    put32(fcb_addr + 0x21, 0);   // random position
+    put16(fcb_addr + 0x21, 0);   // random position - only 3 bytes
+    memory[0x23] = 0;
 
     debug(debug_dos, "OK.\n");
     cpuClrFlag(cpuFlag_CF);
@@ -327,33 +328,27 @@ static void dos_open_file_fcb(int create)
     free(fname);
 }
 
-static void dos_fcb_block_to_rand(void)
-{
-    // Update random position from the block position
-    int fcb = get_fcb();
-    unsigned recnum = memory[0x20 + fcb];
-    unsigned bnum = get16(0x0C + fcb);
-    unsigned rand = recnum + 128 * bnum;
-    put32(0x21 + fcb, rand);
-}
-
-static void dos_fcb_rand_to_block(int fcb)
-{
-    // Update block position from random position
-    unsigned rnum = get32(0x21 + fcb);
-    memory[0x20 + fcb] = rnum & 127;
-    put16(0x0C + fcb, rnum / 128);
-}
-
-static int dos_read_record_fcb(int addr, int update)
+static int dos_rw_record_fcb(int addr, int write, int update, int seq)
 {
     FILE *f = handles[get_fcb_handle()];
     if(!f)
-        return 1; // no data read
+        return 1; // no data read/write
 
     int fcb = get_fcb();
     unsigned rsize = get16(0x0E + fcb);
-    unsigned pos = rsize * get32(0x21 + fcb);
+    unsigned pos;
+
+    if(seq)
+    {
+        unsigned recnum = memory[0x20 + fcb];
+        unsigned bnum = get16(0x0C + fcb);
+        pos = rsize * (recnum + 128 * bnum);
+    }
+    else if(rsize < 64)
+        pos = rsize * get32(0x21 + fcb);
+    else
+        pos = rsize * (0xFFFFFF & get32(0x21 + fcb));
+
     uint8_t *buf = getptr(addr, rsize);
     if(!buf || !rsize)
     {
@@ -363,61 +358,36 @@ static int dos_read_record_fcb(int addr, int update)
     // Seek to block and read
     if(fseek(f, pos, SEEK_SET))
         return 1; // no data read
-    // Read
-    unsigned n = fread(buf, 1, rsize, f);
+    // Read / Write
+    unsigned n = write ? fwrite(buf, 1, rsize, f) : fread(buf, 1, rsize, f);
     // Update random and block positions
     if(update)
     {
-        put32(0x21 + fcb, (pos + n) / rsize);
-        dos_fcb_rand_to_block(fcb);
+        unsigned rnum = (pos + n) / rsize;
+        if(!seq)
+        {
+            put16(0x21 + fcb, rnum & 0xFFFF);
+            memory[0x23] = rnum >> 16;
+            if(rsize < 64)
+                memory[0x24] = rnum >> 24;
+        }
+        memory[0x20 + fcb] = rnum & 127;
+        put16(0x0C + fcb, rnum / 128);
     }
+    // Update file size
+    if(write && (pos + n > get32(fcb + 0x10)))
+        put32(fcb + 0x10, pos + n);
 
     if(n == rsize)
-        return 0; // read full record
-    else if(!n)
-        return 1; // EOF
+        return 0; // read/write full record
+    else if(!n || write)
+        return 1; // EOF on read, disk full on write
     else
     {
         for(unsigned i = n; i < rsize; i++)
             buf[i] = 0;
         return 3; // read partial record
     }
-}
-
-int dos_write_record_fcb(int addr, int update)
-{
-    FILE *f = handles[get_fcb_handle()];
-    if(!f)
-        return 1; // no data write
-
-    int fcb = get_fcb();
-    unsigned rsize = get16(0x0E + fcb);
-    unsigned pos = rsize * get32(0x21 + fcb);
-    uint8_t *buf = getptr(addr, rsize);
-    if(!buf || !rsize)
-    {
-        debug(debug_dos, "\tbuffer pointer invalid\n");
-        return 2; // segment wrap in DTA
-    }
-    // Seek to block and read
-    if(fseek(f, pos, SEEK_SET))
-        return 1; // no data read
-    // Write
-    unsigned n = fwrite(buf, 1, rsize, f);
-    // Update random and block positions
-    if(update)
-    {
-        put32(0x21 + fcb, (pos + n) / rsize);
-        dos_fcb_rand_to_block(fcb);
-    }
-    // Update file size
-    if(pos + n > get32(fcb + 0x10))
-        put32(fcb + 0x10, pos + n);
-
-    if(n == rsize)
-        return 0; // write full record
-    else
-        return 3; // disk full
 }
 
 // Converts Unix time_t to DOS time/date
@@ -1120,14 +1090,12 @@ void int21()
         break;
     }
     case 0x14: // SEQUENTIAL READ USING FCB
-        dos_fcb_block_to_rand();
         dos_show_fcb();
-        cpuSetAL(dos_read_record_fcb(dosDTA, 1));
+        cpuSetAL(dos_rw_record_fcb(dosDTA, 0, 1, 1));
         break;
     case 0x15: // SEQUENTIAL WRITE USING FCB
-        dos_fcb_block_to_rand();
         dos_show_fcb();
-        cpuSetAL(dos_write_record_fcb(dosDTA, 1));
+        cpuSetAL(dos_rw_record_fcb(dosDTA, 1, 1, 1));
         break;
     case 0x16: // CREATE FILE USING FCB
         dos_open_file_fcb(1);
@@ -1147,11 +1115,11 @@ void int21()
         break;
     case 0x21: // RANDOM READ USING FCB
         dos_show_fcb();
-        cpuSetAL(dos_read_record_fcb(dosDTA, 0));
+        cpuSetAL(dos_rw_record_fcb(dosDTA, 0, 0, 0));
         break;
     case 0x22: // RANDOM WRITE USING FCB
         dos_show_fcb();
-        cpuSetAL(dos_write_record_fcb(dosDTA, 0));
+        cpuSetAL(dos_rw_record_fcb(dosDTA, 1, 0, 0));
         break;
     case 0x25: // set interrupt vector
         put16(4 * (ax & 0xFF), cpuGetDX());
@@ -1183,9 +1151,9 @@ void int21()
         while(!e && count)
         {
             if(0x27 == (ax >> 8))
-                e = dos_read_record_fcb(target, 1);
+                e = dos_rw_record_fcb(target, 0, 1, 0);
             else
-                e = dos_write_record_fcb(target, 1);
+                e = dos_rw_record_fcb(target, 1, 1, 0);
 
             if(e == 0 || e == 3)
             {
