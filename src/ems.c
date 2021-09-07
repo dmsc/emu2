@@ -26,7 +26,7 @@ void init_ems(void)
 {
     ems_spc=get_static_memory(64,16);
     memcpy(memory+ems_spc+10,"EMMXXXX0",8);
-    printf("ems-space: %x\n",ems_spc);
+    //printf("ems-space: %x\n",ems_spc);
     //put32(4*0x67, ems_spc);
     // ** setting interrupt vects doesn't work well **
     //put16(4*0x67, 0);
