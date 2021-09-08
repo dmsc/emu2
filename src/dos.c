@@ -1006,6 +1006,10 @@ void int21()
         break;
     case 0xA: // BUFFERED INPUT
     {
+        // If we are reading from console, suspend keyboard handling
+        if(devinfo[0] == 0x80D3)
+            suspend_keyboard();
+
         FILE *f = handles[0] ? handles[0] : stdin;
         int addr = cpuGetAddrDS(cpuGetDX());
         unsigned len = memory[addr], i = 2;

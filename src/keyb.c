@@ -399,7 +399,8 @@ static void init_keyboard(void)
 // Disables keyboard support - will be enabled again if needed
 void suspend_keyboard(void)
 {
-    set_raw_term(0);
+    if(tty_fd >= 0)
+        set_raw_term(0);
 }
 
 int kbhit(void)
