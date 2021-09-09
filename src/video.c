@@ -2,6 +2,7 @@
 #include "codepage.h"
 #include "dbg.h"
 #include "emu.h"
+#include "keyb.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -457,6 +458,10 @@ void int10()
 {
     debug(debug_int, "V-10%04X: BX=%04X\n", cpuGetAX(), cpuGetBX());
     debug(debug_video, "V-10%04X: BX=%04X\n", cpuGetAX(), cpuGetBX());
+
+    // Wake-up keyboard on video calls
+    keyb_wakeup();
+
     if(!video_initialized)
         init_video();
     unsigned ax = cpuGetAX();
