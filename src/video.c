@@ -243,19 +243,12 @@ static void term_goto_xy(unsigned x, unsigned y)
         fprintf(tty_file, "\x1b[%dA", term_posy - y);
         term_posy = y;
     }
-    if(x == 0 && term_posx != 0)
+    if(x != term_posx)
     {
-        putc('\r', tty_file);
-        term_posx = 0;
-    }
-    if(term_posx < x)
-    {
-        fprintf(tty_file, "\x1b[%dC", x - term_posx);
-        term_posx = x;
-    }
-    if(term_posx > x)
-    {
-        fprintf(tty_file, "\x1b[%dD", term_posx - x);
+        if(term_posx != 0)
+            putc('\r', tty_file);
+        if(x != 0)
+            fprintf(tty_file, "\x1b[%dC", x);
         term_posx = x;
     }
 }
