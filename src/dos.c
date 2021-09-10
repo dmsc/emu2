@@ -1816,7 +1816,7 @@ void int21()
     case 0x57: // DATE/TIME
         int21_57();
         break;
-    case 0x58:
+    case 0x58: // MEMORY ALLOCATION STRATEGY
     {
         uint8_t al = ax & 0xFF;
         if(0 == al)
@@ -1828,6 +1828,7 @@ void int21()
             cpuSetFlag(cpuFlag_CF);
             cpuSetAX(1);
         }
+        break;
     }
     case 0x5B: // CREATE NEW FILE
         dos_open_file(2);
