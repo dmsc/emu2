@@ -1006,6 +1006,10 @@ void int21()
         break;
     case 0xA: // BUFFERED INPUT
     {
+        // If we are reading from console, suspend keyboard handling
+        if(devinfo[0] == 0x80D3)
+            suspend_keyboard();
+
         FILE *f = handles[0] ? handles[0] : stdin;
         int addr = cpuGetAddrDS(cpuGetDX());
         unsigned len = memory[addr], i = 2;
@@ -1181,14 +1185,15 @@ void int21()
         debug(debug_dos, "\t'%s' -> ", fname);
         if(ax & 1)
             // Skip separator
-            if(*fname && strchr(":;.,=+", *fname))
+            if(*fname && strchr(":;,=+", *fname))
                 fname++;
         // Skip initial spaces
         while(*fname && strchr(" \t", *fname))
             fname++;
         // Check drive:
         int ret = 0;
-        dst[0] = 0;
+        if(!(ax & 2))
+            dst[0] = 0;
         if(*fname && fname[1] == ':')
         {
             char d = *fname;
@@ -1206,14 +1211,23 @@ void int21()
             char c = *fname;
             if(c == '.' && i <= 9)
             {
-                for(; i < 9; i++)
-                    dst[i] = ' ';
+                if(!(ax & 4) || i > 1)
+                    for(; i < 9; i++)
+                        dst[i] = ' ';
+                else
+                    i = 9;
                 fname++;
             }
             else if(!c || strchr(":.;,=+ \t/\"[]<>|\x0D\x10", c))
             {
-                for(; i < 12; i++)
-                    dst[i] = ' ';
+                if(!(ax & 4) || i > 1)
+                    for(; i < 9; i++)
+                        dst[i] = ' ';
+                if( i < 9 )
+                    i = 9;
+                if(!(ax & 8) || i > 9)
+                    for(; i < 12; i++)
+                        dst[i] = ' ';
                 break;
             }
             else if(c == '*' && i < 9)
@@ -1802,7 +1816,7 @@ void int21()
     case 0x57: // DATE/TIME
         int21_57();
         break;
-    case 0x58:
+    case 0x58: // MEMORY ALLOCATION STRATEGY
     {
         uint8_t al = ax & 0xFF;
         if(0 == al)
@@ -1814,6 +1828,7 @@ void int21()
             cpuSetFlag(cpuFlag_CF);
             cpuSetAX(1);
         }
+        break;
     }
     case 0x5B: // CREATE NEW FILE
         dos_open_file(2);

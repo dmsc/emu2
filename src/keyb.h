@@ -7,3 +7,5 @@ int kbhit(void);
 void int16(void);
 uint8_t keyb_read_port(unsigned port);
 void suspend_keyboard(void);
+// Disable throttling the next keyboard calls
+void keyb_wakeup(void);

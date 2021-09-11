@@ -10,12 +10,14 @@
 #include <string.h>
 #include <termios.h>
 #include <unistd.h>
+#include <sys/time.h>
 
 static int term_raw = 0;
 static int tty_fd = -1;
 static int queued_key = -1;
 static int waiting_key = 0;
 static int mod_state = 0;
+static int throttle_calls = 4;
 
 // Copy mod-state to BIOS memory area
 static void update_bios_state(void)
@@ -399,7 +401,13 @@ static void init_keyboard(void)
 // Disables keyboard support - will be enabled again if needed
 void suspend_keyboard(void)
 {
-    set_raw_term(0);
+    if(tty_fd >= 0)
+        set_raw_term(0);
+}
+
+void keyb_wakeup(void)
+{
+    throttle_calls = 4;
 }
 
 int kbhit(void)
@@ -413,6 +421,30 @@ int kbhit(void)
             update_bios_state();
             cpuTriggerIRQ(1);
         }
+        else
+        {
+            // Used to throttle the CPU on a busy-loop waiting for keyboard
+            static double last_time;
+
+            struct timeval tv;
+            if( gettimeofday(&tv, NULL) != -1)
+            {
+                double t1 = tv.tv_usec + tv.tv_sec * 1000000.0;
+                // Arbitrary limit to 4 calls each 100Hz
+                if( (t1 - last_time) < 10000 )
+                {
+                    throttle_calls--;
+                    if( throttle_calls <= 0 )
+                    {
+                        debug(debug_int, "keyboard sleep.\n");
+                        usleep(10000);
+                    }
+                }
+                else
+                    throttle_calls = 4;
+                last_time = t1;
+            }
+        }
     }
     return (queued_key == -1) ? 0 : queued_key;
 }
@@ -424,7 +456,7 @@ int getch(int detect_brk)
     {
         if(kbhit())
             break;
-        usleep(1000000);
+        usleep(100000);
         waiting_key = 1;
         emulator_update();
         waiting_key = 0;
