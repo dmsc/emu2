@@ -9,7 +9,6 @@
 #include "timer.h"
 #include "video.h"
 #include "term.h"
-#include "ems.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -120,8 +119,6 @@ void bios_routine(unsigned inum)
         debug(debug_int, "W-2F1680: sleep\n");
         usleep(33000);
     }
-    else if(inum == 0x67)
-        int67();
     else if(inum == 0x15)
     {
         cpuSetFlag(cpuFlag_CF);
@@ -331,7 +328,6 @@ int main(int argc, char **argv)
     setitimer(ITIMER_REAL, &itv, 0);
     init_bios_mem();
     init_video2();
-    init_ems();
     while(1)
     {
         exit_cpu = 0;

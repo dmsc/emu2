@@ -84,7 +84,6 @@ static void init_curses()
     //meta(stdscr,TRUE);
     raw();
     noecho();
-    // move nodig?
     //echo();
     if(flag_c) scrollok(stdscr,1);
     else scrollok(stdscr,0);

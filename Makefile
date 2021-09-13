@@ -16,7 +16,6 @@ OBJS=\
  dbg.o\
  timer.o\
  utils.o\
- ems.o\
  term.o\
  int10c.o\
 

@@ -10,7 +10,6 @@
 #include "utils.h"
 #include "video.h"
 #include "term.h"
-#include "ems.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -1323,17 +1322,8 @@ void int21()
             cpuSetDX((cpuGetDX() & 0xFF00) | 1); // Ignore new state
         break;
     case 0x35: // get interrupt vector
-        if(ax==0x3567)
-        {
-            int ems=get_ems_spc();
-            cpuSetES(ems>>16);
-            cpuSetBX(ems&0xffff);
-        }
-        else
-        {
-            cpuSetBX(get16(4 * (ax & 0xFF)));
-            cpuSetES(get16(4 * (ax & 0xFF) + 2));
-        }
+        cpuSetBX(get16(4 * (ax & 0xFF)));
+        cpuSetES(get16(4 * (ax & 0xFF) + 2));
         break;
     case 0x36: // get free space
         cpuSetAX(32);     // 16k clusters
