@@ -290,9 +290,24 @@ static void b_putch(int page, uint8_t ch, int rep)
         ptr++;
     }
 }
-// HAPPY 1: suppress scroll na char output
+
+// HAPPY 1: suppress scroll na char output XXX
 #define HAPPY 0
-static void b_putchar(int page, uint16_t ch)
+
+int easy_switch(int ch, int easy)
+{
+    switch(easy)
+    {
+    case 1:
+        return ch;
+    case 2:
+        return 0xff;
+    default:
+        return ch&0xff;
+    }
+}
+
+static void b_putchar(int page, uint16_t ch, int easy)
 {
     int h=bi->scr_h+1, w=bi->scr_w;
     page &= 7;
@@ -302,7 +317,7 @@ static void b_putchar(int page, uint16_t ch)
     uint16_t scr_end=((bi->scr_h+1)<<8) | bi->scr_w;
     uint16_t cursor=b_get_cursor(page);
     int y=(cursor>>8), x=(cursor&0xff);
-    switch(ch&0xff)
+    switch( easy_switch(ch,easy) )
     {
     case 0xd:
         x=0;
@@ -348,7 +363,7 @@ void int10_t()
     unsigned cx = cpuGetCX();
     unsigned dx = cpuGetDX();
     //unsigned dh=dx>>8, dl=dx&0xff;
-    
+
     debug(debug_video, "\tint 0x10.%02x, rows=%d\n", ah, bi->scr_h+1);
     switch(ah)
     {
@@ -404,7 +419,7 @@ void int10_t()
         // in: al=char bh=page
         // cursor moves
         // control chars handled
-        b_putchar(bh,0x0700|al); // XXX attr?
+        b_putchar(bh, 0x0700|al, 0); // XXX attr?
         break;
     case 0x0F: // GET VIDEO STATE
         // out: bh=page al=mode ah=screencols
@@ -461,15 +476,10 @@ void int10_t()
         uint8_t *strptr_b = memory + (cpuGetES()<<4) + cpuGetBP();
         uint16_t *strptr_w=(uint16_t *)strptr_b;
         b_set_cursor(page, dx);
-        //int j_max= bi->scr_w * (bi->scr_h+1) -1;
         for(int i=0; i<cx; i++)
         {
-            //int _cur=b_get_cursor(page);
-            //int j = (_cur>>8) * bi->scr_w + (_cur&0xff);
-            //if( j >= j_max && !(al&1) ) break;
-            // TODO: the case j=j_max...
-            if(!(al&2)) b_putchar(bh, (bl<<8)|strptr_b[i]);
-            else b_putchar(bh, strptr_w[i]);
+            if(!(al&2)) b_putchar(bh, (bl<<8)|strptr_b[i], 0);
+            else b_putchar(bh, strptr_w[i], 0);
         }
         if(!(al&1)) b_set_cursor(page, saved_cursor);
         break;
@@ -518,7 +528,7 @@ int video_active(void)
 void video_putch(char ch)
 {
     int page=bi->vpage;
-    if(!flag_c) b_putchar(page, 0x0700|ch);
+    if(!flag_c) b_putchar(page, 0x0700|ch, 0);
     else
     {
         xx_putchar(0x700|(ch&0xff), 0);

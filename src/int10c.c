@@ -10,25 +10,11 @@
 #include <locale.h>
 
 static int dummy; // used to make a warning go away...
-
-void xx_putchar(uint16_t ch, int happy)
+void xx_putchar(uint16_t ch, int easy)
 {
     int y,x; getyx(stdscr,y,x);
     int h; getmaxyx(stdscr,h,dummy);
-    int switch_ch;
-    switch(happy)
-    {
-    case 1:
-        switch_ch=ch;
-        break;
-    case 2:
-        switch_ch=0xff;
-        break;
-    default:
-        switch_ch=ch&0xff;
-        break;
-    }
-    switch(switch_ch)
+    switch(easy_switch(ch, easy))
     {
     case 0xd:
         x=0;
@@ -44,9 +30,9 @@ void xx_putchar(uint16_t ch, int happy)
     case 8:
         if(x>0) x--;
         break;
-    case 9: // FIXME
+    case 9: // FIXME: add support for tabs
     default:
-        xx_addch(ch); // XXX if scroll?
+        xx_addch(ch);
         getyx(stdscr,y,x);
         while(y>=h)
         {
@@ -72,7 +58,7 @@ void int10_c()
     unsigned cx = cpuGetCX();
     unsigned dx = cpuGetDX();
     //unsigned dh=dx>>8, dl=dx&0xff;
-    
+
     //debug(debug_video, "\tint 0x10.%02x, rows=%d\n", ah, _bi->scr_hgt+1);
     switch(ah)
     {
@@ -210,13 +196,8 @@ void int10_c()
         uint8_t *strptr_b = memory + (cpuGetES()<<4) + cpuGetBP();
         uint16_t *strptr_w=(uint16_t *)strptr_b;
         move(dx>>8, dx&0xff);
-        //int j_max=my*mx-1;
         for(int i=0; i<cx; i++)
         {
-            //int y,x; getyx(stdscr,y,x);
-            //int j = y*mx + x;
-            //if( j >= j_max && !(al&1) ) break;
-            // XXX what to do for j==j_max?
             if(!(al&2)) xx_putchar((bl<<8)|strptr_b[i], 0);
             else xx_putchar(strptr_w[i], 0);
         }
