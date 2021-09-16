@@ -18,6 +18,8 @@ OBJS=\
  utils.o\
  term.o\
  int10c.o\
+ gen_video.o\
+ video.o\
 
 
 all: obj emu2

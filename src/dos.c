@@ -9,7 +9,7 @@
 #include "timer.h"
 #include "utils.h"
 #include "video.h"
-#include "term.h"
+//#include "term.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -810,10 +810,11 @@ static int run_emulator(char *file, const char *prgname, char *cmdline, char *en
         if(!exe_path)
             print_error("can't get emulator path.\n");
         args[0] = prog_name;
-        args[1] = file;
-        args[2] = cmdline;
-        args[3] = "--";
-        for(i = 4; i < 63 && *env; i++)
+        args[1] = "-c";
+        args[2] = file;
+        args[3] = cmdline;
+        args[4] = "--";
+        for(i = 5; i < 63 && *env; i++)
         {
             int l = strlen(env);
             args[i] = env;

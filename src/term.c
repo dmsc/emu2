@@ -1,5 +1,8 @@
 #define NCURSES_WIDECHAR 1
 #include <curses.h>
+#ifdef getstr
+#undef getstr
+#endif
 #include "emu.h"
 #include "dbg.h"
 #include "term.h"
@@ -11,7 +14,7 @@
 
 static int curses_initialized=0;
 static int video_initialized=0;
-int flag_s=0, flag_c=0;
+int flag_s=0, flag_c=0, flag_C=0;
 
 //void get_cursor_pos(int* x, int* y);
 void b8_to_term();
@@ -43,6 +46,10 @@ uint16_t xx_inch(void)
     if(y_att&A_BOLD)  x |= 0x0800;
     x |= (y_att&0x700) | ((y_att&0x3800)<<1);
     return x;
+}
+int xx_refresh(void)
+{
+    return refresh();
 }
 static void _write_box_curses_W(uint16_t *buf, int y1, int x1, int y2, int x2)
 {
@@ -85,37 +92,27 @@ static void init_curses()
     raw();
     noecho();
     //echo();
-    if(flag_c) scrollok(stdscr,1);
+    if(flag_C) scrollok(stdscr,1);
     else scrollok(stdscr,0);
     curses_initialized=1;
     atexit(cleanup_curses);
 }
 
-#pragma pack(1)
-typedef struct bios_info      //video-bios-gegevens (256 bytes)
-{
-    uint8_t _xx1[0x45];
-    uint32_t fncty_tab;     // "functionality" table
-    uint8_t vid_mode;       // video mode
-    uint16_t scr_w;         // screen width
-    uint16_t vbufsize;      // size of a 1 screen page
-    uint16_t vbufoffs;      // offset of actual page
-    uint16_t cursor[8];     // cursors for 8 pages
-    uint16_t cursor_shape;  // shape/size of the cursor
-    uint8_t vpage;          // screen-page
-    uint16_t vport;         // video port-address ...
-    uint16_t _xx2;
-    uint8_t _xx3[0x1d];
-    uint8_t scr_h;          // screen height -1
-    uint16_t chr_hgt;       // char height
-    uint16_t _yy;
-    uint8_t _xx4[0x77];
-} bios_info;
-#pragma pack()
+bios_info *bi;
+uint16_t b_get_cursor(uint8_t page);
 
-static bios_info *bi;
-static void init_functionality_table(void);
-static uint16_t b_get_cursor(uint8_t page);
+static void init_functionality_table(void)
+{
+    // Fill the functionality table (used by int10.1b)
+    // XXX ??????
+    memory[0xC0100] = 0x08; // Only mode 3 supported
+    memory[0xC0101] = 0x00;
+    memory[0xC0102] = 0x00;
+    memory[0xC0107] = 0x07; // Support 300, 350 and 400 scanlines
+    memory[0xC0108] = 0x00; // Active character blocks?
+    memory[0xC0109] = 0x00; // MAximum character blocks?
+    memory[0xC0108] = 0xFF; // Support functions
+}
 
 
 static void init_b8(void)
@@ -124,28 +121,42 @@ static void init_b8(void)
     for(int i=0; i<0x4000; i++)
         buf[i]=0x0720;
 }
-void init_video2(void)
+int bi_initialized=0;
+void init_bi(void)
 {
-    if(video_initialized)
-        return;
-    if(!curses_initialized)
-        if(!flag_s) init_curses();
+    if(bi_initialized) return;
     bi=(bios_info *)(memory+0x400);
     bi->vid_mode=3;
     bi->vbufsize=0x8000; // ?
     bi->vbufoffs=0;
+    bi_initialized=1;
+}
+int video_ready(void)
+{
+    return video_initialized;
+}
+// initialize bi, curses and some more... 
+// the trick is to do this when int10 is first used...
+void init_video2(void)
+{
+    if(!flag_c && !flag_C && !flag_s)
+        return;
+    if(video_initialized)
+        return;
+    if(!curses_initialized)
+        if(!flag_s) init_curses();
+    init_bi();
+    /*
+    bi=(bios_info *)(memory+0x400);
+    bi->vid_mode=3;
+    bi->vbufsize=0x8000; // ?
+    bi->vbufoffs=0;
+    */
     init_functionality_table(); // ???
     init_b8();
     int x,y;
     if(curses_initialized)
     {
-        /*
-        reset_shell_mode();
-        getyx(stdscr,y,x); // XXX doesn't work...
-        bi->cursor[0]=(y<<8)|x;
-        debug(debug_video, "\tsetting cursor to y=%d, x=%d\n", y, x);
-        reset_prog_mode();
-        */
         bi->vpage=0;
         getmaxyx(stdscr,y,x);
         bi->scr_w=x; // getmaxyx ?
@@ -164,11 +175,14 @@ void b8_to_term()
 {
     // used to map b8000 to a curses screen
     if(flag_s) return; // ignore in stdio mode
-    if(flag_c) return; // not used if int10 API is translated to curses
+    if(flag_C) return; // not used if int10 API is translated to curses
+    if(!video_ready()) return; // int10 must have been called before
+    /*
     if(!video_initialized)
-        init_video2();
+        init_video2(); // XXX
     if(!curses_initialized)
         init_curses();
+    */
     scrollok(stdscr,0); // don't scroll XXX: redundant -> is already set
     int page=bi->vpage;
     uint16_t *vbuf = (uint16_t *)(memory+0xb8000+page*0x1000);
@@ -180,7 +194,7 @@ void b8_to_term()
     refresh();
 }
 
-static uint8_t b_get_page(void)
+uint8_t b_get_page(void)
 {
     return bi->vpage;
 }
@@ -192,7 +206,7 @@ static uint16_t b_get_vmode(void)
 {
     return bi->vid_mode;
 }
-static uint16_t b_get_cursor(uint8_t page)
+uint16_t b_get_cursor(uint8_t page)
 {
     return bi->cursor[page];
 }
@@ -294,6 +308,7 @@ static void b_putch(int page, uint8_t ch, int rep)
 // HAPPY 1: suppress scroll na char output XXX
 #define HAPPY 0
 
+// easy: control chars as normal for write string
 int easy_switch(int ch, int easy)
 {
     switch(easy)
@@ -307,7 +322,7 @@ int easy_switch(int ch, int easy)
     }
 }
 
-static void b_putchar(int page, uint16_t ch, int easy)
+void b_putchar(int page, uint16_t ch, int easy)
 {
     int h=bi->scr_h+1, w=bi->scr_w;
     page &= 7;
@@ -516,81 +531,3 @@ void int10_t()
     }
 }
 
-void int10(void)
-{
-    if(flag_c) int10_c();
-    else int10_t();
-}
-int video_active(void)
-{
-    return 1;
-}
-void video_putch(char ch)
-{
-    int page=bi->vpage;
-    if(!flag_c) b_putchar(page, 0x0700|ch, 0);
-    else
-    {
-        xx_putchar(0x700|(ch&0xff), 0);
-        refresh();
-    }
-    if(flag_s) putchar(ch);
-    if(!flag_s) b8_to_term();
-}
-int video_get_col(void)
-{
-    int cursor=b_get_cursor(b_get_page());
-    return cursor&0xff;
-}
-
-
-static void init_functionality_table(void)
-{
-    // Fill the functionality table (used by int10.1b)
-    // XXX ??????
-    memory[0xC0100] = 0x08; // Only mode 3 supported
-    memory[0xC0101] = 0x00;
-    memory[0xC0102] = 0x00;
-    memory[0xC0107] = 0x07; // Support 300, 350 and 400 scanlines
-    memory[0xC0108] = 0x00; // Active character blocks?
-    memory[0xC0109] = 0x00; // MAximum character blocks?
-    memory[0xC0108] = 0xFF; // Support functions
-}
-
-
-//* crtc emulation copied from "video.c"
-// CRTC port emulation, some software use it to fix "snow" in CGA modes.
-static uint8_t crtc_port;
-static uint16_t crtc_cursor_loc;
-
-uint8_t video_crtc_read(int port)
-{
-    if(port & 1)
-    {
-        if(crtc_port == 0x0E)
-            return crtc_cursor_loc >> 8;
-        if(crtc_port == 0x0F)
-            return crtc_cursor_loc;
-        else
-            return 0;
-    }
-    else
-        return crtc_port;
-}
-
-void video_crtc_write(int port, uint8_t value)
-{
-    if(port & 1)
-    {
-        if(crtc_port == 0x0E)
-            crtc_cursor_loc = (crtc_cursor_loc & 0xFF) | (value << 8);
-        if(crtc_port == 0x0F)
-            crtc_cursor_loc = (crtc_cursor_loc & 0xFF00) | (value);
-        else
-            debug(debug_video, "CRTC port write [%02x] <- %02x\n",
-                    crtc_port, value);
-    }
-    else
-        crtc_port = value;
-}
-// */

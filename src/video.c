@@ -13,25 +13,37 @@
 #include <unistd.h>
 
 // Simulated character screen.
+// (flow: B8_mem --> term_screen --> terminal)
 // This is a copy of the currently displayed output in the terminal window.
 // We have a max of 128 rows of up to 256 columns, total of 32KB.
 static uint16_t term_screen[64][256];
+// Current cursor row/column position in the terminal.
+static unsigned term_posx, term_posy;
+// output color and cursor shape(?) in terminal
+static unsigned term_color, term_cursor;
+// Current terminal sizes (=max pos)
+static unsigned term_sx, term_sy;
 // Current line in output, lines bellow this are not currently displayed.
 // This allows using only part of the terminal.
 static int output_row;
-// Current cursor row/column position in the terminal.
-static unsigned term_posx, term_posy, term_color, term_cursor;
-// Current terminal sizes
-static unsigned term_sx, term_sy;
+
 // Current emulated video sizes and cursor position
-static unsigned vid_posx[8], vid_posy[8], vid_cursor;
-static unsigned vid_sx, vid_sy, vid_color, vid_page;
+static unsigned vid_page;
+// current output color
+static unsigned vid_color;
+// positions on 8 pages
+static unsigned vid_posx[8], vid_posy[8];
+// video size (=max position)
+static unsigned vid_sx, vid_sy;
+// cursor shape (?)
+static unsigned vid_cursor;
 static unsigned vid_font_lines, vid_no_blank;
 // Signals that the terminal size needs updating
 static volatile int term_needs_update;
 // Terminal FD, allows video output even with redirection.
 static FILE *tty_file;
 // Video is already initialized
+// using int10 initializes video...
 static int video_initialized;
 
 // Forward
@@ -143,7 +155,7 @@ static unsigned get_last_used_row(void)
 static void exit_video(void)
 {
     vid_cursor = 1;
-    check_screen();
+    check_screen_v();
     unsigned max = get_last_used_row();
     term_goto_xy(0, max);
     fputs("\x1b[m", tty_file);
@@ -181,7 +193,7 @@ static void init_video(void)
     term_color = 0x07;
 }
 
-int video_active(void)
+int video_active_v(void)
 {
     return video_initialized;
 }
@@ -278,7 +290,7 @@ static void put_vc_xy(uint8_t vc, uint8_t color, unsigned x, unsigned y)
 }
 
 // Compares current screen with memory data
-void check_screen(void)
+void check_screen_v(void)
 {
     // Exit if not in video mode
     if(!video_initialized)
@@ -336,7 +348,7 @@ static void vid_scroll_up(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1, int n,
     if(y0 == 0 && y1 >= vid_sy - 2 && x0 < 2 && x1 >= vid_sx - 2)
     {
         // Update screen before
-        check_screen();
+        check_screen_v();
         int m = n > output_row + 1 ? output_row + 1 : n;
         if(term_posy < m)
             term_goto_xy(0, m);
@@ -445,7 +457,7 @@ static void video_putchar(uint8_t ch, uint16_t at, int page)
     update_posxy();
 }
 
-void video_putch(char ch)
+void video_putch_v(char ch)
 {
     debug(debug_video, "putchar %02x at (%d,%d)\n", ch & 0xFF, vid_posx[vid_page],
           vid_posy[vid_page]);
@@ -453,7 +465,7 @@ void video_putch(char ch)
 }
 
 // VIDEO int
-void int10()
+void int10_v()
 {
     debug(debug_int, "V-10%04X: BX=%04X\n", cpuGetAX(), cpuGetBX());
     debug(debug_video, "V-10%04X: BX=%04X\n", cpuGetAX(), cpuGetBX());
@@ -745,7 +757,7 @@ void video_crtc_write(int port, uint8_t value)
         crtc_port = value;
 }
 
-int video_get_col(void)
+int video_get_col_v(void)
 {
     return vid_posx[vid_page];
 }

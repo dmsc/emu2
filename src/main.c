@@ -52,9 +52,7 @@ void emulator_update(void)
 {
     debug(debug_int, "emu update cycle\n");
     update_timer();
-    //check_screen();
-    if(flag_s == 0)
-        b8_to_term();
+    check_screen();
     update_keyb();
 }
 
@@ -177,14 +175,14 @@ static void init_bios_mem(void)
     memory[0x413] = 0x80; // ram size: 640k
     memory[0x414] = 0x02; //
     memory[0x449] = 3;    // video mode
-    //memory[0x44A] = 80;   // screen columns
+    memory[0x44A] = 80;   // screen columns
     memory[0x44B] = 0;    // ...
     memory[0x450] = 0;    // cursor column
     memory[0x451] = 0;    // cursor row
     memory[0x462] = 0;    // current screen page
     memory[0x463] = 0xD4; // I/O port of video CRTC
     memory[0x464] = 0x03; // ...
-    //memory[0x484] = 24;   // screen rows - 1
+    memory[0x484] = 24;   // screen rows - 1
     // Store an "INT-19h" instruction in address FFFF:0000
     memory[0xFFFF0] = 0xCB;
     memory[0xFFFF1] = 0x19;
@@ -240,6 +238,9 @@ int main(int argc, char **argv)
             print_usage();
         case 'c':
             flag_c=1;
+            break;
+        case 'C':
+            flag_C=1;
             break;
         case 's':
             flag_s=1;
@@ -298,7 +299,6 @@ int main(int argc, char **argv)
     // Init debug facilities
     init_debug(argv[1]);
     init_cpu();
-    init_video2();
 
     if(bin_load_addr >= 0)
     {
@@ -327,7 +327,6 @@ int main(int argc, char **argv)
     itv.it_value.tv_usec = 54925;
     setitimer(ITIMER_REAL, &itv, 0);
     init_bios_mem();
-    init_video2();
     while(1)
     {
         exit_cpu = 0;
