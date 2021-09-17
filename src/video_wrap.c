@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include "term.h"
 #include "video.h"
+#include "video_wrap.h"
 #include "dbg.h"
 
 void int10(void)
@@ -13,7 +14,7 @@ void int10(void)
 }
 int video_active(void)
 {
-    if(flag_c || flag_C || flag_s) 
+    if(flag_c || flag_C || flag_s)
         return 1;
     else return video_active_v();
 }
