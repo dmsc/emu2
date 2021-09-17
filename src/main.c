@@ -117,14 +117,8 @@ void bios_routine(unsigned inum)
         debug(debug_int, "W-2F1680: sleep\n");
         usleep(33000);
     }
-    else if(inum == 0x15)
-    {
-        cpuSetFlag(cpuFlag_CF);
-    }
     else
-    {
         debug(debug_int, "UNHANDLED INT %02x, AX=%04x\n", inum, cpuGetAX());
-    }
 }
 
 static int load_binary_prog(const char *name, int bin_load_addr)
