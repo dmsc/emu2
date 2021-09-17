@@ -98,7 +98,30 @@ static void init_curses()
     atexit(cleanup_curses);
 }
 
-bios_info *bi;
+
+#pragma pack(1)
+typedef struct bios_info    // bios-data (256 bytes)
+{
+    uint8_t _xx1[0x45];
+    uint32_t fncty_tab;     // "functionality" table
+    uint8_t vid_mode;       // video mode
+    uint16_t scr_w;         // screen width
+    uint16_t vbufsize;      // size of a 1 screen page
+    uint16_t vbufoffs;      // offset of actual page
+    uint16_t cursor[8];     // cursors for 8 pages
+    uint16_t cursor_shape;  // shape/size of the cursor
+    uint8_t vpage;          // screen-page
+    uint16_t vport;         // video port-address ...
+    uint16_t _xx2;
+    uint8_t _xx3[0x1d];
+    uint8_t scr_h;          // screen height -1
+    uint16_t chr_hgt;       // char height
+    uint16_t _yy;
+    uint8_t _xx4[0x77];
+} bios_info;
+#pragma pack()
+
+static bios_info *bi;
 uint16_t b_get_cursor(uint8_t page);
 
 static void init_functionality_table(void)
