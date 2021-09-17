@@ -126,6 +126,7 @@ static inline uint8_t *getptr(uint32_t addr, unsigned size)
     return memory + addr;
 }
 
+/* disabled because of confilict with curses
 // Get a copy of CPU memory forcing a nul byte at end.
 // Four static buffers are used, so at most 4 results can be in use.
 static inline char *getstr(uint32_t addr, unsigned size)
@@ -139,5 +140,6 @@ static inline char *getstr(uint32_t addr, unsigned size)
         memcpy(buf[cbuf], memory + addr, size);
     return buf[cbuf];
 }
+*/
 
 #endif // EMU_H

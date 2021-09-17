@@ -522,13 +522,13 @@ int dos_change_cwd(char *path)
 // changes CWD
 int dos_change_dir(int addr)
 {
-    return dos_change_cwd(emu_getstr(addr, 63));
+    return dos_change_cwd(getstr(addr, 63));
 }
 
 // Converts a DOS full path to equivalent Unix filename
 char *dos_unix_path(int addr, int force)
 {
-    char *path = emu_getstr(addr, 63);
+    char *path = getstr(addr, 63);
     debug(debug_dos, "\tconvert dos path '%s'\n", path);
     // Check for standard paths:
     if(*path && (!strcasecmp(path, "NUL") || !strcasecmp(path + 1, ":NUL")))
@@ -554,7 +554,7 @@ char *dos_unix_path_fcb(int addr, int force)
     else
         drive = drive - 1;
     // And copy file name
-    char *fcb_name = emu_getstr(addr + 1, 11);
+    char *fcb_name = getstr(addr + 1, 11);
     debug(debug_dos, "\tconvert dos fcb name %c:'%s'\n", drive + 'A', fcb_name);
 
     // Build complete path, copy current directory and add FCB file name

@@ -3,7 +3,7 @@
 #ifdef getstr
 #undef getstr
 #endif
-#include "emu.h"
+#include "emu_base.h"
 #include "dbg.h"
 #include "term.h"
 #include "codepage.h"
