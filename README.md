@@ -26,9 +26,12 @@ Options (should be placed *before* the DOS program name):
 
 - `-r <seg>:<ip>`  Specify a run address to start execution (only for binary loaded data).
 
-- `-s`         Use stdio only
+- `-c`          Use curses to update from text buffer at 0xb8000 to terminal.
 
-- `-c`          Use only int10 to render text on terminal.
+- `-C`          Use curses to render text on terminal only via int10.
+                (Direct writes to videobuffer have no effect.)
+
+- `-s`          Force use stdio only.
 
 The available environment variables are:
 - `EMU2_DEBUG_NAME`    Base name of a file to write the debug log, defaults to

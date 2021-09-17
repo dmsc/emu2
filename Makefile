@@ -18,7 +18,7 @@ OBJS=\
  utils.o\
  term.o\
  int10c.o\
- gen_video.o\
+ video_wrap.o\
  video.o\
 
 
