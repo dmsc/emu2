@@ -1,5 +1,8 @@
 #define NCURSES_WIDECHAR 1
 #include <curses.h>
+#ifdef getstr
+#undef getstr
+#endif
 #include "emu.h"
 #include "dbg.h"
 #include "codepage.h"
