@@ -55,19 +55,17 @@ static void term_get_size(void)
         // TODO: perhaps restrict to "known" values
         term_sx = ws.ws_col;
         term_sy = ws.ws_row;
-        if(term_sx < 40)
-            term_sx = 40;
-        else if(term_sx > 240)
+        if(term_sx > 240)
             term_sx = 240;
-        if(term_sy < 25)
-            term_sy = 25;
-        else if(term_sy > 64)
+        if(term_sy > 64)
             term_sy = 64;
+        debug(debug_video, "terminal size: %dx%d\n", term_sx, term_sy);
     }
     else
     {
         term_sx = 80;
         term_sy = 25;
+        debug(debug_video, "can't get terminal size, assuming %dx%d\n", term_sx, term_sy);
     }
 }
 
@@ -147,6 +145,7 @@ static void exit_video(void)
     check_screen();
     unsigned max = get_last_used_row();
     term_goto_xy(0, max);
+    fputs("\x1b[?7h", tty_file); // Re-enable margin
     fputs("\x1b[m", tty_file);
     fclose(tty_file);
     debug(debug_video, "exit video - row %d\n", max);
@@ -162,6 +161,7 @@ static void init_video(void)
         exit(1);
     }
     tty_file = fdopen(tty_fd, "w");
+    fputs("\x1b[?7l", tty_file); // Disable automatic margin
     atexit(exit_video);
     video_initialized = 1;
 
@@ -220,6 +220,9 @@ static void put_vc(uint8_t c)
 // Move terminal cursor to the position
 static void term_goto_xy(unsigned x, unsigned y)
 {
+    if( y >= term_sy )
+        y = term_sy - 1;
+
     if(term_posy < y && (int)term_posy < output_row)
     {
         int inc = (int)y < output_row ? y - term_posy : output_row - term_posy;
@@ -261,11 +264,8 @@ static void put_vc_xy(uint8_t vc, uint8_t color, unsigned x, unsigned y)
 
     put_vc(vc);
     term_posx++;
-    if(term_posx >= term_sx)
-    {
-        term_posx = 0;
-        term_posy++;
-    }
+    if(term_posx > term_sx)
+        term_posx = term_sx;
 
     if(output_row < (int)term_posy)
         output_row = term_posy;
@@ -277,6 +277,8 @@ void check_screen(void)
     // Exit if not in video mode
     if(!video_initialized)
         return;
+
+    debug(debug_video, "check_screen, redrawing\n");
 
     uint16_t memp = (vid_page & 7) * (vid_sy > 25 ? 0x2000 : 0x1000);
     uint16_t *vm = (uint16_t *)(memory + 0xB8000 + memp);
