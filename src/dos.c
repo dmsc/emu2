@@ -319,7 +319,7 @@ static void dos_open_file_fcb(int create)
     put16(fcb_addr + 0x18, h);   // reserved - store DOS handle!
     memory[fcb_addr + 0x20] = 0; // current record
     put16(fcb_addr + 0x21, 0);   // random position - only 3 bytes
-    memory[0x23] = 0;
+    memory[fcb_addr + 0x23] = 0;
 
     debug(debug_dos, "OK.\n");
     cpuClrFlag(cpuFlag_CF);
@@ -367,9 +367,9 @@ static int dos_rw_record_fcb(int addr, int write, int update, int seq)
         if(!seq)
         {
             put16(0x21 + fcb, rnum & 0xFFFF);
-            memory[0x23] = rnum >> 16;
+            memory[0x23 + fcb] = rnum >> 16;
             if(rsize < 64)
-                memory[0x24] = rnum >> 24;
+                memory[0x24 + fcb] = rnum >> 24;
         }
         memory[0x20 + fcb] = rnum & 127;
         put16(0x0C + fcb, rnum / 128);
