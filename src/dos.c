@@ -328,6 +328,18 @@ static void dos_open_file_fcb(int create)
     free(fname);
 }
 
+static void dos_seq_to_rand_fcb(int fcb)
+{
+    unsigned rsize = get16(0x0E + fcb);
+    unsigned recnum = memory[0x20 + fcb];
+    unsigned bnum = get16(0x0C + fcb);
+    unsigned rand = recnum + 128 * bnum;
+    put16(0x21 + fcb, rand & 0xFFFF);
+    memory[0x23 + fcb] = rand >> 16;
+    if(rsize < 64)
+        memory[0x24 + fcb] = rand >> 24;
+}
+
 static int dos_rw_record_fcb(int addr, int write, int update, int seq)
 {
     FILE *f = handles[get_fcb_handle()];
@@ -364,15 +376,10 @@ static int dos_rw_record_fcb(int addr, int write, int update, int seq)
     if(update)
     {
         unsigned rnum = (pos + n) / rsize;
-        if(!seq)
-        {
-            put16(0x21 + fcb, rnum & 0xFFFF);
-            memory[0x23 + fcb] = rnum >> 16;
-            if(rsize < 64)
-                memory[0x24 + fcb] = rnum >> 24;
-        }
         memory[0x20 + fcb] = rnum & 127;
         put16(0x0C + fcb, rnum / 128);
+        if(!seq)
+            dos_seq_to_rand_fcb(fcb);
     }
     // Update file size
     if(write && (pos + n > get32(fcb + 0x10)))
@@ -1124,6 +1131,10 @@ void int21()
     case 0x22: // RANDOM WRITE USING FCB
         dos_show_fcb();
         cpuSetAL(dos_rw_record_fcb(dosDTA, 1, 0, 0));
+        break;
+    case 0x24: //SET RANDOM RECORD NUMBER IN FCB
+        dos_show_fcb();
+        dos_seq_to_rand_fcb(get_fcb());
         break;
     case 0x25: // set interrupt vector
         put16(4 * (ax & 0xFF), cpuGetDX());
