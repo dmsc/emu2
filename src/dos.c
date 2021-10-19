@@ -943,6 +943,23 @@ static void int21_debug(void)
           ax, fn, cpuGetBX(), cpuGetCX(), cpuGetDX(), cpuGetDI(), cpuGetDS(), cpuGetES());
 }
 
+// DOS int 2f
+// Static set of functions used for DOS devices/extensions and TSR installation checks
+void int2f()
+{
+    debug(debug_int, "D-2F%04X: BX=%04X\n", cpuGetAX(), cpuGetBX());
+    unsigned ax = cpuGetAX();
+    switch(ax)
+    {
+    case 0x1680:
+        // Windows "release VM timeslice", use sleep instead of yield to give more
+        // cpu to other tasks.
+        debug(debug_dos, "W-2F1680: sleep\n");
+        usleep(33000);
+        break;
+    }
+}
+
 // DOS int 21
 void int21()
 {
@@ -1841,6 +1858,9 @@ void int21()
         }
         break;
     }
+    case 0x59: // GET EXTENDED ERROR
+        cpuSetAX(ax & 0xFF);
+        break;
     case 0x5B: // CREATE NEW FILE
         dos_open_file(2);
         break;

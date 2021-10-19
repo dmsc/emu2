@@ -109,13 +109,8 @@ void bios_routine(unsigned inum)
         int28();
     else if(inum == 0x2A)
         int2a();
-    else if(inum == 0x2f && cpuGetAX() == 0x1680)
-    {
-        // Windows "release VM timeslice", use sleep instead of yield to give more
-        // cpu to other tasks.
-        debug(debug_int, "W-2F1680: sleep\n");
-        usleep(33000);
-    }
+    else if(inum == 0x2f)
+        int2f();
     else
         debug(debug_int, "UNHANDLED INT %02x, AX=%04x\n", inum, cpuGetAX());
 }

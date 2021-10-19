@@ -8,3 +8,4 @@ void int20(void);
 void int21(void);
 void int22(void);
 void int28(void);
+void int2f(void);
