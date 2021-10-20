@@ -29,6 +29,13 @@ static uint32_t nls_collating_table;
 static uint32_t nls_dbc_set_table;
 static uint8_t *nls_country_info;
 static uint32_t dos_sysvars;
+static uint32_t dos_append;
+
+// Returns "APPEND" path, if activated:
+static const char *append_path()
+{
+    return (memory[dos_append] & 0x01) ? ((char *)memory + dos_append + 2) : 0;
+}
 
 // Disk Transfer Area, buffer for find-first-file output.
 static int dosDTA;
@@ -108,7 +115,7 @@ static int dos_close_file(int h)
 
 static void create_dir(void)
 {
-    char *fname = dos_unix_path(cpuGetAddrDS(cpuGetDX()), 1);
+    char *fname = dos_unix_path(cpuGetAddrDS(cpuGetDX()), 1, 0);
     debug(debug_dos, "\tmkdir '%s' ", fname);
     if(0 != mkdir(fname, 0777))
     {
@@ -134,7 +141,7 @@ static void create_dir(void)
 
 static void remove_dir(void)
 {
-    char *fname = dos_unix_path(cpuGetAddrDS(cpuGetDX()), 1);
+    char *fname = dos_unix_path(cpuGetAddrDS(cpuGetDX()), 1, 0);
     debug(debug_dos, "\trmdir '%s' ", fname);
     if(0 != rmdir(fname))
     {
@@ -167,7 +174,7 @@ static void dos_open_file(int create)
         return;
     }
     int name_addr = cpuGetAddrDS(cpuGetDX());
-    char *fname = dos_unix_path(name_addr, create);
+    char *fname = dos_unix_path(name_addr, create, append_path());
     if(!memory[name_addr] || !fname)
     {
         debug(debug_dos, "\t(file not found)\n");
@@ -287,7 +294,7 @@ static void dos_open_file_fcb(int create)
         return;
     }
     int fcb_addr = get_fcb();
-    char *fname = dos_unix_path_fcb(fcb_addr, create);
+    char *fname = dos_unix_path_fcb(fcb_addr, create, append_path());
     if(!fname)
     {
         debug(debug_dos, "\t(file not found)\n");
@@ -435,7 +442,7 @@ static void int21_43(void)
     int dname = cpuGetAddrDS(cpuGetDX());
     if(al == 0)
     {
-        char *fname = dos_unix_path(dname, 0);
+        char *fname = dos_unix_path(dname, 0, append_path());
         if(!fname)
         {
             debug(debug_dos, "\t(file not found)\n");
@@ -957,6 +964,22 @@ void int2f()
         debug(debug_dos, "W-2F1680: sleep\n");
         usleep(33000);
         break;
+    case 0xB700:
+        cpuSetAL(0xFF);
+        break;
+    case 0xB702:
+        cpuSetAX(0xFDFD);
+        break;
+    case 0xB704: // Get append Path
+        cpuSetES(dos_append >> 4);
+        cpuSetDI((dos_append & 0xF) + 24);
+        break;
+    case 0xB706: // Get Append Function State
+        cpuSetBX(get16(dos_append));
+        break;
+    case 0xB710: // Get Version
+        cpuSetDX(0x0303);
+        break;
     }
 }
 
@@ -1095,7 +1118,7 @@ void int21()
         dos_show_fcb();
         /* TODO: Limited support. No wild cards */
         int fcb_addr = get_fcb();
-        char *fname = dos_unix_path_fcb(fcb_addr, 0);
+        char *fname = dos_unix_path_fcb(fcb_addr, 0, append_path());
         if(!fname)
         {
             debug(debug_dos, "\t(file not found)\n");
@@ -1450,7 +1473,7 @@ void int21()
     }
     case 0x41: // UNLINK
     {
-        char *fname = dos_unix_path(cpuGetAddrDS(cpuGetDX()), 0);
+        char *fname = dos_unix_path(cpuGetAddrDS(cpuGetDX()), 0, append_path());
         if(!fname)
         {
             debug(debug_dos, "\t(file not found)\n");
@@ -1674,7 +1697,7 @@ void int21()
     }
     case 0x4B: // EXEC
     {
-        char *fname = dos_unix_path(cpuGetAddrDS(cpuGetDX()), 0);
+        char *fname = dos_unix_path(cpuGetAddrDS(cpuGetDX()), 0, 0);
         if(!fname)
         {
             debug(debug_dos, "\texec error, file not found\n");
@@ -1815,14 +1838,14 @@ void int21()
     }
     case 0x56: // RENAME
     {
-        char *fname1 = dos_unix_path(cpuGetAddrDS(cpuGetDX()), 0);
+        char *fname1 = dos_unix_path(cpuGetAddrDS(cpuGetDX()), 0, 0);
         if(!fname1)
         {
             debug(debug_dos, "\t(file not found)\n");
             cpuSetAX(0x02);
             cpuSetFlag(cpuFlag_CF);
         }
-        char *fname2 = dos_unix_path(cpuGetAddrES(cpuGetDI()), 1);
+        char *fname2 = dos_unix_path(cpuGetAddrES(cpuGetDI()), 1, 0);
         debug(debug_dos, "\t'%s' -> '%s'\n", fname1, fname2);
         int e = rename(fname1, fname2);
         free(fname2);
@@ -1954,6 +1977,19 @@ static char *addstr(char *dst, const char *src, int limit)
     return dst;
 }
 
+// Initialize append structure
+static void init_append(void)
+{
+    char *env = getenv(ENV_APPEND);
+    // allocate append path and status
+    dos_append =  get_static_memory(0x100 + 2, 0);
+    if(env)
+    {
+        put16(dos_append, 0x0001);
+        strncpy((char *)memory + dos_append + 2, env, 0xFF);
+    }
+}
+
 // Initializes all NLS data for INT 21/38 and INT 21/65
 static void init_nls_data(void)
 {
@@ -2063,6 +2099,7 @@ void init_dos(int argc, char **argv)
     init_handles();
     init_codepage();
     init_nls_data();
+    init_append();
 
     // Init INTERRUPT handlers - point to our own handlers
     for(int i = 0; i < 256; i++)

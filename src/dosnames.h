@@ -9,14 +9,16 @@
 // Converts a DOS full path to equivalent Unix filename
 // If the file exists, returns the name of the file.
 // If the file does not exists, and "force" is true, returns the possible lowercase name.
-// If the file does not exists, and "force" is false, returns null.
-char *dos_unix_path(int addr, int force);
+// If the file does not exists, and "force" is false, returns null, but if append is not
+// null the search is retried searching inside the append paths.
+char *dos_unix_path(int addr, int force, const char *append);
 
 // Converts a DOS FCB file name to equivalent Unix filename
 // If the file exists, returns the name of the file.
 // If the file does not exists, and "force" is true, returns the possible lowercase name.
-// If the file does not exists, and "force" is false, returns null.
-char *dos_unix_path_fcb(int addr, int force);
+// If the file does not exists, and "force" is false, returns null, but if append is not
+// null the search is retried searching inside the append paths.
+char *dos_unix_path_fcb(int addr, int force, const char *append);
 
 // Changes current working directory
 int dos_change_cwd(char *path);

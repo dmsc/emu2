@@ -525,16 +525,8 @@ int dos_change_dir(int addr)
     return dos_change_cwd(getstr(addr, 63));
 }
 
-// Converts a DOS full path to equivalent Unix filename
-char *dos_unix_path(int addr, int force)
+static char *dos_unix_path_base(char *path, int force)
 {
-    char *path = getstr(addr, 63);
-    debug(debug_dos, "\tconvert dos path '%s'\n", path);
-    // Check for standard paths:
-    if(*path && (!strcasecmp(path, "NUL") || !strcasecmp(path + 1, ":NUL")))
-        return strdup("/dev/null");
-    if(*path && (!strcasecmp(path, "CON") || !strcasecmp(path + 1, ":CON")))
-        return strdup("/dev/tty");
     // Normalize
     int drive = dos_path_normalize(path);
     // Get UNIX base path:
@@ -543,44 +535,112 @@ char *dos_unix_path(int addr, int force)
     return dos_unix_path_rec(base, path, force);
 }
 
-// Converts a FCB path to equivalent Unix filename
-char *dos_unix_path_fcb(int addr, int force)
+// Search a file in each possible "append" path component
+static char *search_append_path(char *path, const char *append)
 {
-    int opos = 0;
+    // Now we concatenate each of the append paths:
+    while(*append)
+    {
+        // Skip separators
+        while( *append == ';' )
+            append ++;
+        if(*append)
+        {
+            // Find the end of token
+            const char *p = append;
+            while( *append != ';' && *append )
+                append++;
+
+            // Construct new path:
+            char full_path[64];
+            if( snprintf(full_path, 64, "%.*s\\%s", (int)(append - p), p, path) < 64 )
+            {
+                debug(debug_dos, "\tconvert dos path '%s'\n", full_path);
+                char *result = dos_unix_path_base(full_path, 0);
+                if(result)
+                    return result;
+            }
+        }
+    }
+    return 0;
+}
+
+// Converts a DOS full path to equivalent Unix filename
+char *dos_unix_path(int addr, int force, const char *append)
+{
+    char *path = getstr(addr, 63);
+    debug(debug_dos, "\tconvert dos path '%s'\n", path);
+    // Check for standard paths:
+    if(*path && (!strcasecmp(path, "NUL") || !strcasecmp(path + 1, ":NUL")))
+        return strdup("/dev/null");
+    if(*path && (!strcasecmp(path, "CON") || !strcasecmp(path + 1, ":CON")))
+        return strdup("/dev/tty");
+    // Try to convert
+    char *result = dos_unix_path_base(path, force);
+    // Be done if the path is found, or no append.
+    if(result || !append)
+        return result;
+    // Restore original path, and see if path is absolute, so we don't append
+    path = getstr(addr, 63);
+    if( !char_valid(path[0]) || (path[1] == ':' && !char_valid(path[2])) )
+        return result;
+    return search_append_path(path, append);
+}
+
+// Converts a FCB path to equivalent Unix filename
+char *dos_unix_path_fcb(int addr, int force, const char *append)
+{
     // Copy drive number from the FCB structure:
     int drive = memory[addr] & 0xFF;
     if(!drive)
         drive = dos_default_drive;
     else
+    {
         drive = drive - 1;
+        // Don't append if drive is specified.
+        append = 0;
+    }
     // And copy file name
     char *fcb_name = getstr(addr + 1, 11);
     debug(debug_dos, "\tconvert dos fcb name %c:'%s'\n", drive + 'A', fcb_name);
+
+    // Build filename from FCB
+    char filename[13];
+    int opos = 0;
+
+    for(int pos = 0; pos < 8 && opos < 13; pos++, opos++)
+        if(fcb_name[pos] == '?')
+            filename[opos] = '?';
+        else if(0 == (filename[opos] = dos_valid_char(fcb_name[pos])))
+            break;
+    if(opos < 63 && (dos_valid_char(fcb_name[8]) || fcb_name[8] == '?'))
+        filename[opos++] = '.';
+    for(int pos = 8; pos < 11 && opos < 63; pos++, opos++)
+        if(fcb_name[pos] == '?')
+            filename[opos] = '?';
+        else if(0 == (filename[opos] = dos_valid_char(fcb_name[pos])))
+            break;
+    filename[opos] = 0;
 
     // Build complete path, copy current directory and add FCB file name
     char path[64];
     memcpy(path, dos_cwd[drive], 64);
     opos = strlen(path);
 
-    for(int pos = 0; pos < 8 && opos < 63; pos++, opos++)
-        if(fcb_name[pos] == '?')
-            path[opos] = '?';
-        else if(0 == (path[opos] = dos_valid_char(fcb_name[pos])))
-            break;
-    if(opos < 63 && (dos_valid_char(fcb_name[8]) || fcb_name[8] == '?'))
-        path[opos++] = '.';
-    for(int pos = 8; pos < 11 && opos < 63; pos++, opos++)
-        if(fcb_name[pos] == '?')
-            path[opos] = '?';
-        else if(0 == (path[opos] = dos_valid_char(fcb_name[pos])))
-            break;
-    path[opos] = 0;
+    if( snprintf(path, 64, "%s\\%s", dos_cwd[drive], filename) >= 64 )
+        return 0; // Path too long
 
     debug(debug_dos, "\ttemp name '%s'\n", path);
     // Get UNIX base path:
     const char *base = get_base_path(drive);
     // Adds CWD if path is not absolute
-    return dos_unix_path_rec(base, path, force);
+    char *result = dos_unix_path_rec(base, path, force);
+    // Be done if the path is found, or no append.
+    if(result || !append)
+        return result;
+
+    // Now, try append paths - using full path resolution
+    return search_append_path(filename, append);
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -612,12 +672,12 @@ static struct dos_file_list *find_first_file(char *fspec)
 
 struct dos_file_list *dos_find_first_file(int addr)
 {
-    return find_first_file(dos_unix_path(addr, 1));
+    return find_first_file(dos_unix_path(addr, 1, 0));
 }
 
 struct dos_file_list *dos_find_first_file_fcb(int addr)
 {
-    return find_first_file(dos_unix_path_fcb(addr, 1));
+    return find_first_file(dos_unix_path_fcb(addr, 1, 0));
 }
 
 char *dos_real_path(char drive, const char *unix_path)

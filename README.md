@@ -45,6 +45,15 @@ The available environment variables are:
 - `EMU2_DRIVE_`n       Set unix path as root of drive `n`, by default all drives
                        point to the unix working directory.
 
+- `EMU2_APPEND`        Sets a list of paths to search for data files on open,
+                       emulating the DOS `APPEND` command. Only files with a
+                       relative path are included in the search, and the search
+                       is relative to the current working directory if no drive
+                       letter is specified in the append path.
+                       For example, if set to "`TXT;C:\IN`", when opening the
+                       file "`CAT.TXT`" the file is searched as "`CAT.TXT`",
+                       "`TXT\CAT.TXT`" and "`C:\IN\CAT.TXT`" in turn.
+
 - `EMU2_CODEPAGE`      Set DOS code-page to the specified string. Set to '?' to
                        show list of included code-pages, multiple aliases
                        separeted with commas.  Set to a file name to read the
