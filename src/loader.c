@@ -26,8 +26,7 @@ static int valid_fcb_sep(int i)
 static int valid_fcb_char(int i)
 {
     return isalnum(i) || (i > 127 && i < 229) || (i > 229) ||
-           (i == '\\' && FCB_PARSE_DOS == 1) ||
-           strchr("!#$%&'()-@^_`{}~?<>", i);
+           (i == '\\' && FCB_PARSE_DOS == 1) || strchr("!#$%&'()-@^_`{}~?<>", i);
 }
 
 // The FCB parsing states.
@@ -76,8 +75,7 @@ static void cmdline_to_fcb(const char *cmd_line, uint8_t *fcb1, uint8_t *fcb2)
                 else
                 {
                     offset = fcb2 + 1;
-                    state = (FCB_PARSE_DOS == 1) ? FCB_PARSE_SEP
-                                                 : FCB_PARSE_SEP_PURGE;
+                    state = (FCB_PARSE_DOS == 1) ? FCB_PARSE_SEP : FCB_PARSE_SEP_PURGE;
                 }
                 break;
             case '*':
@@ -404,8 +402,8 @@ static void mcb_new(int mcb, int owner, int size, int last)
     memory[mcb * 16 + 0] = last ? 'Z' : 'M';
     put16(mcb * 16 + 1, owner);
     put16(mcb * 16 + 3, size);
-    debug(debug_dos, "\tmcb_new: mcb:$%04X type:%c owner:$%04X size:$%04X\n",
-          mcb, last ? 'Z' : 'M', owner, size);
+    debug(debug_dos, "\tmcb_new: mcb:$%04X type:%c owner:$%04X size:$%04X\n", mcb,
+          last ? 'Z' : 'M', owner, size);
 }
 
 static int mcb_size(int mcb)
@@ -658,26 +656,26 @@ uint16_t create_PSP(const char *cmdline, const char *environment, int env_size,
     memset(dosPSP, 0, 256);
 
     dosPSP[0] = 0xCD;                   // 00: int20
-    dosPSP[1] = 0x20;
+    dosPSP[1] = 0x20;                   //
     dosPSP[2] = 0x00;                   // 02: memory end segment
     dosPSP[3] = 0x00;                   //
     dosPSP[5] = 0x9A;                   // 05: FAR call to CP/M entry point:
     dosPSP[6] = 0xF0;                   //       CALL FAR F01D:FEF0
     dosPSP[7] = 0xFE;                   //     this jumps to 0xC0, where an
     dosPSP[8] = 0x1D;                   //     INT 21h is patched.
-    dosPSP[9] = 0xF0;
+    dosPSP[9] = 0xF0;                   //
     dosPSP[10] = 0x22;                  // Handler for INT 22h
-    dosPSP[11] = 0x00;
-    dosPSP[12] = 0x00;
-    dosPSP[13] = 0x00;
+    dosPSP[11] = 0x00;                  //
+    dosPSP[12] = 0x00;                  //
+    dosPSP[13] = 0x00;                  //
     dosPSP[14] = 0x23;                  // Handler for INT 23h
-    dosPSP[15] = 0x00;
-    dosPSP[16] = 0x00;
-    dosPSP[17] = 0x00;
+    dosPSP[15] = 0x00;                  //
+    dosPSP[16] = 0x00;                  //
+    dosPSP[17] = 0x00;                  //
     dosPSP[18] = 0x24;                  // Handler for INT 24h
-    dosPSP[19] = 0x00;
-    dosPSP[20] = 0x00;
-    dosPSP[21] = 0x00;
+    dosPSP[19] = 0x00;                  //
+    dosPSP[20] = 0x00;                  //
+    dosPSP[21] = 0x00;                  //
     dosPSP[22] = 0xFE;                  // 16: Parent PSP, use special value of FFFE
     dosPSP[23] = 0xFF;                  //     to signal no parent DOS process
     dosPSP[44] = 0xFF & env_seg;        // 2C: environment segment
@@ -685,11 +683,11 @@ uint16_t create_PSP(const char *cmdline, const char *environment, int env_size,
     dosPSP[80] = 0xCD;                  // 50: INT 21h / RETF
     dosPSP[81] = 0x21;                  //
     dosPSP[82] = 0xCB;                  //
-    unsigned l = strlen(cmdline);
-    if(l > 126)
-        l = 126;
+    unsigned l = strlen(cmdline);       //
+    if(l > 126)                         //
+        l = 126;                        //
     dosPSP[128] = l;                    // 80: Cmd line len
-    memcpy(dosPSP + 129, cmdline, l);
+    memcpy(dosPSP + 129, cmdline, l);   //
     dosPSP[129 + l] = 0x00d;            // Adds an ENTER at the end
     // Copy environment:
     memcpy(memory + env_seg * 16, environment, env_size);
@@ -827,8 +825,7 @@ int dos_load_exe(FILE *f, uint16_t psp_mcb)
     int data_blocks = g16(buf + 4);
     if(data_blocks & 0xF800)
     {
-        debug(debug_dos, "\tinvalid number of blocks ($%04x), fixing.\n",
-              data_blocks);
+        debug(debug_dos, "\tinvalid number of blocks ($%04x), fixing.\n", data_blocks);
         data_blocks &= 0x07FF;
     }
     int data_size = data_blocks * 512 + g16(buf + 2) - head_size;

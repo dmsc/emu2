@@ -8,9 +8,9 @@
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/time.h>
 #include <termios.h>
 #include <unistd.h>
-#include <sys/time.h>
 
 static int term_raw = 0;
 static int tty_fd = -1;
@@ -427,14 +427,14 @@ int kbhit(void)
             static double last_time;
 
             struct timeval tv;
-            if( gettimeofday(&tv, NULL) != -1)
+            if(gettimeofday(&tv, NULL) != -1)
             {
                 double t1 = tv.tv_usec + tv.tv_sec * 1000000.0;
                 // Arbitrary limit to 4 calls each 100Hz
-                if( (t1 - last_time) < 10000 )
+                if((t1 - last_time) < 10000)
                 {
                     throttle_calls--;
-                    if( throttle_calls <= 0 )
+                    if(throttle_calls <= 0)
                     {
                         debug(debug_int, "keyboard sleep.\n");
                         usleep(10000);

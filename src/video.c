@@ -220,7 +220,7 @@ static void put_vc(uint8_t c)
 // Move terminal cursor to the position
 static void term_goto_xy(unsigned x, unsigned y)
 {
-    if( y >= term_sy )
+    if(y >= term_sy)
         y = term_sy - 1;
 
     if(term_posy < y && (int)term_posy < output_row)
@@ -313,8 +313,7 @@ void check_screen(void)
     fflush(tty_file);
 }
 
-static void vid_scroll_up(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1, int n,
-                          int page)
+static void vid_scroll_up(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1, int n, int page)
 {
     debug(debug_video, "scroll up %d: (%d, %d) - (%d, %d)\n", n, x0, y0, x1, y1);
 
@@ -551,7 +550,7 @@ void int10()
         video_putchar(ax, 0xFF00, (cpuGetBX() >> 8) & 7);
         break;
     case 0x0F: // GET CURRENT VIDEO MODE
-        cpuSetAX((vid_sx << 8) | 0x0003 | vid_no_blank); // 80x25 mode
+        cpuSetAX((vid_sx << 8) | 0x0003 | vid_no_blank);
         cpuSetBX((vid_page << 8) | (0xFF & cpuGetBX()));
         break;
     case 0x10:
@@ -689,16 +688,16 @@ void int10()
                 memory[addr + 27] = vid_cursor * 6; // cursor start scanline
                 memory[addr + 28] = vid_cursor * 7; // cursor end scanline
                 memory[addr + 29] = 0;              // current page
-                memory[addr + 30] = 0xD4;
-                memory[addr + 31] = 0x03; // CRTC port: 03D4
+                memory[addr + 30] = 0xD4;           //
+                memory[addr + 31] = 0x03;           // CRTC port: 03D4
                 memory[addr + 34] = vid_sy;
                 memory[addr + 35] = vid_font_lines;
-                memory[addr + 36] = 0x00; // font lines: 0010
-                memory[addr + 39] = 0x10;
-                memory[addr + 40] = 0x00; // # of colors: 0010
+                memory[addr + 36] = 0x00;                // font lines: 0010
+                memory[addr + 39] = 0x10;                //
+                memory[addr + 40] = 0x00;                // # of colors: 0010
                 memory[addr + 41] = vid_sy > 25 ? 4 : 8; // # of pages
-                memory[addr + 42] = 2;    // # of scan-lines - get from vid_sy
-                memory[addr + 49] = 3;    // 256k memory
+                memory[addr + 42] = 2;                   // # of scan-lines - from vid_sy
+                memory[addr + 49] = 3;                   // 256k memory
                 cpuSetAX(0x1B1B);
             }
         }

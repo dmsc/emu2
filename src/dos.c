@@ -863,7 +863,7 @@ static int line_input(FILE *f, uint8_t *buf, int max)
                 video_putch('\r');
                 video_putch('\n');
                 buf[len] = '\r';
-                buf[len+1] = '\n';
+                buf[len + 1] = '\n';
                 len += 2;
                 break;
             }
@@ -1172,7 +1172,7 @@ void int21()
         dos_show_fcb();
         cpuSetAL(dos_rw_record_fcb(dosDTA, 1, 0, 0));
         break;
-    case 0x24: //SET RANDOM RECORD NUMBER IN FCB
+    case 0x24: // SET RANDOM RECORD NUMBER IN FCB
         dos_show_fcb();
         dos_seq_to_rand_fcb(get_fcb());
         break;
@@ -1274,7 +1274,7 @@ void int21()
                 if(!(ax & 4) || i > 1)
                     for(; i < 9; i++)
                         dst[i] = ' ';
-                if( i < 9 )
+                if(i < 9)
                     i = 9;
                 if(!(ax & 8) || i > 9)
                     for(; i < 12; i++)
@@ -1982,7 +1982,7 @@ static void init_append(void)
 {
     char *env = getenv(ENV_APPEND);
     // allocate append path and status
-    dos_append =  get_static_memory(0x100 + 2, 0);
+    dos_append = get_static_memory(0x100 + 2, 0);
     if(env)
     {
         put16(dos_append, 0x0001);

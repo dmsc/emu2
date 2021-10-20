@@ -542,18 +542,18 @@ static char *search_append_path(char *path, const char *append)
     while(*append)
     {
         // Skip separators
-        while( *append == ';' )
-            append ++;
+        while(*append == ';')
+            append++;
         if(*append)
         {
             // Find the end of token
             const char *p = append;
-            while( *append != ';' && *append )
+            while(*append != ';' && *append)
                 append++;
 
             // Construct new path:
             char full_path[64];
-            if( snprintf(full_path, 64, "%.*s\\%s", (int)(append - p), p, path) < 64 )
+            if(snprintf(full_path, 64, "%.*s\\%s", (int)(append - p), p, path) < 64)
             {
                 debug(debug_dos, "\tconvert dos path '%s'\n", full_path);
                 char *result = dos_unix_path_base(full_path, 0);
@@ -582,7 +582,7 @@ char *dos_unix_path(int addr, int force, const char *append)
         return result;
     // Restore original path, and see if path is absolute, so we don't append
     path = getstr(addr, 63);
-    if( !char_valid(path[0]) || (path[1] == ':' && !char_valid(path[2])) )
+    if(!char_valid(path[0]) || (path[1] == ':' && !char_valid(path[2])))
         return result;
     return search_append_path(path, append);
 }
@@ -627,7 +627,7 @@ char *dos_unix_path_fcb(int addr, int force, const char *append)
     memcpy(path, dos_cwd[drive], 64);
     opos = strlen(path);
 
-    if( snprintf(path, 64, "%s\\%s", dos_cwd[drive], filename) >= 64 )
+    if(snprintf(path, 64, "%s\\%s", dos_cwd[drive], filename) >= 64)
         return 0; // Path too long
 
     debug(debug_dos, "\ttemp name '%s'\n", path);
