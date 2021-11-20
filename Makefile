@@ -1,4 +1,4 @@
-CC=gcc
+CC=cc
 CFLAGS=-O3 -flto -Wall -g -Werror=implicit-function-declaration -Werror=int-conversion
 LDLIBS=-lm
 INSTALL=install
