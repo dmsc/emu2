@@ -188,6 +188,18 @@ static void init_bios_mem(void)
     update_timer();
 }
 
+// Portability signal setting
+void set_signal(int signum, sighandler_t handler)
+{
+    struct sigaction act;
+    memset(&act, 0, sizeof(act));
+    act.sa_handler = handler;
+    act.sa_flags = SA_RESTART;
+    sigaddset(&act.sa_mask, signum);
+    if(sigaction(signum, &act, 0) != 0)
+        print_error("can't set signal handler %d: %s\n", signum, strerror(errno));
+}
+
 int main(int argc, char **argv)
 {
     int i;
@@ -293,13 +305,13 @@ int main(int argc, char **argv)
     else
         init_dos(argc - 1, argv + 1);
 
-    signal(SIGALRM, timer_alarm);
+    set_signal(SIGALRM, timer_alarm);
     // Install an exit handler to allow exit functions to run
-    signal(SIGHUP, exit_handler);
-    signal(SIGINT, exit_handler);
-    signal(SIGQUIT, exit_handler);
-    signal(SIGPIPE, exit_handler);
-    signal(SIGTERM, exit_handler);
+    set_signal(SIGHUP, exit_handler);
+    set_signal(SIGINT, exit_handler);
+    set_signal(SIGQUIT, exit_handler);
+    set_signal(SIGPIPE, exit_handler);
+    set_signal(SIGTERM, exit_handler);
     struct itimerval itv;
     itv.it_interval.tv_sec = 0;
     itv.it_interval.tv_usec = 54925;
