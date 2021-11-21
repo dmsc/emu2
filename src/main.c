@@ -189,14 +189,13 @@ static void init_bios_mem(void)
 }
 
 // Portability signal setting
-void set_signal(int signum, sighandler_t handler)
+void set_signal(int signum, void (*handler)(int sigraised))
 {
     struct sigaction act;
     memset(&act, 0, sizeof(act));
     act.sa_handler = handler;
     act.sa_flags = SA_RESTART;
-    sigaddset(&act.sa_mask, signum);
-    if(sigaction(signum, &act, 0) != 0)
+    if(sigaction(signum, &act, NULL) != 0)
         print_error("can't set signal handler %d: %s\n", signum, strerror(errno));
 }
 
