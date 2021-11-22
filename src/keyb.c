@@ -365,10 +365,15 @@ static void set_raw_term(int raw)
     term_raw = raw;
     if(term_raw)
     {
+        // Set terminal to RAW
         struct termios newattr;
         tcgetattr(tty_fd, &oldattr);
         newattr = oldattr;
-        cfmakeraw(&newattr);
+        newattr.c_iflag &= ~(IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | ICRNL | IXON);
+        newattr.c_oflag &= ~(OPOST);
+        newattr.c_cflag &= ~(CSIZE | PARENB);
+        newattr.c_cflag |= CS8;
+        newattr.c_lflag &= ~(ECHO | ECHONL | ICANON | ISIG | IEXTEN);
         newattr.c_cc[VMIN] = 0;
         newattr.c_cc[VTIME] = 0;
         tcsetattr(tty_fd, TCSANOW, &newattr);
