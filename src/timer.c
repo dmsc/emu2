@@ -122,6 +122,19 @@ void port_timer_write(uint16_t port, uint8_t val)
     }
 }
 
+static uint16_t bcd(uint16_t v, int digits)
+{
+    uint16_t bcd = 0;
+
+    for(int i = 0; i < digits; i++)
+    {
+        bcd |= (v % 10) << (i * 4);
+        v /= 10;
+    }
+
+    return bcd;
+}
+
 // BIOS TIMER
 void int1A(void)
 {
@@ -137,9 +150,32 @@ void int1A(void)
         cpuSetAX(bios_dater);
         debug(debug_int, "GET TIME: %02x:%04x:%04x\n", cpuGetAX(), cpuGetCX(),
               cpuGetDX());
+        break;
     }
-    break;
+    case 2: // RTC TIME
+    {
+        time_t tm = time(0);
+        struct tm lt;
+        if(localtime_r(&tm, &lt))
+        {
+            cpuSetDX(bcd(lt.tm_sec, 2) << 8);
+            cpuSetCX((bcd(lt.tm_hour, 2) << 8) | bcd(lt.tm_min, 2));
+        }
+        break;
+    }
+    case 4: // RTC DATE
+    {
+        time_t tm = time(0);
+        struct tm lt;
+        if(localtime_r(&tm, &lt))
+        {
+            cpuSetDX((bcd(lt.tm_mon + 1, 2) << 8) | bcd(lt.tm_mday, 2));
+            cpuSetCX(bcd(lt.tm_year + 1900, 4));
+        }
+        break;
+    }
     default:
         debug(debug_int, "UNHANDLED INT 1A, AX=%04x\n", ax);
+        break;
     }
 }
