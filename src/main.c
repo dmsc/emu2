@@ -8,6 +8,9 @@
 #include "keyb.h"
 #include "timer.h"
 #include "video.h"
+#ifdef EMS_SUPPORT
+#include "ems.h"
+#endif /* EMS_SUPPORT */
 
 #include <errno.h>
 #include <fcntl.h>
@@ -112,6 +115,10 @@ void bios_routine(unsigned inum)
         int2a();
     else if(inum == 0x2f)
         int2f();
+#ifdef EMS_SUPPORT
+    else if(inum == 0x67)
+        int67();
+#endif
     else
         debug(debug_int, "UNHANDLED INT %02x, AX=%04x\n", inum, cpuGetAX());
 }

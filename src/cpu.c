@@ -30,23 +30,22 @@ static uint16_t irq_mask; // IRQs pending
 
 static uint8_t GetMemAbsB(uint32_t addr)
 {
-    return memory[addr & 0xFFFFF];
+    return get8(addr);
 }
 
 static uint16_t GetMemAbsW(uint32_t addr)
 {
-    return memory[addr & 0xFFFFF] + 256 * memory[(addr + 1) & 0xFFFFF];
+    return get16(addr);
 }
 
 static void SetMemAbsB(uint32_t addr, uint8_t val)
 {
-    memory[0xFFFFF & addr] = val;
+    put8(addr, val);
 }
 
-static void SetMemAbsW(uint32_t addr, uint16_t x)
+static void SetMemAbsW(uint32_t addr, uint16_t val)
 {
-    memory[addr & 0xFFFFF] = x;
-    memory[(addr + 1) & 0xFFFFF] = x >> 8;
+    put16(addr, val);
 }
 
 static void SetMemB(uint16_t seg, uint16_t off, uint8_t val)
@@ -56,7 +55,7 @@ static void SetMemB(uint16_t seg, uint16_t off, uint8_t val)
 
 static uint8_t GetMemB(int seg, uint16_t off)
 {
-    return memory[0xFFFFF & (sregs[seg] * 16 + off)];
+    return GetMemAbsB(sregs[seg] * 16 + off);
 }
 
 static void SetMemW(uint16_t seg, uint16_t off, uint16_t val)
@@ -2632,6 +2631,11 @@ int cpuGetAddrDS(uint16_t offset)
 }
 
 int cpuGetAddrES(uint16_t offset)
+{
+    return 0xFFFFF & (sregs[ES] * 16 + offset);
+}
+
+int cpuGetAddrSS(uint16_t offset)
 {
     return 0xFFFFF & (sregs[ES] * 16 + offset);
 }

@@ -9,6 +9,7 @@
 #include "timer.h"
 #include "utils.h"
 #include "video.h"
+#include "ems.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -369,6 +370,15 @@ static int dos_rw_record_fcb(int addr, int write, int update, int seq)
         pos = rsize * (0xFFFFFF & get32(0x21 + fcb));
 
     uint8_t *buf = getptr(addr, rsize);
+#ifdef EMS_SUPPORT
+    int buf_allocated = 0;
+    if (in_ems_pageframe2(addr, rsize)) {
+	buf_allocated = 1;
+	buf = malloc(rsize);
+	if (buf && write)
+	    ems_getmem(buf, addr, rsize);
+    }
+#endif
     if(!buf || !rsize)
     {
         debug(debug_dos, "\tbuffer pointer invalid\n");
@@ -392,16 +402,21 @@ static int dos_rw_record_fcb(int addr, int write, int update, int seq)
     if(write && (pos + n > get32(fcb + 0x10)))
         put32(fcb + 0x10, pos + n);
 
+    for(unsigned i = n; i < rsize; i++)
+	buf[i] = 0;
+#ifdef EMS_SUPPORT
+    if (buf_allocated) {
+	if (!write)
+	    ems_putmem(addr, buf, rsize);
+	free(buf);
+    }
+#endif
     if(n == rsize)
         return 0; // read/write full record
     else if(!n || write)
         return 1; // EOF on read, disk full on write
     else
-    {
-        for(unsigned i = n; i < rsize; i++)
-            buf[i] = 0;
         return 3; // read partial record
-    }
 }
 
 // Converts Unix time_t to DOS time/date
@@ -1417,7 +1432,16 @@ void int21()
             cpuSetAX(6); // invalid handle
             break;
         }
-        uint8_t *buf = getptr(cpuGetAddrDS(cpuGetDX()), cpuGetCX());
+	int len = cpuGetCX();
+	uint32_t addr = cpuGetAddrDS(cpuGetDX());
+	uint8_t *buf = getptr(addr, len);
+#ifdef EMS_SUPPORT
+	int buf_allocated = 0;
+	if (in_ems_pageframe2(addr, len)) {
+	    buf_allocated = 1;
+	    buf = malloc(len);
+	}
+#endif
         if(!buf)
         {
             debug(debug_dos, "\tbuffer pointer invalid\n");
@@ -1429,14 +1453,20 @@ void int21()
         if(devinfo[cpuGetBX()] == 0x80D3)
         {
             suspend_keyboard();
-            cpuSetAX(line_input(f, buf, cpuGetCX()));
+            cpuSetAX(line_input(f, buf, len));
         }
         else
         {
-            unsigned n = fread(buf, 1, cpuGetCX(), f);
+            unsigned n = fread(buf, 1, len, f);
             cpuSetAX(n);
         }
         cpuClrFlag(cpuFlag_CF);
+#ifdef EMS_SUPPORT
+	if (buf_allocated) {
+	    ems_putmem(addr, buf, len);
+	    free(buf);
+	}
+#endif
         break;
     }
     case 0x40: // WRITE
@@ -1449,7 +1479,18 @@ void int21()
             return;
         }
         unsigned len = cpuGetCX();
-        uint8_t *buf = getptr(cpuGetAddrDS(cpuGetDX()), len);
+	uint32_t addr = cpuGetAddrDS(cpuGetDX());
+	uint8_t *buf = getptr(addr, len);
+#ifdef EMS_SUPPORT
+	int buf_allocated = 0;
+	if (in_ems_pageframe2(addr, len)) {
+	    buf_allocated = 1;
+	    buf = malloc(len);
+	    if (buf) {
+		ems_getmem(buf, addr, len);
+	    }
+	}
+#endif
         if(!buf)
         {
             debug(debug_dos, "\tbuffer pointer invalid\n");
@@ -1469,6 +1510,10 @@ void int21()
             cpuSetAX(n);
         }
         cpuClrFlag(cpuFlag_CF);
+#ifdef EMS_SUPPORT
+	if (buf_allocated)
+	    free(buf);
+#endif
         break;
     }
     case 0x41: // UNLINK
@@ -2113,6 +2158,10 @@ void init_dos(int argc, char **argv)
     // Patch an INT 21 at address 0x000C0, this is for the CP/M emulation code
     memory[0x000C0] = 0xCD;
     memory[0x000C1] = 0x21;
+    
+#ifdef EMS_SUPPORT
+    init_ems();
+#endif
 
     // Init memory handling - available start address at 0x800,
     // ending address at 0xA0000.
