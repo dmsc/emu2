@@ -281,6 +281,10 @@ int67(void)
 	    
 	    int size = sizeof(struct ems_data) + EMS_PAGESIZE * alloc_pages;
 	    struct ems_data *new_ems = malloc(size);
+	    if (new_ems == NULL) {
+		set_emm_result(ax, EMM_STATUS_MALFUNCTION_SOFT);
+		break;
+	    }
 	    memset(new_ems, 0, sizeof(struct ems_data));
 	    new_ems->pages = alloc_pages;
 	    new_ems->handle = handle;
@@ -891,6 +895,10 @@ int67(void)
 		
 		if (exchange) {
 		    uint8_t *buf = malloc(len);
+		    if (buf == NULL) {
+			set_emm_result(ax, EMM_STATUS_MALFUNCTION_SOFT);
+			break;
+		    }
 		    ems_getmem(buf, dest_addr, len);
 		    ems_putmem(dest_addr, &src_ems->memory[src_offset], len);
 		    memcpy(&src_ems->memory[src_offset], buf, len);
@@ -912,6 +920,10 @@ int67(void)
 		
 		if (exchange) {
 		    uint8_t *buf = malloc(len);
+		    if (buf == NULL) {
+			set_emm_result(ax, EMM_STATUS_MALFUNCTION_SOFT);
+			break;
+		    }
 		    ems_getmem(buf, src_addr, len);
 		    ems_putmem(src_addr, &dest_ems->memory[dest_offset], len);
 		    memcpy(&dest_ems->memory[dest_offset], buf, len);
@@ -944,6 +956,10 @@ int67(void)
 		}
 		if (exchange) {
 		    uint8_t *buf = malloc(len);
+		    if (buf == NULL) {
+			set_emm_result(ax, EMM_STATUS_MALFUNCTION_SOFT);
+			break;
+		    }
 		    memcpy(buf, &dest_ems->memory[dest_offset], len);
 		    memcpy(&dest_ems->memory[dest_offset],
 			   &src_ems->memory[src_offset],
