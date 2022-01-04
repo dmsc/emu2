@@ -2160,7 +2160,18 @@ void init_dos(int argc, char **argv)
     memory[0x000C1] = 0x21;
     
 #ifdef EMS_SUPPORT
-    init_ems();
+    const char *emsmem = getenv(ENV_EMSMEM);
+    int ems_pages = 0;
+    if (emsmem != NULL) {
+	char *ep;
+	ems_pages = strtol(emsmem, &ep, 0);
+	if (*ep  || ems_pages < 0 || ems_pages > 2048)
+	    print_error("%s must be set between 0 to 2048\n", ENV_EMSMEM);
+    }
+    if (ems_pages != 0) {
+	debug(debug_dos, "set EMS pages = %d\n", ems_pages);
+	init_ems(ems_pages);
+    }
 #endif
 
     // Init memory handling - available start address at 0x800,

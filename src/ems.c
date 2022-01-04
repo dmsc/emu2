@@ -6,7 +6,8 @@
 
 #ifdef EMS_SUPPORT
 
-#define EMS_MAXPAGES	1024
+int use_ems = 0;
+
 #define EMS_MAXHANDLES	255
 #define EMS_PAGESIZE	(16*1024)
 #define EMS_HEADER_SEG	(EMS_PAGEFRAME_SEG + 0x1000)
@@ -153,15 +154,17 @@ ems_getmem(uint8_t *dest, uint32_t src, unsigned size)
 }
 
 void
-init_ems()
+init_ems(int pages)
 {
-    ems_freepages = ems_maxpages = EMS_MAXPAGES;
-    
+    ems_freepages = ems_maxpages = pages;
+
     // Install INT 67 handler for EMS check
     uint32_t ems_header_addr =  (EMS_HEADER_SEG << 4);
     memcpy(memory + ems_header_addr, ems_header, sizeof ems_header);
     put16(0x67*4, 0x18);
     put16(0x67*4+2, EMS_HEADER_SEG);
+    
+    use_ems = 1;
 }
 
 static struct ems_data **

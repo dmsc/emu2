@@ -576,7 +576,7 @@ char *dos_unix_path(int addr, int force, const char *append)
     if(*path && (!strcasecmp(path, "CON") || !strcasecmp(path + 1, ":CON")))
         return strdup("/dev/tty");
 #ifdef EMS_SUPPORT
-    if(*path && (!strcasecmp(path, "EMMXXXX0") ||
+    if(use_ems && *path && (!strcasecmp(path, "EMMXXXX0") ||
 		 !strcasecmp(path + 1, ":EMMXXXX0")))
         return strdup("/dev/null");
 #endif
