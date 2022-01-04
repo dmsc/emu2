@@ -133,7 +133,7 @@ ems_put8(int addr, int value)
     }
 }
 
-/*FIXME*/
+/* XXX This function may be slow, so fix in the future */
 int
 ems_putmem(uint32_t dest, const uint8_t *src, unsigned size)
 {
@@ -143,7 +143,7 @@ ems_putmem(uint32_t dest, const uint8_t *src, unsigned size)
     return 0;
 }
 
-/*FIXME*/
+/* XXX This function may be slow, so fix in the future */
 int
 ems_getmem(uint8_t *dest, uint32_t src, unsigned size)
 {
@@ -467,7 +467,7 @@ int67(void)
 	break;
 	
     case 0x4F: // 4.0: Get/set partial page map
-	/*FIXME*/
+	/* XXX This function may use memory a lota, so fix in the future */
 	switch (ax) {
 	case 0x4F00: // get partial mapping registers
 	    {
