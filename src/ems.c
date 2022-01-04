@@ -546,7 +546,7 @@ int67(void)
 		if (segmode) {
 		    int i;
 		    for (i = 0; i < 4; i++) {
-			if (phy_page == EMS_PAGEFRAME_SEG + 0x4000*i) {
+			if (phy_page == EMS_PAGEFRAME_SEG + 0x400*i) {
 			    phy_page = i;
 			    break;
 			}
@@ -755,7 +755,7 @@ int67(void)
 		if (segmode) {
 		    int i;
 		    for (i = 0; i < 4; i++) {
-			if (phy_page == EMS_PAGEFRAME_SEG + 0x4000*i) {
+			if (phy_page == EMS_PAGEFRAME_SEG + 0x400*i) {
 			    phy_page = i;
 			    break;
 			}
@@ -980,16 +980,17 @@ int67(void)
 	}
 	break;
 	
-    case 0x58: // 4.0: Get mapplable physical address array
+    case 0x58: // 4.0: Get mappable physical address array
 	switch (ax) {
 	case 0x5800: // get physical addresses
 	    {
 		uint32_t addr = cpuGetAddrES(cpuGetDI());
 		for (int i = 0; i < 4; i++) {
-		    put16(addr, EMS_PAGEFRAME_SEG + 0x4000 * i);
+		    put16(addr, EMS_PAGEFRAME_SEG + 0x400 * i);
 		    put16(addr + 2, i);
 		    addr += 4;
 		}
+		cpuSetCX(4);
 		set_emm_result(ax, EMM_STATUS_SUCCESS);
 	    }
 	    break;
