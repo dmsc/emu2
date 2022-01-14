@@ -13,10 +13,20 @@
 #include <termios.h>
 #include <unistd.h>
 
+// Color cell: une byte for the value and one for the color
+union term_cell {
+    struct {
+        uint8_t chr;
+        uint8_t color;
+    };
+    uint16_t value;
+};
 // Simulated character screen.
 // This is a copy of the currently displayed output in the terminal window.
 // We have a max of 128 rows of up to 256 columns, total of 32KB.
-static uint16_t term_screen[64][256];
+// Note that this array holds the character and color of each text cell,
+// with the byte-order given as the 8086 little-endian.
+static union term_cell term_screen[64][256];
 // Current line in output, lines bellow this are not currently displayed.
 // This allows using only part of the terminal.
 static int output_row;
@@ -46,6 +56,15 @@ static void sigwinch_handler(int sig)
     //    term_needs_upodate = 1;
 }
 #endif
+
+// Returns a cell from character and color.
+static union term_cell get_cell(uint8_t chr, uint8_t color)
+{
+    union term_cell c;
+    c.chr = chr;
+    c.color = color;
+    return c;
+}
 
 static void term_get_size(void)
 {
@@ -92,7 +111,7 @@ static void clear_terminal(void)
     // Clear screen terminal:
     for(int y = 0; y < 64; y++)
         for(int x = 0; x < 256; x++)
-            term_screen[y][x] = 0x0720;
+            term_screen[y][x] = get_cell(0x20, 0x07);
     output_row = -1;
     term_posx = 0;
     term_posy = 0;
@@ -109,7 +128,7 @@ static void set_text_mode(int clear)
     {
         uint16_t *vm = (uint16_t *)(memory + 0xB8000);
         for(int i = 0; i < 16384; i++)
-            vm[i] = 0x0720;
+            vm[i] = get_cell(0x20, 0x07).value;
     }
     for(int i = 0; i < 8; i++)
     {
@@ -134,7 +153,8 @@ static unsigned get_last_used_row(void)
     unsigned max = 0;
     for(unsigned y = 0; y < vid_sy; y++)
         for(unsigned x = 0; x < vid_sx; x++)
-            if(term_screen[y][x] != 0x700 && term_screen[y][x] != 0x720)
+            if(term_screen[y][x].value != get_cell(0x00, 0x7).value  &&
+               term_screen[y][x].value != get_cell(0x20, 0x7).value )
                 max = y + 1;
     return max;
 }
@@ -285,18 +305,20 @@ void check_screen(void)
     unsigned max = output_row + 1;
     for(unsigned y = output_row + 1; y < vid_sy; y++)
         for(unsigned x = 0; x < vid_sx; x++)
-            if(vm[x + y * vid_sx] != term_screen[y][x])
+            if(vm[x + y * vid_sx] != term_screen[y][x].value)
                 max = y + 1;
 
     for(unsigned y = 0; y < max; y++)
         for(unsigned x = 0; x < vid_sx; x++)
         {
             int16_t vc = vm[x + y * vid_sx];
-            if(vc != term_screen[y][x])
+            if(vc != term_screen[y][x].value)
             {
                 // Output character
-                term_screen[y][x] = vc;
-                put_vc_xy(vc & 0xFF, vc >> 8, x, y);
+                union term_cell cell;
+                cell.value = vc;
+                term_screen[y][x] = cell;
+                put_vc_xy(cell.chr, cell.color, x, y);
             }
         }
     if(term_cursor != vid_cursor)
@@ -339,10 +361,10 @@ static void vid_scroll_up(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1, int n,
         term_posy -= m;
         for(unsigned y = 0; y + m < term_sy; y++)
             for(unsigned x = 0; x < term_sx; x++)
-                term_screen[y][x] = term_screen[y + m][x];
+                term_screen[y][x].value = term_screen[y + m][x].value;
         for(unsigned y = term_sy - m; y < term_sy; y++)
             for(unsigned x = 0; x < term_sx; x++)
-                term_screen[y][x] = 0x0720;
+                term_screen[y][x] = get_cell(0x20, 0x07);
     }
 
     // Scroll VIDEO
@@ -354,7 +376,7 @@ static void vid_scroll_up(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1, int n,
     // Set last rows
     for(unsigned y = y1 - (n - 1); y <= y1; y++)
         for(unsigned x = x0; x <= x1; x++)
-            vm[x + y * vid_sx] = (vid_color << 8) + 0x20;
+            vm[x + y * vid_sx] = get_cell(0x20, vid_color).value;
 }
 
 static void vid_scroll_dwn(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1, unsigned n,
@@ -383,21 +405,37 @@ static void vid_scroll_dwn(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1, unsig
     // Set first rows
     for(unsigned y = y0; y < y0 + n; y++)
         for(unsigned x = x0; x <= x1; x++)
-            vm[x + y * vid_sx] = (vid_color << 8) + 0x20;
+            vm[x + y * vid_sx] = get_cell(0x20, vid_color).value;
 }
 
-static void set_xy(unsigned x, unsigned y, uint16_t c, uint16_t mask, int page)
+static uint16_t *addr_xy(unsigned x, unsigned y, int page)
 {
     uint16_t mem = (page & 7) * (vid_sy > 25 ? 0x2000 : 0x1000);
     uint16_t *vm = (uint16_t *)(memory + 0xB8000 + mem);
-    vm[x + y * vid_sx] = (vm[x + y * vid_sx] & mask) | c;
+    return &vm[x + y * vid_sx];
+}
+
+static void set_xy_char(unsigned x, unsigned y, uint8_t chr, int page)
+{
+    uint16_t *p = addr_xy(x, y, page);
+    union term_cell cell;
+    cell.value = *p;
+    cell.chr = chr;
+    *p = cell.value;
+}
+
+static void set_xy_full(unsigned x, unsigned y, uint8_t chr, uint8_t color, int page)
+{
+    *addr_xy(x, y, page) = get_cell(chr, color).value;
 }
 
 static uint16_t get_xy(unsigned x, unsigned y, int page)
 {
     uint16_t mem = (page & 7) * (vid_sy > 25 ? 0x2000 : 0x1000);
     uint16_t *vm = (uint16_t *)(memory + 0xB8000 + mem);
-    return vm[x + y * vid_sx];
+    union term_cell c;
+    c.value = vm[x + y * vid_sx];
+    return c.chr | (c.color << 8);
 }
 
 static void video_putchar(uint8_t ch, uint16_t at, int page)
@@ -421,10 +459,10 @@ static void video_putchar(uint8_t ch, uint16_t at, int page)
     }
     else
     {
-        if(at & 0xFFFF)
-            set_xy(vid_posx[page], vid_posy[page], ch, 0xFF00, page);
+        if(at & 0xFF00)
+            set_xy_char(vid_posx[page], vid_posy[page], ch, page);
         else
-            set_xy(vid_posx[page], vid_posy[page], ch + (at << 8), 0, page);
+            set_xy_full(vid_posx[page], vid_posy[page], ch, at, page);
         vid_posx[page]++;
         if(vid_posx[page] >= vid_sx)
         {
@@ -528,13 +566,17 @@ void int10()
     case 0x0A: // WRITE CHAR ONLY AT CURSOR
     {
         int page = (cpuGetBX() >> 8) & 7;
+        int full = (ax & 0x0100) ? 1 : 0;
         uint16_t px = vid_posx[page];
         uint16_t py = vid_posy[page];
-        uint16_t mask = (ax & 0x0100) ? 0 : 0xFF00;
-        uint16_t ch = ((ax & 0xFF) | (cpuGetBX() << 8)) & ~mask;
+        uint16_t ch = ax & 0xFF;
+        uint16_t at = cpuGetBX();
         for(int i = cpuGetCX(); i > 0; i--)
         {
-            set_xy(px, py, ch, mask, page);
+            if(full)
+                set_xy_full(px, py, ch, at, page);
+            else
+                set_xy_char(px, py, ch, page);
             px++;
             if(px >= vid_sx)
             {
@@ -578,7 +620,7 @@ void int10()
                 fputs("\x1b[J", tty_file);
                 for(int y = 25; y < 64; y++)
                     for(int x = 0; x < 256; x++)
-                        term_screen[y][x] = 0x0720;
+                        term_screen[y][x] = get_cell(0x20, 0x07);
                 if(output_row > 24)
                     output_row = 24;
             }
