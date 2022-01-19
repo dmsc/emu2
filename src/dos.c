@@ -382,7 +382,7 @@ static int dos_rw_record_fcb(int addr, int write, int update, int seq)
     // Update random and block positions
     if(update)
     {
-        unsigned rnum = (pos + n) / rsize;
+        unsigned rnum = (pos + ((n>0) ? rsize : 0)) / rsize;
         memory[0x20 + fcb] = rnum & 127;
         put16(0x0C + fcb, rnum / 128);
         if(!seq)
