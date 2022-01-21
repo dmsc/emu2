@@ -391,7 +391,12 @@ int67(void)
 	}
 	break;
 
-    case 0x4B: // Get pages owned by handle
+    case 0x4B: // Get number of EMM handle
+	cpuSetBX(ems_handle_cnt + 1); // +1 for system handle
+	set_emm_result(ax, EMM_STATUS_SUCCESS);
+	break;
+	
+    case 0x4C: // Get pages owned by handle
 	{
 	    struct ems_data **pp = search_handle(cpuGetDX());
 	    if (pp == NULL) {
@@ -420,11 +425,6 @@ int67(void)
 	    cpuSetBX(handle_num);
 	    set_emm_result(ax, EMM_STATUS_SUCCESS);
 	}
-	break;
-	
-    case 0x4C: // Get number of EMM handle
-	cpuSetBX(ems_handle_cnt + 1); // +1 for system handle
-	set_emm_result(ax, EMM_STATUS_SUCCESS);
 	break;
 	
     case 0x4E: // Get or set page map
