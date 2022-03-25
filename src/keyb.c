@@ -492,11 +492,15 @@ void int16()
     unsigned ax = cpuGetAX();
     switch(ax >> 8)
     {
-    case 0: // GET KEY
+    case 0:    // GET KEY
+    case 0x10: // GET ENHANCED KEY:
+        // TODO: implement differences between 00h / 10h
         ax = getch(0);
         cpuSetAX(ax);
         break;
-    case 1: // GET KEY AVAILABLE
+    case 1:    // GET KEY AVAILABLE
+    case 0x11: // CHECK FOR ENHANCED KEY AVAILABLE
+        // TODO: implement differences between 01h / 11h
         ax = kbhit();
         cpuSetAX(ax);
         if(ax == 0)
