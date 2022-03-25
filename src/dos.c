@@ -440,8 +440,9 @@ static void int21_43(void)
 {
     unsigned al = cpuGetAX() & 0xFF;
     int dname = cpuGetAddrDS(cpuGetDX());
-    if(al == 0)
+    if(al == 0 || al == 1)
     {
+        // Get path
         char *fname = dos_unix_path(dname, 0, append_path());
         if(!fname)
         {
@@ -451,7 +452,7 @@ static void int21_43(void)
             return;
         }
         debug(debug_dos, "\tattr '%s' = ", fname);
-        // GET FILE ATTRIBUTES
+        // Get current file attributes, check for error
         struct stat st;
         if(0 != stat(fname, &st))
         {
@@ -468,8 +469,26 @@ static void int21_43(void)
             debug(debug_dos, "ERROR %d\n", cpuGetAX());
             return;
         }
+        int current = get_attributes(st.st_mode);
+        if(al == 0)
+        {
+            // GET FILE ATTRIBUTES
+            cpuSetCX(current);
+        }
+        else
+        {
+            // SET FILE ATTRIBUTES
+            int dif = current ^ cpuGetCX();
+            if(dif & 0x1C)
+            {
+                cpuSetFlag(cpuFlag_CF);
+                cpuSetAX(5);
+                free(fname);
+                debug(debug_dos, "ERROR %d\n", cpuGetAX());
+                return;
+            }
+        }
         cpuClrFlag(cpuFlag_CF);
-        cpuSetCX(get_attributes(st.st_mode));
         debug(debug_dos, "%04X\n", cpuGetCX());
         free(fname);
         return;
