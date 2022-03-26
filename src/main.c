@@ -307,6 +307,7 @@ int main(int argc, char **argv)
     itv.it_value.tv_usec = 54925;
     setitimer(ITIMER_REAL, &itv, 0);
     init_bios_mem();
+    video_init_mem();
     while(1)
     {
         exit_cpu = 0;

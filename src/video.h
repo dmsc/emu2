@@ -14,3 +14,5 @@ int video_get_col(void);
 // CRTC port read/write
 uint8_t video_crtc_read(int port);
 void video_crtc_write(int port, uint8_t value);
+// Initializes emulated video memory and tables
+void video_init_mem(void);
