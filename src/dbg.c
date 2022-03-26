@@ -30,7 +30,7 @@ void print_usage(void)
            "  %-18s  DOS current working directory, use 'C:\\' if not given.\n"
            "  %-18s  Set unix path as root of drive 'n', by default all drives\n"
            "\t\t      point to the unix working directory.\n"
-           "  %-18s  Set DOS code-page. Set to '?' to show lost of code-pages.\n"
+           "  %-18s  Set DOS code-page. Set to '?' to show list of code-pages.\n"
            "  %-18s  Limit DOS memory to 512KB, fixes some old buggy programs.\n"
            "  %-18s  Specifies a DOS append paths, separated by ';'.\n",
            prog_name, ENV_DBG_NAME, ENV_DBG_OPT, ENV_PROGNAME, ENV_DEF_DRIVE, ENV_CWD,
