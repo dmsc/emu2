@@ -7,7 +7,7 @@
 #include <sys/time.h>
 #include <time.h>
 
-static uint16_t last_timer = 0;
+// Emulate BIOS time
 static uint32_t bios_timer = 0;
 static uint16_t bios_dater = 0;
 void update_timer(void)
@@ -28,99 +28,184 @@ void update_timer(void)
     memory[0x470] = bios_dater & 0xFF;
 }
 
+// Emulate i8253 timers
+// TODO: emulate timer interrupts.
+static struct i8253_timer
+{
+    long load_time;
+    uint16_t load_value;
+    uint16_t rd_latch;
+    uint16_t wr_latch;
+    int8_t op_mode;
+    int8_t rd_mode;
+    int8_t wr_mode;
+    int8_t latched;
+} timers[3];
+
+// Timer Read/Write states:
+#define TIMER_LSB 0
+#define TIMER_MSB 1
+#define TIMER_WORD_L 2
+#define TIMER_WORD_M 3
+
 // Returns port timer at 1193179.97HZ
-static uint16_t get_port_timer(void)
+static long get_timer_clock(void)
 {
     struct timeval tv;
     gettimeofday(&tv, 0);
     // us in microseconds
-    double us = tv.tv_sec * 1000000.0 + tv.tv_usec;
-    // Convert to "counts
-    us = us * 1.19317997037;
-    // And return "low part"
-    return (lrint(fmod(us, 16777216.0)) & 0xFFFF);
+    // (don't use full seconds resolution, to avoid losing precision
+    double us = (tv.tv_sec & 0xFFFFFF) * 1000000.0 + tv.tv_usec;
+    // Convert to "counts"
+    us = us * (105.0 / 88.0);
+    // And return as long (64 bits)
+    return lrint(us);
+}
+
+// Get actual value in timer
+static uint16_t get_actual_timer(struct i8253_timer *t)
+{
+    int64_t elapsed = get_timer_clock() - t->load_time;
+    debug(debug_int, "timer elapsed: %ld\n", elapsed);
+    switch(t->op_mode & 7)
+    {
+    case 2: // RATE GENERATOR
+    case 3: // SQUARE WAVE GENERATOR
+        return t->load_value - (elapsed % (t->load_value));
+    default:
+        return t->load_value - elapsed;
+    }
+}
+
+// Implement reading/writing to timer ports
+uint8_t port_timer_read(uint16_t port)
+{
+    int tnum = port & 0x03;
+    if(tnum == 3)
+    {
+        debug(debug_int, "INVALID timer port read $%02x\n", port);
+        return 0xFF; // Invalid in original i8253
+    }
+
+    struct i8253_timer *t = &timers[tnum];
+
+    // Value to read can be "realtime" or "latched":
+    uint16_t tval = 0;
+    if(t->latched)
+    {
+        tval = t->rd_latch;
+        // Clear the latch except if we are reading in word mode
+        if(!(t->rd_mode == TIMER_WORD_L))
+            t->latched = 0;
+    }
+    else
+        tval = get_actual_timer(t);
+
+    // Convert internal timer value to port read
+    int ret = 0;
+    if(t->rd_mode == TIMER_LSB)
+        ret = tval & 0xFF;
+    else if(t->rd_mode == TIMER_MSB)
+        ret = tval >> 8;
+    else if(t->rd_mode == TIMER_WORD_L)
+    {
+        ret = tval & 0xFF;
+        t->rd_mode = TIMER_WORD_M;
+    }
+    else
+    {
+        ret = tval >> 8;
+        t->rd_mode = TIMER_WORD_L;
+    }
+
+    debug(debug_int, "timer port read $%02x = %02x (mode=%02x, r_state=%d, latch=%d)\n",
+          port, ret, t->op_mode, t->rd_mode, t->latched);
+
+    return ret;
+}
+
+void port_timer_write(uint16_t port, uint8_t val)
+{
+    int tnum = port & 0x03;
+    if(tnum == 3)
+    {
+        // PORT 43h: timer control word
+        tnum = (val >> 6);
+        if(tnum == 3)
+        {
+            // Invalid in original i8253
+            debug(debug_int, "INVALID timer port read $%02x\n", port);
+            return;
+        }
+        struct i8253_timer *t = &timers[tnum];
+        int rl = (val >> 4) & 3;
+        if(rl == 0)
+        {
+            // Latch value to read
+            t->rd_latch = get_actual_timer(t);
+            t->latched = 1;
+            debug(debug_int,
+                  "timer port write $%02x = %02x (latching timer %d, value=%04x)\n", port,
+                  val, tnum, t->rd_latch);
+            return;
+        }
+        // TODO: don't support BCD mode
+        t->op_mode = (val >> 1) & 7;
+        if(rl == 1)
+        {
+            t->rd_mode = TIMER_LSB;
+            t->wr_mode = TIMER_LSB;
+        }
+        else if(rl == 2)
+        {
+            t->rd_mode = TIMER_MSB;
+            t->wr_mode = TIMER_MSB;
+        }
+        else
+        {
+            t->rd_mode = TIMER_WORD_L;
+            t->wr_mode = TIMER_WORD_L;
+        }
+        debug(debug_int,
+              "timer port write $%02x = %02x (setup timer %d, RL=%d, MODE=%d, BCD=%d)\n",
+              port, val, tnum, rl, t->op_mode, val & 1);
+    }
+    else
+    {
+        // Write to timer value
+        struct i8253_timer *t = &timers[tnum];
+
+        if(t->wr_mode == TIMER_WORD_L)
+        {
+            // NOTE: data-sheet specifies invalid data could be read if
+            //       the timer is between updates, we simply don't update
+            //       after the full word is written.
+            t->wr_latch = val;
+            t->wr_mode = TIMER_WORD_M;
+            debug(debug_int, "timer port write $%02x = %02x (timer %d, latched %02x)\n",
+                  port, val, tnum, val);
+            return;
+        }
+
+        t->load_time = get_timer_clock();
+
+        if(t->wr_mode == TIMER_LSB)
+            t->load_value = (t->load_value & 0xFF00) | val;
+        else if(t->wr_mode == TIMER_MSB)
+            t->load_value = (t->load_value & 0x00FF) | (val << 8);
+        else
+        {
+            t->load_value = t->wr_latch | (val << 8);
+            t->rd_mode = TIMER_WORD_L;
+        }
+        debug(debug_int, "timer port write $%02x = %02x (timer %d, counter=%04x)\n", port,
+              val, tnum, t->load_value);
+    }
 }
 
 uint32_t get_bios_timer(void)
 {
     return bios_timer;
-}
-
-// Implement reading/writing to timer ports
-static uint16_t port_value;
-static uint8_t port_control;
-uint8_t port_timer_read(uint16_t port)
-{
-    if(port == 0x43)
-        return port_control;
-    int tag = port_control & 0x30;
-    if(tag == 0x20)
-    {
-        debug(debug_int, "timer port read $%02x = %02x (control=%02x)\n", port,
-              port_value >> 8, port_control);
-        return port_value >> 8;
-    }
-    else if(tag == 0x10)
-    {
-        debug(debug_int, "timer port read $%02x = %02x (control=%02x)\n", port,
-              port_value & 0xFF, port_control);
-        return port_value;
-    }
-    else if(tag == 0x30)
-    {
-        debug(debug_int, "timer port read $%02x = %02x (control=%02x)\n", port,
-              port_value & 0xFF, port_control);
-        port_control &= 0xCF;
-        return port_value;
-    }
-    else // (tag == 0x00)
-    {
-        debug(debug_int, "timer port read $%02x = %02x (control=%02x)\n", port,
-              port_value >> 8, port_control);
-        port_control |= 0x30;
-        return port_value >> 8;
-    }
-}
-
-void port_timer_write(uint16_t port, uint8_t val)
-{
-    if(port == 0x43)
-    {
-        // Fill timer:
-        port_control = val;
-        if(0x00 == (port_control & 0x30))
-            port_control |= 0x30;
-        port_value = get_port_timer() - last_timer;
-        debug(debug_int,
-              "timer port write $%02x = %02x (latched val=%04x control=%02x)\n", port,
-              val, port_value, port_control);
-    }
-    else if(port == 0x40)
-    {
-        int tag = port_control & 0x30;
-        if(tag == 0x20)
-        {
-            last_timer = ((get_port_timer() + (val << 8)) & 0xFF00) + (last_timer & 0xFF);
-        }
-        else if(tag == 0x10)
-        {
-            last_timer = ((get_port_timer() + val) & 0xFF) + (last_timer & 0xFF00);
-        }
-        else if(tag == 0x30)
-        {
-            port_control &= 0xCF; // Go to state 00
-            port_value = val;
-        }
-        else // tag == 0x00
-        {
-            port_control |= 0x30; // Go to state 30
-            port_value = port_value | (val << 8);
-            last_timer = get_port_timer() + port_value;
-        }
-        debug(debug_int,
-              "timer port write $%02x = %02x (last=%04x val=%04x control=%02x)\n", port,
-              val, last_timer, port_value, port_control);
-    }
 }
 
 static uint16_t bcd(uint16_t v, int digits)
