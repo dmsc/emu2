@@ -14,8 +14,10 @@
 #include <unistd.h>
 
 // Color cell: une byte for the value and one for the color
-union term_cell {
-    struct {
+union term_cell
+{
+    struct
+    {
         uint8_t chr;
         uint8_t color;
     };
@@ -168,8 +170,8 @@ static unsigned get_last_used_row(void)
     unsigned max = 0;
     for(unsigned y = 0; y < vid_sy; y++)
         for(unsigned x = 0; x < vid_sx; x++)
-            if(term_screen[y][x].value != get_cell(0x00, 0x7).value  &&
-               term_screen[y][x].value != get_cell(0x20, 0x7).value )
+            if(term_screen[y][x].value != get_cell(0x00, 0x7).value &&
+               term_screen[y][x].value != get_cell(0x20, 0x7).value)
                 max = y + 1;
     return max;
 }
@@ -509,7 +511,8 @@ void video_putch(char ch)
 void int10()
 {
     debug(debug_int, "V-10%04X: BX=%04X\n", cpuGetAX(), cpuGetBX());
-    debug(debug_video, "V-10%04X: BX=%04X CX=%04X DX=%04X\n", cpuGetAX(), cpuGetBX(), cpuGetCX(), cpuGetDX());
+    debug(debug_video, "V-10%04X: BX=%04X CX=%04X DX=%04X\n", cpuGetAX(), cpuGetBX(),
+          cpuGetCX(), cpuGetDX());
 
     // Wake-up keyboard on video calls
     keyb_wakeup();
