@@ -575,6 +575,11 @@ char *dos_unix_path(int addr, int force, const char *append)
         return strdup("/dev/null");
     if(*path && (!strcasecmp(path, "CON") || !strcasecmp(path + 1, ":CON")))
         return strdup("/dev/tty");
+#ifdef EMS_SUPPORT
+    if(use_ems && *path && (!strcasecmp(path, "EMMXXXX0") ||
+		 !strcasecmp(path + 1, ":EMMXXXX0")))
+        return strdup("/dev/null");
+#endif
     // Try to convert
     char *result = dos_unix_path_base(path, force);
     // Be done if the path is found, or no append.

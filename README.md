@@ -69,6 +69,9 @@ The available environment variables are:
                        "signed" comparison insructions (JLE instead of JBE).
                        This is needed at least for MASM versions 1.0 and 1.10.
 
+- `EMU2_EMSMEM`        Use LIM-EMS 4.0. Set this variable as available pages
+                       between 0 (no use) to 2048 (32MiB).
+                       The default is 0 (no use).
 
 Simple Example
 --------------
