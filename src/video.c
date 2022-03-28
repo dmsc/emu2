@@ -104,6 +104,21 @@ static void update_posxy(void)
     memory[0x462] = vid_page;
 }
 
+static void reload_posxy(int page)
+{
+    vid_posx[page] = memory[0x450 + page * 2];
+    vid_posy[page] = memory[0x451 + page * 2];
+}
+
+static void reload_posxy_all()
+{
+    for(int i = 0; i < 8; i++)
+    {
+        vid_posx[i] = memory[0x450 + i * 2];
+        vid_posy[i] = memory[0x451 + i * 2];
+    }
+}
+
 // Clears the terminal data - not the actual terminal screen
 static void clear_terminal(void)
 {
@@ -484,6 +499,7 @@ static void video_putchar(uint8_t ch, uint16_t at, int page)
 
 void video_putch(char ch)
 {
+    reload_posxy(vid_page);
     debug(debug_video, "putchar %02x at (%d,%d)\n", ch & 0xFF, vid_posx[vid_page],
           vid_posy[vid_page]);
     video_putchar(ch, 0xFF00, vid_page);
@@ -493,7 +509,7 @@ void video_putch(char ch)
 void int10()
 {
     debug(debug_int, "V-10%04X: BX=%04X\n", cpuGetAX(), cpuGetBX());
-    debug(debug_video, "V-10%04X: BX=%04X\n", cpuGetAX(), cpuGetBX());
+    debug(debug_video, "V-10%04X: BX=%04X CX=%04X DX=%04X\n", cpuGetAX(), cpuGetBX(), cpuGetCX(), cpuGetDX());
 
     // Wake-up keyboard on video calls
     keyb_wakeup();
@@ -533,6 +549,7 @@ void int10()
     case 0x03: // GET CURSOR POS
     {
         int page = (cpuGetBX() >> 8) & 7;
+        reload_posxy(page);
         cpuSetDX(vid_posx[page] + (vid_posy[page] << 8));
         cpuSetCX(0x0010);
         break;
@@ -542,6 +559,7 @@ void int10()
             debug(debug_video, "WARN: Select display page > 7!\n");
         else
         {
+            reload_posxy_all();
             vid_page = ax & 7;
             update_posxy();
         }
@@ -563,6 +581,7 @@ void int10()
     case 0x08: // READ CHAR AT CURSOR
     {
         int page = (cpuGetBX() >> 8) & 7;
+        reload_posxy(page);
         cpuSetAX(get_xy(vid_posx[page], vid_posy[page], page));
         break;
     }
@@ -571,6 +590,7 @@ void int10()
     {
         int page = (cpuGetBX() >> 8) & 7;
         int full = (ax & 0x0100) ? 1 : 0;
+        reload_posxy(page);
         uint16_t px = vid_posx[page];
         uint16_t py = vid_posy[page];
         uint16_t ch = ax & 0xFF;
@@ -593,8 +613,12 @@ void int10()
         break;
     }
     case 0x0E: // TELETYPE OUTPUT
-        video_putchar(ax, 0xFF00, (cpuGetBX() >> 8) & 7);
+    {
+        int page = (cpuGetBX() >> 8) & 7;
+        reload_posxy(page);
+        video_putchar(ax, 0xFF00, page);
         break;
+    }
     case 0x0F: // GET CURRENT VIDEO MODE
         cpuSetAX((vid_sx << 8) | 0x0003 | vid_no_blank);
         cpuSetBX((vid_page << 8) | (0xFF & cpuGetBX()));
