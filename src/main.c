@@ -51,6 +51,7 @@ void write_port(unsigned port, uint8_t value)
 void emulator_update(void)
 {
     debug(debug_int, "emu update cycle\n");
+    cpuTriggerIRQ(0);
     update_timer();
     check_screen();
     update_keyb();
@@ -114,6 +115,10 @@ void bios_routine(unsigned inum)
         int2a();
     else if(inum == 0x2f)
         int2f();
+    else if(inum == 0x8)
+        ; // Timer interrupt - nothing to do
+    else if(inum == 0x9)
+        ; // Keyboard interrupt - nothing to do
     else
         debug(debug_int, "UNHANDLED INT %02x, AX=%04x\n", inum, cpuGetAX());
 }
