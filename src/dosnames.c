@@ -450,7 +450,7 @@ static int dos_path_normalize(char *path)
             end++;
 
         if(path[end] && !char_pathsep(path[end]))
-            break;
+            path[end] = 0;
         if(!path[end] && end < 63)
             path[end + 1] = 0;
 
