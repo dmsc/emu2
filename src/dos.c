@@ -849,24 +849,32 @@ void int20()
     exit(0);
 }
 
+// Returns a character read from keyboard - note that control keys return two
+// characters, so we need to store the half-processed char here.
+static uint16_t inp_last_key;
 static void char_input(int brk)
 {
-    static uint16_t last_key;
     fflush(handles[1] ? handles[1] : stdout);
 
-    if(last_key == 0)
+    if(inp_last_key == 0)
     {
         if(devinfo[0] != 0x80D3 && handles[0])
-            last_key = getc(handles[0]);
+            inp_last_key = getc(handles[0]);
         else
-            last_key = getch(brk);
+            inp_last_key = getch(brk);
     }
-    debug(debug_dos, "\tgetch = %02x '%c'\n", last_key, (char)last_key);
-    cpuSetAL(last_key);
-    if((last_key & 0xFF) == 0)
-        last_key = last_key >> 8;
+    debug(debug_dos, "\tgetch = %02x '%c'\n", inp_last_key, (char)inp_last_key);
+    cpuSetAL(inp_last_key);
+    if((inp_last_key & 0xFF) == 0)
+        inp_last_key = inp_last_key >> 8;
     else
-        last_key = 0;
+        inp_last_key = 0;
+}
+
+// Returns true if a character to read is pending
+static int char_pending()
+{
+    return (inp_last_key != 0) || kbhit();
 }
 
 static int line_input(FILE *f, uint8_t *buf, int max)
@@ -1054,7 +1062,18 @@ void int21()
         break;
     case 0x6: // CONSOLE OUTPUT
         if((cpuGetDX() & 0xFF) == 0xFF)
-            char_input(1);
+        {
+            if(char_pending())
+            {
+                char_input(0);
+                cpuClrFlag(cpuFlag_ZF);
+            }
+            else
+            {
+                cpuSetAL(0);
+                cpuSetFlag(cpuFlag_ZF);
+            }
+        }
         else
         {
             dos_putchar(cpuGetDX() & 0xFF);
@@ -1094,7 +1113,7 @@ void int21()
     }
     case 0xB: // STDIN STATUS
         if(devinfo[0] == 0x80D3)
-            cpuSetAX(kbhit() ? 0x0BFF : 0x0B00);
+            cpuSetAX(char_pending() ? 0x0BFF : 0x0B00);
         else
             cpuSetAX(0x0B00);
         break;
@@ -1588,7 +1607,7 @@ void int21()
             break;
         case 0x06: // GET INPUT STATUS
             if(devinfo[h] == 0x80D3)
-                cpuSetAX(kbhit() ? 0x44FF : 0x4400);
+                cpuSetAX(char_pending() ? 0x44FF : 0x4400);
             else
                 cpuSetAX(feof(handles[h]) ? 0x4400 : 0x44FF);
             break;
