@@ -1395,8 +1395,10 @@ void int21()
         cpuSetES(get16(4 * (ax & 0xFF) + 2));
         break;
     case 0x36: // get free space
+        // We only return 512MB free, as some old DOS programs crash if
+        // the free space returned is more than 0x7FFF clusters.
         cpuSetAX(32);     // 16k clusters
-        cpuSetBX(0xFFFF); // all free, 1GB
+        cpuSetBX(0x7FFF); // half of disk free, 512MB
         cpuSetCX(512);    // 512 bytes/sector
         cpuSetDX(0xFFFF); // total 1GB
         break;
