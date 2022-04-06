@@ -604,15 +604,8 @@ static void dos_find_first(void)
         dos_free_file_list(p->find_first_list);
 
     // Check if we want the volume label
-    if(cpuGetCX() & 8)
-    {
-        p->find_first_list = calloc(2, sizeof(struct dos_file_list));
-        p->find_first_list[0].unixname = strdup("//");
-        memcpy(p->find_first_list[0].dosname, "DISK LABEL", 11);
-        p->find_first_list[1].unixname = 0;
-    }
-    else
-        p->find_first_list = dos_find_first_file(cpuGetAddrDS(cpuGetDX()));
+    int do_label = (cpuGetCX() & 8) != 0;
+    p->find_first_list = dos_find_first_file(cpuGetAddrDS(cpuGetDX()), do_label);
 
     p->find_first_ptr = p->find_first_list;
     return dos_find_next(1);
@@ -684,15 +677,8 @@ static void dos_find_first_fcb(void)
         dos_free_file_list(p->find_first_list);
 
     int efcb = get_ex_fcb();
-    if(memory[efcb] == 0xFF && memory[efcb + 6] == 0x08)
-    {
-        p->find_first_list = calloc(2, sizeof(struct dos_file_list));
-        p->find_first_list[0].unixname = strdup("//");
-        memcpy(p->find_first_list[0].dosname, "DISK LABEL", 11);
-        p->find_first_list[1].unixname = 0;
-    }
-    else
-        p->find_first_list = dos_find_first_file_fcb(get_fcb());
+    int do_label = (memory[efcb] == 0xFF && memory[efcb + 6] == 0x08);
+    p->find_first_list = dos_find_first_file_fcb(get_fcb(), do_label);
     p->find_first_ptr = p->find_first_list;
     return dos_find_next_fcb();
 }
