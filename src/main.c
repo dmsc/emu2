@@ -108,6 +108,8 @@ void bios_routine(unsigned inum)
     }
     else if(inum == 0x28)
         int28();
+    else if(inum == 0x29)
+        int29();
     else if(inum == 0x2A)
         int2a();
     else if(inum == 0x2f)
