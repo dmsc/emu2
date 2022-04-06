@@ -501,6 +501,8 @@ static void video_putchar(uint8_t ch, uint16_t at, int page)
 
 void video_putch(char ch)
 {
+    if(!video_initialized)
+        init_video();
     reload_posxy(vid_page);
     debug(debug_video, "putchar %02x at (%d,%d)\n", ch & 0xFF, vid_posx[vid_page],
           vid_posy[vid_page]);
