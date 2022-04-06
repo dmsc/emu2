@@ -397,7 +397,7 @@ int dos_get_default_drive(void)
 // Checks if char is a valid path name character
 static int char_valid(unsigned char c)
 {
-    if(c < 32 || c == '/' || c == '\\')
+    if(c < 33 || c == '/' || c == '\\')
         return 0;
     else
         return 1;
