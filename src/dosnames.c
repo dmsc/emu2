@@ -135,7 +135,8 @@ static int dos_glob(const uint8_t *n, const char *g)
         // An '*' consumes any letter, except the dot
         if(cg == '*')
         {
-            if(cn == '.')
+            // Spacial case "." and ".."
+            if(cn == '.' && (n[1] != '.' && n[1] != 0))
                 g++;
             else
                 n++;
