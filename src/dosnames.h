@@ -44,7 +44,7 @@ struct dos_file_list
 // Implements "find first file" and "next file" DOS functions.
 // Returns a list with filenames compatibles with the DOS filespec, as pairs
 // The list will be deleted at the next call
-struct dos_file_list *dos_find_first_file(int addr, int label);
+struct dos_file_list *dos_find_first_file(int addr, int label, int dirs);
 struct dos_file_list *dos_find_first_file_fcb(int addr, int label);
 
 // Frees a fileList.

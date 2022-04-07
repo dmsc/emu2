@@ -605,7 +605,8 @@ static void dos_find_first(void)
 
     // Check if we want the volume label
     int do_label = (cpuGetCX() & 8) != 0;
-    p->find_first_list = dos_find_first_file(cpuGetAddrDS(cpuGetDX()), do_label);
+    int do_dirs = (cpuGetCX() & 16) != 0;
+    p->find_first_list = dos_find_first_file(cpuGetAddrDS(cpuGetDX()), do_label, do_dirs);
 
     p->find_first_ptr = p->find_first_list;
     return dos_find_next(1);

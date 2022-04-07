@@ -175,7 +175,8 @@ static int dos_glob(const uint8_t *n, const char *g)
 // We read the full directory and convert filenames to dos names,
 // then we can search the correct ones. 'path' is the Unix path,
 // returning all the files matching with glob.
-static struct dos_file_list *dos_read_dir(const char *path, const char *glob, int label)
+static struct dos_file_list *dos_read_dir(const char *path, const char *glob, int label,
+                                          int dirs)
 {
     struct dirent **dir;
     struct dos_file_list *ret;
@@ -206,6 +207,16 @@ static struct dos_file_list *dos_read_dir(const char *path, const char *glob, in
         {
             free(fpath);
             continue;
+        }
+        // Check if it is a folder
+        if(!dirs)
+        {
+            struct stat st;
+            if((0 == stat(fpath, &st)) && S_ISDIR(st.st_mode))
+            {
+                free(fpath);
+                continue;
+            }
         }
         // Ok, add to list
         int dot = unix_to_dos(dirp->dosname, dir[i]->d_name);
@@ -324,7 +335,7 @@ static char *dos_unix_name(const char *path, const char *dosN, int force)
     if(0 == stat(ret, &st))
         return ret;
     // Finally, do a full directory search
-    struct dos_file_list *dl = dos_read_dir(bpath, dosN, 0);
+    struct dos_file_list *dl = dos_read_dir(bpath, dosN, 0, 1);
     if(!dl || !dl->unixname)
     {
         // The filename does not exists, returns the lowercase version
@@ -657,7 +668,7 @@ char *dos_unix_path_fcb(int addr, int force, const char *append)
 ////////////////////////////////////////////////////////////////////
 // Implements FindFirstFile
 // NOTE: this frees fspec before return
-static struct dos_file_list *find_first_file(char *fspec, int label)
+static struct dos_file_list *find_first_file(char *fspec, int label, int dirs)
 {
     // Now, separate the path to the spec
     char *glob, *unixpath, *p = strrchr(fspec, '/');
@@ -675,20 +686,20 @@ static struct dos_file_list *find_first_file(char *fspec, int label)
     debug(debug_dos, "\tfind_first '%s' at '%s'\n", glob, unixpath);
 
     // Read the directory using the given GLOB
-    struct dos_file_list *dirEntries = dos_read_dir(unixpath, glob, label);
+    struct dos_file_list *dirEntries = dos_read_dir(unixpath, glob, label, dirs);
     free(fspec);
 
     return dirEntries;
 }
 
-struct dos_file_list *dos_find_first_file(int addr, int label)
+struct dos_file_list *dos_find_first_file(int addr, int label, int dirs)
 {
-    return find_first_file(dos_unix_path(addr, 1, 0), label);
+    return find_first_file(dos_unix_path(addr, 1, 0), label, dirs);
 }
 
 struct dos_file_list *dos_find_first_file_fcb(int addr, int label)
 {
-    return find_first_file(dos_unix_path_fcb(addr, 1, 0), label);
+    return find_first_file(dos_unix_path_fcb(addr, 1, 0), label, 1);
 }
 
 char *dos_real_path(char drive, const char *unix_path)
@@ -732,7 +743,7 @@ char *dos_real_path(char drive, const char *unix_path)
             else
                 *sep = 0;
             // And search the DOS path name
-            struct dos_file_list *fl = dos_read_dir(path, "*.*", 0);
+            struct dos_file_list *fl = dos_read_dir(path, "*.*", 0, 1);
             path[l - 1] = '/';
             const struct dos_file_list *sl = dos_search_unix_name(fl, path);
             if(!sl)
