@@ -203,9 +203,19 @@ static struct dos_file_list *dos_read_dir(const char *path, const char *glob, in
         char *fpath;
         if(-1 == asprintf(&fpath, "%s/%s", path, dir[i]->d_name))
             continue;
-        if(dir[i]->d_name[0] == '.')
+        // Spacial case "." and "..", only on "full directory" mode
+        if(!strcmp(dir[i]->d_name, ".") || !strcmp(dir[i]->d_name, ".."))
         {
-            free(fpath);
+            if(dirs != 2)
+            {
+                free(fpath);
+            }
+            else
+            {
+                memcpy(dirp->dosname, dir[i]->d_name, strlen(dir[i]->d_name) + 1);
+                dirp->unixname = fpath;
+                dirp++;
+            }
             continue;
         }
         // Check if it is a folder
@@ -694,7 +704,7 @@ static struct dos_file_list *find_first_file(char *fspec, int label, int dirs)
 
 struct dos_file_list *dos_find_first_file(int addr, int label, int dirs)
 {
-    return find_first_file(dos_unix_path(addr, 1, 0), label, dirs);
+    return find_first_file(dos_unix_path(addr, 1, 0), label, dirs ? 2 : 0);
 }
 
 struct dos_file_list *dos_find_first_file_fcb(int addr, int label)
