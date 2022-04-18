@@ -6,6 +6,7 @@
 #include <math.h>
 #include <sys/time.h>
 #include <time.h>
+#include <inttypes.h>
 
 // Emulate BIOS time
 static uint32_t bios_timer = 0;
@@ -66,7 +67,7 @@ static long get_timer_clock(void)
 static uint16_t get_actual_timer(struct i8253_timer *t)
 {
     uint64_t elapsed = get_timer_clock() - t->load_time;
-    debug(debug_int, "timer elapsed: %ld\n", elapsed);
+    debug(debug_int, "timer elapsed: %" PRIu64 "\n", elapsed);
     switch(t->op_mode & 7)
     {
     case 2: // RATE GENERATOR
