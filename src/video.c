@@ -46,6 +46,8 @@ static volatile int term_needs_update;
 static FILE *tty_file;
 // Video is already initialized
 static int video_initialized;
+// Actual cursor position in the CRTC register
+static uint16_t crtc_cursor_loc;
 
 // Forward
 static void term_goto_xy(unsigned x, unsigned y);
@@ -90,7 +92,7 @@ static void term_get_size(void)
     }
 }
 
-// Update posx/posy in BIOS memory
+// Update posx/posy in BIOS memory and CRTC
 static void update_posxy(void)
 {
     int vid_size = vid_sy > 25 ? 0x20 : 0x10;
@@ -104,6 +106,7 @@ static void update_posxy(void)
         memory[0x451 + i * 2] = vid_posy[i];
     }
     memory[0x462] = vid_page;
+    crtc_cursor_loc = vid_posx[vid_page] + vid_posy[vid_page] * vid_sx;
 }
 
 static void reload_posxy(int page)
@@ -350,9 +353,11 @@ void check_screen(void)
         else
             fputs("\x1b[?25l", tty_file);
     }
-    if(term_cursor)
+    if(term_cursor && vid_sx)
+    {
         // Move cursor
-        term_goto_xy(vid_posx[vid_page], vid_posy[vid_page]);
+        term_goto_xy(crtc_cursor_loc % vid_sx, crtc_cursor_loc / vid_sx);
+    }
     fflush(tty_file);
 }
 
@@ -787,7 +792,6 @@ void int10()
 
 // CRTC port emulation, some software use it to fix "snow" in CGA modes.
 static uint8_t crtc_port;
-static uint16_t crtc_cursor_loc;
 
 uint8_t video_crtc_read(int port)
 {
@@ -808,12 +812,11 @@ void video_crtc_write(int port, uint8_t value)
 {
     if(port & 1)
     {
+        debug(debug_video, "CRTC port write [%02x] <- %02x\n", crtc_port, value);
         if(crtc_port == 0x0E)
             crtc_cursor_loc = (crtc_cursor_loc & 0xFF) | (value << 8);
-        if(crtc_port == 0x0F)
+        else if(crtc_port == 0x0F)
             crtc_cursor_loc = (crtc_cursor_loc & 0xFF00) | (value);
-        else
-            debug(debug_video, "CRTC port write [%02x] <- %02x\n", crtc_port, value);
     }
     else
         crtc_port = value;
