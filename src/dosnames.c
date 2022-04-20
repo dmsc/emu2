@@ -436,7 +436,7 @@ static int char_pathsep(unsigned char c)
 
 // Normalizes DOS path, removing relative items and adding base
 // Modifies the passed string and returns the drive as integer.
-static int dos_path_normalize(char *path)
+int dos_path_normalize(char *path)
 {
     int drive = dos_default_drive;
 
