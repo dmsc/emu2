@@ -1929,7 +1929,7 @@ void int21()
                 truename[1]=':';
                 truename[0]='a'+drive;
                 cpuClrFlag(cpuFlag_CF);
-                cpuSetAX(0);
+                cpuSetAX(0x5C);
             }
         }
         break;
