@@ -2075,6 +2075,28 @@ void intr21(void)
     case 0x5B: // CREATE NEW FILE
         dos_open_file(2, cpuGetAX() & 0xFF, cpuGetAddrDS(cpuGetDX()));
         break;
+    case 0x60: // TRUENAME - CANONICALIZE FILENAME OR PATH
+    {
+        char *path = (char *)getptr(cpuGetAddrDS(cpuGetSI()), 64);
+        char *truename = (char *)getptr(cpuGetAddrES(cpuGetDI()), 128);
+        char *no_drive_path = truename + 3;
+        if(strlen(path) > 63)
+        {
+            cpuSetFlag(cpuFlag_CF);
+        }
+        else
+        {
+            strncpy(no_drive_path, path, 64);
+            no_drive_path[64] = 0;
+            int drive = dos_path_normalize(no_drive_path);
+            truename[2] = '\\';
+            truename[1] = ':';
+            truename[0] = 'A' + drive;
+            cpuClrFlag(cpuFlag_CF);
+            cpuSetAX(0x5C);
+        }
+        break;
+    }
     case 0x62: // GET PSP SEGMENT
         cpuSetBX(get_current_PSP());
         break;
