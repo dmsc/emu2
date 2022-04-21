@@ -1930,7 +1930,7 @@ void int21()
             int drive = dos_path_normalize(no_drive_path);
             truename[2] = '\\';
             truename[1] = ':';
-            truename[0] = 'a' + drive;
+            truename[0] = 'A' + drive;
             cpuClrFlag(cpuFlag_CF);
             cpuSetAX(0x5C);
         }
