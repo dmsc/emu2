@@ -76,8 +76,8 @@ static void init_handles(void)
     handles[0] = stdin;
     handles[1] = stdout;
     handles[2] = stderr;
-    handles[3] = 0; // AUX
-    handles[4] = 0; // PRN
+    handles[3] = stderr; // AUX
+    handles[4] = stderr; // PRN
     // stdin,stdout,stderr: special, eof on input, is device
     for(int i = 0; i < 3; i++)
         devinfo[i] = guess_devinfo(handles[i]);
