@@ -76,8 +76,8 @@ static void init_handles(void)
     handles[0] = stdin;
     handles[1] = stdout;
     handles[2] = stderr;
-    handles[3] = 0; // AUX
-    handles[4] = 0; // PRN
+    handles[3] = stderr; // AUX
+    handles[4] = stderr; // PRN
     // stdin,stdout,stderr: special, eof on input, is device
     for(int i = 0; i < 3; i++)
         devinfo[i] = guess_devinfo(handles[i]);
@@ -86,7 +86,7 @@ static void init_handles(void)
 static int get_new_handle(void)
 {
     int i;
-    for(i = 5; i < max_handles; i++)
+    for(i = 0; i < max_handles; i++)
         if(!handles[i])
             return i;
     return 0;
@@ -1762,10 +1762,13 @@ void int21()
             char *cmdline = getstr(cmd_addr + 1, clen);
             debug(debug_dos, "\texec command line: '%s %.*s'\n", prgname, clen, cmdline);
             char *env = "\0\0";
-            if(get16(pb) != 0)
+            uint16_t env_seg = get16(pb);
+            if(!env_seg)
+                env_seg = get16(cpuGetAddress(get_current_PSP(), 0x2C));
+            if(env_seg != 0)
             {
                 // Sanitize env
-                int eaddr = cpuGetAddress(get16(pb), 0);
+                int eaddr = cpuGetAddress(env_seg, 0);
                 while(memory[eaddr] != 0 && eaddr < 0xFFFFF)
                 {
                     while(memory[eaddr] != 0 && eaddr < 0xFFFFF)
@@ -1773,7 +1776,7 @@ void int21()
                     eaddr++;
                 }
                 if(eaddr < 0xFFFFF)
-                    env = (char *)(memory + cpuGetAddress(get16(pb), 0));
+                    env = (char *)(memory + cpuGetAddress(env_seg, 0));
             }
             if(run_emulator(fname, prgname, cmdline, env))
             {
