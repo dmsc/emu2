@@ -1762,10 +1762,13 @@ void int21()
             char *cmdline = getstr(cmd_addr + 1, clen);
             debug(debug_dos, "\texec command line: '%s %.*s'\n", prgname, clen, cmdline);
             char *env = "\0\0";
-            if(get16(pb) != 0)
+            uint16_t env_seg = get16(pb);
+            if(!env_seg)
+                env_seg = get16(cpuGetAddress(get_current_PSP(), 0x2C));
+            if(env_seg != 0)
             {
                 // Sanitize env
-                int eaddr = cpuGetAddress(get16(pb), 0);
+                int eaddr = cpuGetAddress(env_seg, 0);
                 while(memory[eaddr] != 0 && eaddr < 0xFFFFF)
                 {
                     while(memory[eaddr] != 0 && eaddr < 0xFFFFF)
@@ -1773,7 +1776,7 @@ void int21()
                     eaddr++;
                 }
                 if(eaddr < 0xFFFFF)
-                    env = (char *)(memory + cpuGetAddress(get16(pb), 0));
+                    env = (char *)(memory + cpuGetAddress(env_seg, 0));
             }
             if(run_emulator(fname, prgname, cmdline, env))
             {
