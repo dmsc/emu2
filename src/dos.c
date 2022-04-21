@@ -86,7 +86,7 @@ static void init_handles(void)
 static int get_new_handle(void)
 {
     int i;
-    for(i = 5; i < max_handles; i++)
+    for(i = 0; i < max_handles; i++)
         if(!handles[i])
             return i;
     return 0;
