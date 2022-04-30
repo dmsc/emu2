@@ -7,6 +7,7 @@
 
 extern volatile int exit_cpu;
 extern uint8_t memory[];
+extern uint32_t memory_mask;
 
 int cpuGetAddress(uint16_t segment, uint16_t offset);
 int cpuGetAddrDS(uint16_t offset);
@@ -86,8 +87,8 @@ void cpuClrStartupFlag(enum cpuFlags flag);
 // Read 16 bit number
 static inline void put16(int addr, int v)
 {
-    memory[0xFFFFF & (addr)] = v;
-    memory[0xFFFFF & (addr + 1)] = v >> 8;
+    memory[memory_mask & (addr)] = v;
+    memory[memory_mask & (addr + 1)] = v >> 8;
 }
 
 // Read 32 bit number
@@ -100,7 +101,7 @@ static inline void put32(int addr, unsigned v)
 // Write 16 bit number
 static inline int get16(int addr)
 {
-    return memory[0xFFFFF & addr] + (memory[0xFFFFF & (addr + 1)] << 8);
+    return memory[memory_mask & addr] + (memory[memory_mask & (addr + 1)] << 8);
 }
 
 // Write 32 bit number

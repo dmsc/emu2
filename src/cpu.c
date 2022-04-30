@@ -21,6 +21,9 @@ static int8_t CF, PF, ZF, TF, IF, DF;
 /* All the word flags may be either none-zero (true) or zero (false) */
 static unsigned AF, OF, SF;
 
+/* A20 gate control */
+uint32_t memory_mask = 0xFFFFF; // Mask for 1MB
+
 /* Override segment execution */
 static int segment_override;
 
@@ -30,23 +33,23 @@ static uint16_t irq_mask; // IRQs pending
 
 static uint8_t GetMemAbsB(uint32_t addr)
 {
-    return memory[addr & 0xFFFFF];
+    return memory[addr & memory_mask];
 }
 
 static uint16_t GetMemAbsW(uint32_t addr)
 {
-    return memory[addr & 0xFFFFF] + 256 * memory[(addr + 1) & 0xFFFFF];
+    return memory[addr & memory_mask] + 256 * memory[(addr + 1) & memory_mask];
 }
 
 static void SetMemAbsB(uint32_t addr, uint8_t val)
 {
-    memory[0xFFFFF & addr] = val;
+    memory[memory_mask & addr] = val;
 }
 
 static void SetMemAbsW(uint32_t addr, uint16_t x)
 {
-    memory[addr & 0xFFFFF] = x;
-    memory[(addr + 1) & 0xFFFFF] = x >> 8;
+    memory[addr & memory_mask] = x;
+    memory[(addr + 1) & memory_mask] = x >> 8;
 }
 
 static void SetMemB(uint16_t seg, uint16_t off, uint8_t val)
@@ -56,7 +59,7 @@ static void SetMemB(uint16_t seg, uint16_t off, uint8_t val)
 
 static uint8_t GetMemB(int seg, uint16_t off)
 {
-    return memory[0xFFFFF & (sregs[seg] * 16 + off)];
+    return memory[memory_mask & (sregs[seg] * 16 + off)];
 }
 
 static void SetMemW(uint16_t seg, uint16_t off, uint16_t val)
@@ -2592,7 +2595,7 @@ unsigned cpuGetIP() { return ip; }
 // Address of flags in stack when in interrupt handler
 static uint8_t *flagAddr(void)
 {
-    return memory + (0xFFFFF & (4 + cpuGetSS() * 16 + cpuGetSP()));
+    return memory + (memory_mask & (4 + cpuGetSS() * 16 + cpuGetSP()));
 }
 
 // Set flags in the stack
@@ -2623,17 +2626,17 @@ void cpuClrStartupFlag(enum cpuFlags flag)
 
 int cpuGetAddress(uint16_t segment, uint16_t offset)
 {
-    return 0xFFFFF & (segment * 16 + offset);
+    return memory_mask & (segment * 16 + offset);
 }
 
 int cpuGetAddrDS(uint16_t offset)
 {
-    return 0xFFFFF & (sregs[DS] * 16 + offset);
+    return memory_mask & (sregs[DS] * 16 + offset);
 }
 
 int cpuGetAddrES(uint16_t offset)
 {
-    return 0xFFFFF & (sregs[ES] * 16 + offset);
+    return memory_mask & (sregs[ES] * 16 + offset);
 }
 
 uint16_t cpuGetStack(uint16_t disp)
