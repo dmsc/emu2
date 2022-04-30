@@ -5,6 +5,11 @@
 #include <stdio.h>
 #include <string.h>
 
+// RAM size, *must be a power of two*
+#define EMU_RAM_SIZE (1 << 22)
+// RAM mask used to wrap memory access around
+#define EMU_RAM_MASK (EMU_RAM_SIZE - 1)
+
 extern volatile int exit_cpu;
 extern uint8_t memory[];
 extern uint32_t memory_mask;
@@ -61,6 +66,10 @@ unsigned cpuGetCS(void);
 unsigned cpuGetSS(void);
 unsigned cpuGetDS(void);
 unsigned cpuGetIP(void);
+
+// Gate A20 control:
+void cpuSetA20(int en);
+int cpuGetA20(void);
 
 // Alter flags in the stack, use from interrupt handling
 enum cpuFlags

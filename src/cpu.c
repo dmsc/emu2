@@ -2648,3 +2648,22 @@ void cpuTriggerIRQ(int num)
 {
     irq_mask |= (1 << num);
 }
+
+void cpuSetA20(int en)
+{
+    if(en)
+    {
+        debug(debug_int, "enable A20\n");
+        memory_mask = EMU_RAM_MASK;
+    }
+    else
+    {
+        debug(debug_int, "disable A20\n");
+        memory_mask = 0x0FFFFF;
+    }
+}
+
+int cpuGetA20(void)
+{
+    return memory_mask == 0x0FFFFF ? 0 : 1;
+}

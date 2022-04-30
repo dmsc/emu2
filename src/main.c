@@ -34,6 +34,8 @@ uint8_t read_port(unsigned port)
         return port_timer_read(port);
     else if(port >= 0x60 && port <= 0x65)
         return keyb_read_port(port);
+    else if(port == 0x92)
+        return cpuGetA20() ? 0x0A : 0x08;
     debug(debug_port, "port read %04x\n", port);
     return 0xFF;
 }
@@ -44,6 +46,9 @@ void write_port(unsigned port, uint8_t value)
         return port_timer_write(port, value);
     else if(port == 0x03D4 || port == 0x03D5)
         return video_crtc_write(port, value);
+    else if(port == 0x92)
+        // PS/2 system control A
+        cpuSetA20(0 != (value & 2));
     else
         debug(debug_port, "port write %04x <- %02x\n", port, value);
 }
