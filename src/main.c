@@ -84,6 +84,87 @@ static void int19(void)
     exit(0);
 }
 
+// INT 15
+static void int15(void)
+{
+    debug(debug_int, "B-15%04X: BX=%04X\n", cpuGetAX(), cpuGetBX());
+    int ax = cpuGetAX();
+    switch(ax >> 8)
+    {
+        // No cassette interface
+    case 0:
+    case 1:
+    case 2:
+    case 3:
+        // ABIOS
+    case 4:
+    case 5:
+        cpuSetAX((ax & 0xFF) | 0x8600);
+        return;
+    case 0x83: // SET EVENT WAIT INTERVAL
+    case 0x84: // JOYSTICK
+    case 0x86: // WAIT
+        return;
+    case 0x87: // COPY EXTENDED MEMORY
+    {
+        int count = cpuGetCX();
+        uint8_t *desc = getptr(cpuGetAddrES(cpuGetSI()), 0x30);
+        if(!desc)
+        {
+            cpuSetFlag(cpuFlag_CF);
+            cpuSetAX((ax & 0xFF) | 0x0100);
+            return;
+        }
+        if(debug_active(debug_int))
+        {
+            debug(debug_int, "COPY MEM (CX=%04X):", count);
+            for(int i = 0; i < 0x30; i++)
+                debug(debug_int, " %02X", desc[i]);
+        }
+        debug(debug_int, "\n");
+        if(count >= 0x8000)
+        {
+            debug(debug_int, " invalid count\n");
+            cpuSetAX((ax & 0xFF) | 0x0100);
+            cpuSetFlag(cpuFlag_CF);
+            return;
+        }
+        if(desc[21] != 0x93 || desc[29] != 0x93)
+        {
+            debug(debug_int, " invalid segment access rights\n");
+            cpuSetAX((ax & 0xFF) | 0x0100);
+            cpuSetFlag(cpuFlag_CF);
+            return;
+        }
+        if(desc[16] != 0xFF || desc[17] != 0xFF || desc[24] != 0xFF || desc[25] != 0xFF)
+        {
+            debug(debug_int, " unsupported segment length\n");
+            cpuSetAX((ax & 0xFF) | 0x0100);
+            cpuSetFlag(cpuFlag_CF);
+            return;
+        }
+        int addr_src = (desc[20] << 16) | (desc[19] << 8) | desc[18];
+        int addr_dst = (desc[28] << 16) | (desc[27] << 8) | desc[26];
+        if(addr_src >= EMU_RAM_SIZE || addr_src + count * 2 >= EMU_RAM_SIZE ||
+           addr_dst >= EMU_RAM_SIZE || addr_dst + count * 2 >= EMU_RAM_SIZE)
+        {
+            debug(debug_int, " copy outside memory: %06X -> %06X\n", addr_src, addr_dst);
+            cpuSetAX((ax & 0xFF) | 0x0100);
+            cpuSetFlag(cpuFlag_CF);
+            return;
+        }
+        memcpy(memory + addr_dst, memory + addr_src, count * 2);
+        cpuSetAX(ax & 0xFF);
+        cpuClrFlag(cpuFlag_CF);
+        return;
+    }
+    case 0x88: // GET EXTENDED MEMORY SIZE
+        cpuClrFlag(cpuFlag_CF);
+        cpuSetAX((EMU_RAM_SIZE >> 10) - 1024);
+        return;
+    }
+}
+
 // DOS/BIOS interface
 void bios_routine(unsigned inum)
 {
@@ -120,6 +201,8 @@ void bios_routine(unsigned inum)
         int2a();
     else if(inum == 0x2f)
         int2f();
+    else if(inum == 0x15)
+        int15();
     else if(inum == 0x8)
         ; // Timer interrupt - nothing to do
     else if(inum == 0x9)
