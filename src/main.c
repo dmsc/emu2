@@ -49,6 +49,8 @@ void write_port(unsigned port, uint8_t value)
     else if(port == 0x92)
         // PS/2 system control A
         cpuSetA20(0 != (value & 2));
+    else if(port >= 0x60 && port <= 0x65)
+        return keyb_write_port(port, value);
     else
         debug(debug_port, "port write %04x <- %02x\n", port, value);
 }

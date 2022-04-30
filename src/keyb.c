@@ -480,11 +480,33 @@ uint8_t keyb_read_port(unsigned port)
 {
     if(queued_key == -1)
         kbhit();
-    debug(debug_int, "keyboard read_port: %02X (key=%04X)\n", port, queued_key);
+    debug(debug_int, "keyboard read_port: %02X (key=%d)\n", port, queued_key);
     if(port == 0x60)
         return queued_key >> 8;
+    else if(port == 0x64)
+        return 0x04;
     else
         return 0xFF;
+}
+
+// Handle keyboard controller port writing
+void keyb_write_port(unsigned port, uint8_t value)
+{
+    debug(debug_int, "keyboard write_port: %02X <- %02X\n", port, value);
+    static int command = 0; // store keyboard command
+    switch(port)
+    {
+    case 0x60:
+        // handle commands
+        if(command == 0xD1)
+            cpuSetA20(0 != (value & 2));
+        command = 0;
+        return;
+    case 0x64:
+        // set command
+        command = value;
+        return;
+    }
 }
 
 // BIOS keyboards handler
