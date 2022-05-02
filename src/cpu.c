@@ -8,6 +8,7 @@
 
 // Forward declarations
 static void do_instruction(uint8_t code);
+static void cpu_trap(int num);
 
 static uint16_t wregs[8];
 static uint16_t sregs[4];
@@ -24,6 +25,103 @@ static unsigned AF, OF, SF;
 /* A20 gate control */
 uint32_t memory_mask = 0xFFFFF; // Mask for 1MB
 
+/* Machine Status Word (286+) */
+static uint16_t cpu_msw = 0xFFF0;
+static uint16_t cpu_idtr_limit = 0x03FF;
+static uint32_t cpu_idtr_base = 0;
+static uint16_t cpu_gdtr_limit = 0x03FF;
+static uint32_t cpu_gdtr_base = 0;
+static uint16_t cpu_ldtr_limit = 0x03FF;
+static uint32_t cpu_ldtr_base = 0;
+static unsigned cpu_cpl_level = 0;
+
+// And segment descriptors
+static uint32_t seg_base[4];
+static uint16_t seg_limit[4];
+static uint8_t seg_flags[4];
+static uint8_t seg_rpl[4];
+
+// Define to emulate CPU read/write access checks, not needed for most DOS applications.
+//#define EMU_PM_PRIV
+
+#ifdef EMU_PM_PRIV
+// Full protected-mode privileges emulation:
+#define SEG_DPL(seg) ((seg_flags[seg] >> 5) & 3) // Protection Level
+#define SEG_RPL(seg) (seg_rpl[seg])              // Requested Protection Level
+#define SEG_PRE(seg) (!!(seg_flags[seg] & 128))  // Segment present
+#define SEG_ED(seg) ((seg_flags[seg] & 12) == 4) // Expand-Down
+#define SEG_WR(seg) ((seg_flags[seg] & 10) == 2) // Writable
+#define SEG_RD(seg) ((seg_flags[seg] & 10) != 8) // Readable
+
+static int seg_in_limit(int seg, uint16_t off, uint16_t size)
+{
+    if(SEG_ED(seg))
+        return off >= (0xFFFF & (1 + seg_limit[seg]));
+    else
+        return (off + size) <= (seg_limit[seg] + 1);
+}
+
+// Trap if read is not allowed:
+static int trap_read_chk(int seg, uint16_t off, uint16_t size)
+{
+    if(!seg_in_limit(seg, off, size) || !SEG_RD(seg) || cpu_cpl_level > SEG_DPL(seg) ||
+       SEG_RPL(seg) > SEG_DPL(seg) || !SEG_PRE(seg))
+    {
+        debug(debug_cpu,
+              "read trap: %04X:%04X(%d)"
+              " L:%04X ED:%d CPL:%d DPL:%d RPL:%d PRE:%d W:%d R:%d PM:%d\n",
+              sregs[seg], off, size, seg_limit[seg], SEG_ED(seg), cpu_cpl_level,
+              SEG_DPL(seg), SEG_RPL(seg), SEG_PRE(seg), SEG_WR(seg), SEG_RD(seg),
+              cpu_msw & 1);
+        cpu_trap(13);
+        return 1;
+    }
+    else
+        return 0;
+}
+
+// Trap if write is not allowed:
+static int trap_write_chk(int seg, uint16_t off, uint16_t size)
+{
+    if(!seg_in_limit(seg, off, size) || !SEG_WR(seg) || cpu_cpl_level > SEG_DPL(seg) ||
+       SEG_RPL(seg) > SEG_DPL(seg) || !SEG_PRE(seg))
+    {
+        debug(debug_cpu,
+              "write trap: %04X:%04X(%d)"
+              " L:%04X ED:%d CPL:%d DPL:%d RPL:%d PRE:%d W:%d R:%d PM:%d\n",
+              sregs[seg], off, size, seg_limit[seg], SEG_ED(seg), cpu_cpl_level,
+              SEG_DPL(seg), SEG_RPL(seg), SEG_PRE(seg), SEG_WR(seg), SEG_RD(seg),
+              cpu_msw & 1);
+        cpu_trap(13);
+        return 1;
+    }
+    else
+        return 0;
+}
+
+#else
+
+// Fast emulation: ignore privilege levels and segment sizes:
+static int trap_read_chk(int seg, uint16_t off, uint16_t size)
+{
+    return 0;
+}
+
+static int trap_write_chk(int seg, uint16_t off, uint16_t size)
+{
+    return 0;
+}
+#endif
+
+#define refmem(addr) memory[memory_mask & (addr)]
+
+// Structure used to hold a "fat" pointer
+struct fat_ptr
+{
+    uint16_t off;
+    uint16_t seg;
+};
+
 /* Override segment execution */
 static int segment_override;
 
@@ -31,45 +129,81 @@ static uint8_t parity_table[256];
 
 static uint16_t irq_mask; // IRQs pending
 
-static uint8_t GetMemAbsB(uint32_t addr)
-{
-    return memory[addr & memory_mask];
-}
-
-static uint16_t GetMemAbsW(uint32_t addr)
-{
-    return memory[addr & memory_mask] + 256 * memory[(addr + 1) & memory_mask];
-}
-
-static void SetMemAbsB(uint32_t addr, uint8_t val)
-{
-    memory[memory_mask & addr] = val;
-}
-
-static void SetMemAbsW(uint32_t addr, uint16_t x)
-{
-    memory[addr & memory_mask] = x;
-    memory[(addr + 1) & memory_mask] = x >> 8;
-}
-
 static void SetMemB(uint16_t seg, uint16_t off, uint8_t val)
 {
-    SetMemAbsB(sregs[seg] * 16 + off, val);
+    if(!trap_write_chk(seg, off, 1))
+        refmem(seg_base[seg] + off) = val;
 }
 
 static uint8_t GetMemB(int seg, uint16_t off)
 {
-    return memory[memory_mask & (sregs[seg] * 16 + off)];
+    if(trap_read_chk(seg, off, 1))
+        return 0;
+    return refmem(seg_base[seg] + off);
 }
 
 static void SetMemW(uint16_t seg, uint16_t off, uint16_t val)
 {
-    SetMemAbsW(sregs[seg] * 16 + off, val);
+    if(!trap_write_chk(seg, off, 2))
+    {
+        refmem(seg_base[seg] + off) = val;
+        refmem(seg_base[seg] + off + 1) = val >> 8;
+    }
 }
 
 static uint16_t GetMemW(uint16_t seg, uint16_t off)
 {
-    return GetMemAbsW(sregs[seg] * 16 + off);
+    if(trap_read_chk(seg, off, 2))
+        return 0;
+    return refmem(seg_base[seg] + off) | (refmem(seg_base[seg] + off + 1) << 8);
+}
+
+static void SetMem48(uint16_t seg, uint16_t off, uint16_t x, uint32_t y)
+{
+    if(!trap_write_chk(seg, off, 6))
+    {
+        refmem(seg_base[seg] + off + 1) = x >> 8;
+        refmem(seg_base[seg] + off + 2) = y;
+        refmem(seg_base[seg] + off + 3) = y >> 8;
+        refmem(seg_base[seg] + off + 4) = y >> 16;
+        refmem(seg_base[seg] + off + 5) = y >> 24;
+    }
+}
+
+static uint64_t GetMem48(uint16_t seg, uint16_t off)
+{
+    if(trap_read_chk(seg, off, 6))
+        return 0;
+    return refmem(seg_base[seg] + off) | (refmem(seg_base[seg] + off + 1) << 8) |
+           (refmem(seg_base[seg] + off + 2) << 16) |
+           (refmem(seg_base[seg] + off + 3) << 24) |
+           ((uint64_t)refmem(seg_base[seg] + off + 4) << 32) |
+           ((uint64_t)refmem(seg_base[seg] + off + 5) << 40);
+}
+
+static uint8_t GetMemAbsB(struct fat_ptr ptr)
+{
+    return GetMemB(ptr.seg, ptr.off);
+}
+
+static uint16_t GetMemAbsW(struct fat_ptr ptr)
+{
+    return GetMemW(ptr.seg, ptr.off);
+}
+
+static uint16_t GetMemAbsWOff(struct fat_ptr ptr, int off)
+{
+    return GetMemW(ptr.seg, ptr.off + off);
+}
+
+static void SetMemAbsB(struct fat_ptr ptr, uint8_t val)
+{
+    SetMemB(ptr.seg, ptr.off, val);
+}
+
+static void SetMemAbsW(struct fat_ptr ptr, uint16_t val)
+{
+    SetMemW(ptr.seg, ptr.off, val);
 }
 
 // Read memory via DS, with possible segment override.
@@ -105,12 +239,50 @@ static void PutMemDSW(uint16_t off, uint16_t val)
         SetMemW(DS, off, val);
 }
 
-static uint32_t GetAbsAddrSeg(int seg, uint16_t off)
+static struct fat_ptr GetAbsAddrSeg(int seg, uint16_t off)
 {
+    struct fat_ptr ret;
+    ret.off = off;
+    ret.seg = seg;
     if(segment_override != NoSeg && (seg == DS || seg == SS))
-        return sregs[segment_override] * 16 + off;
+        ret.seg = segment_override;
+    return ret;
+}
+
+void SetSegment(int seg, uint16_t val)
+{
+    if(cpu_msw & 1)
+    {
+        uint32_t off;
+        if(val & 0x04)
+        {
+            // Load from LDT
+            if((val | 0x07) > cpu_ldtr_limit)
+                return cpu_trap(13);
+            off = cpu_ldtr_base + (val & 0xFFF8);
+        }
+        else
+        {
+            // Load from GDT
+            if((val | 0x07) > cpu_gdtr_limit)
+                return cpu_trap(13);
+            off = cpu_gdtr_base + (val & 0xFFF8);
+        }
+        seg_limit[seg] = refmem(off) | (refmem(off + 1) << 8);
+        seg_base[seg] =
+            refmem(off + 2) | (refmem(off + 3) << 8) | (refmem(off + 4) << 16);
+        seg_flags[seg] = refmem(off + 5);
+        seg_rpl[seg] = val & 3;
+        sregs[seg] = val;
+    }
     else
-        return sregs[seg] * 16 + off;
+    {
+        seg_base[seg] = val * 16;
+        seg_limit[seg] = 0xFFFF;
+        seg_flags[seg] = 0x92;
+        seg_rpl[seg] = 0;
+        sregs[seg] = val;
+    }
 }
 
 static void PushWord(uint16_t w)
@@ -229,21 +401,33 @@ static uint16_t FETCH_W(void)
 
 #define SET_r16w() SetModRMRegW(ModRM, dest)
 
+static void reset_cpu(void)
+{
+    cpu_msw = 0xFFF0;
+    cpu_idtr_limit = 0x03FF;
+    cpu_idtr_base = 0;
+    cpu_gdtr_limit = 0xFFFF;
+    cpu_gdtr_base = 0;
+    cpu_ldtr_limit = 0xFFFF;
+    cpu_ldtr_base = 0;
+    cpu_cpl_level = 0;
+
+    SetSegment(CS, 0xF000);
+    SetSegment(DS, 0);
+    SetSegment(ES, 0);
+    SetSegment(SS, 0);
+
+    for(int i = 0; i < 8; i++)
+        wregs[i] = 0;
+
+    ip = 0xFFF0;
+    CF = PF = AF = ZF = SF = TF = IF = DF = OF = 0;
+    segment_override = NoSeg;
+}
+
 void init_cpu(void)
 {
     unsigned i, j, c;
-
-    for(i = 0; i < 4; i++)
-    {
-        wregs[i] = 0;
-        sregs[i] = 0x70;
-    }
-    for(; i < 8; i++)
-        wregs[i] = 0;
-
-    wregs[SP] = 0;
-    ip = 0x100;
-
     for(i = 0; i < 256; i++)
     {
         for(j = i, c = 0; j > 0; j >>= 1)
@@ -252,9 +436,14 @@ void init_cpu(void)
         parity_table[i] = !(c & 1);
     }
 
-    CF = PF = AF = ZF = SF = TF = IF = DF = OF = 0;
+    reset_cpu();
+}
 
-    segment_override = NoSeg;
+static void do_reset_cpu()
+{
+    reset_cpu();
+    print_error("CPU RESET");
+    exit(1);
 }
 
 static uint8_t GetModRMRegB(unsigned ModRM)
@@ -277,6 +466,42 @@ static void SetModRMRegB(unsigned ModRM, uint8_t val)
 
 #define GetModRMRegW(ModRM) (wregs[(ModRM & 0x38) >> 3])
 #define SetModRMRegW(ModRM, val) wregs[(ModRM & 0x38) >> 3] = val;
+
+// CPU interrupt
+static void interrupt(unsigned int_num)
+{
+    uint16_t dest_seg, dest_off;
+    if(cpu_msw & 1)
+    {
+        uint16_t off = (int_num & 0xFF) * 8;
+        if(off + 7 > cpu_idtr_limit)
+        {
+            if( int_num == 13 )
+            {
+                debug(debug_cpu, "Double Trap, reset CPU\n");
+                return do_reset_cpu();
+            }
+            return cpu_trap(13);
+        }
+        dest_off = refmem(cpu_idtr_base + off + 0) | (refmem(cpu_idtr_base + off + 1) << 8);
+        dest_seg = refmem(cpu_idtr_base + off + 2) | (refmem(cpu_idtr_base + off + 3) << 8);
+        // TODO: ignored DPL an P
+    }
+    else
+    {
+        dest_off = refmem(int_num * 4 + 0) | (refmem(int_num * 4 + 1) << 8);
+        dest_seg = refmem(int_num * 4 + 2) | (refmem(int_num * 4 + 3) << 8);
+    }
+
+    PushWord(CompressFlags());
+    PushWord(sregs[CS]);
+    PushWord(ip);
+
+    ip = dest_off;
+    SetSegment(CS, dest_seg);
+
+    TF = IF = 0; /* Turn of trap and interrupts... */
+}
 
 // Used on LEA instruction
 static uint16_t GetModRMOffset(unsigned ModRM)
@@ -311,7 +536,7 @@ static uint16_t GetModRMOffset(unsigned ModRM)
     }
 }
 
-static uint32_t GetModRMAddress(unsigned ModRM)
+static struct fat_ptr GetModRMAddress(unsigned ModRM)
 {
     uint16_t disp = GetModRMOffset(ModRM);
     switch(ModRM & 0xC7)
@@ -343,11 +568,11 @@ static uint32_t GetModRMAddress(unsigned ModRM)
     case 0x86:
         return GetAbsAddrSeg(SS, disp);
     default:
-        return disp; // TODO: illegal instruction
+        return GetAbsAddrSeg(DS, disp);
     }
 }
 
-static uint32_t ModRMAddress;
+static struct fat_ptr ModRMAddress;
 static uint16_t GetModRMRMW(unsigned ModRM)
 {
     if(ModRM >= 0xc0)
@@ -405,27 +630,10 @@ static void next_instruction(void)
         do_instruction(FETCH_B());
 }
 
-static void interrupt(unsigned int_num)
-{
-    uint16_t dest_seg, dest_off;
-
-    dest_off = GetMemAbsW(int_num * 4);
-    dest_seg = GetMemAbsW(int_num * 4 + 2);
-
-    PushWord(CompressFlags());
-    PushWord(sregs[CS]);
-    PushWord(ip);
-
-    ip = dest_off;
-    sregs[CS] = dest_seg;
-
-    TF = IF = 0; /* Turn of trap and interrupts... */
-}
-
 static void do_retf(void)
 {
     ip = PopWord();
-    sregs[CS] = PopWord();
+    SetSegment(CS, PopWord());
 }
 
 static void trap_1(void)
@@ -448,7 +656,7 @@ static void do_iret(void)
     do_popf();
 }
 
-// BOUND or DIV0
+// CPU trap - IP is set at start of instruction
 static void cpu_trap(int num)
 {
     ip = start_ip;
@@ -473,6 +681,12 @@ static void handle_irq(void)
                 interrupt(0x68 + irqn);
         }
     }
+}
+
+static void i_undefined(void)
+{
+    // Generate an invalid opcode exception
+    cpu_trap(6);
 }
 
 #define ADD_8()                                                                \
@@ -708,12 +922,6 @@ static void handle_irq(void)
         segment_override = NoSeg;                                              \
     }                                                                          \
     break;
-
-static void i_undefined(void)
-{
-    // Generate an invalid opcode exception
-    cpu_trap(6);
-}
 
 static void i_das(void)
 {
@@ -1100,7 +1308,7 @@ static void i_mov_wsreg(void)
 static void i_mov_sregw(void)
 {
     int ModRM = FETCH_B();
-    sregs[(ModRM & 0x18) >> 3] = GetModRMRMW(ModRM);
+    SetSegment((ModRM & 0x18) >> 3, GetModRMRMW(ModRM));
 }
 
 static void i_lea(void)
@@ -1133,7 +1341,7 @@ static void i_call_far(void)
     PushWord(ip);
 
     ip = tgt_ip;
-    sregs[CS] = tgt_cs;
+    SetSegment(CS, tgt_cs);
 }
 
 static void i_sahf(void)
@@ -1290,7 +1498,7 @@ static void i_les_dw(void)
 {
     GET_r16w();
     dest = src;
-    sregs[ES] = GetMemAbsW(ModRMAddress + 2);
+    SetSegment(ES, GetMemAbsWOff(ModRMAddress, 2));
     SET_r16w();
 }
 
@@ -1298,7 +1506,7 @@ static void i_lds_dw(void)
 {
     GET_r16w();
     dest = src;
-    sregs[DS] = GetMemAbsW(ModRMAddress + 2);
+    SetSegment(DS, GetMemAbsWOff(ModRMAddress, 2));
     SET_r16w();
 }
 
@@ -1834,7 +2042,7 @@ static void i_jmp_far(void)
     uint16_t nip = FETCH_W();
     uint16_t ncs = FETCH_W();
 
-    sregs[CS] = ncs;
+    SetSegment(CS, ncs);
     ip = nip;
 }
 
@@ -2165,7 +2373,7 @@ static void i_bound(void)
     int ModRM = FETCH_B();
     uint16_t src = GetModRMRegW(ModRM);
     uint16_t low = GetModRMRMW(ModRM);
-    uint16_t hi = GetMemAbsW(ModRMAddress + 2);
+    uint16_t hi = GetMemAbsWOff(ModRMAddress, 2);
     if(src < low || src > hi)
         cpu_trap(5);
 }
@@ -2226,20 +2434,140 @@ static void i_ffpre(void)
         PushWord(sregs[CS]);
         PushWord(ip);
         ip = dest;
-        sregs[CS] = GetMemAbsW(ModRMAddress + 2);
+        SetSegment(CS, GetMemAbsWOff(ModRMAddress, 2));
         break;
     case 0x20: /* JMP ea */
         ip = dest;
         break;
     case 0x28: /* JMP FAR ea */
         ip = dest;
-        sregs[CS] = GetMemAbsW(ModRMAddress + 2);
+        SetSegment(CS, GetMemAbsWOff(ModRMAddress, 2));
         break;
     case 0x30: /* PUSH ea */
         PushWord(dest);
         break;
     case 0x38:
         i_undefined();
+    }
+}
+
+static void load_msw(uint16_t val)
+{
+    if((val & 0xFFF0) != 0xFFF0)
+    {
+        debug(debug_cpu, "trying to load MSW with invalid value 0x%04X\n", val);
+        return i_undefined();
+    }
+    cpu_msw = val;
+}
+
+static void i_0f00(void)
+{
+    int ModRM = FETCH_B();
+
+    switch(ModRM & 0x38)
+    {
+    case 0x00: // SLDT
+    case 0x08: // STR
+    case 0x10: // LLDT
+    case 0x18: // LTR
+    case 0x20: // VERR
+        return i_undefined();
+    case 0x28: // VERW
+        return i_undefined();
+    case 0x30: // undefined
+        return i_undefined();
+    case 0x38: // undefined
+        return i_undefined();
+    }
+}
+
+static void i_0f01(void)
+{
+    uint64_t tmp;
+    int ModRM = FETCH_B();
+
+    switch(ModRM & 0x38)
+    {
+    case 0x00: // SGDT
+        if(ModRM >= 0xC0)
+            return i_undefined();
+        ModRMAddress = GetModRMAddress(ModRM);
+        SetMem48(ModRMAddress.seg, ModRMAddress.off, cpu_gdtr_limit,
+                 cpu_gdtr_base | 0xFF000000);
+        break;
+    case 0x08: // SIDT
+        if(ModRM >= 0xC0)
+            return i_undefined();
+        ModRMAddress = GetModRMAddress(ModRM);
+        SetMem48(ModRMAddress.seg, ModRMAddress.off, cpu_idtr_limit,
+                 cpu_idtr_base | 0xFF000000);
+        break;
+    case 0x10: // LGDT
+        if(cpu_cpl_level != 0)
+            return cpu_trap(13);
+        if(ModRM >= 0xC0)
+            return i_undefined();
+        ModRMAddress = GetModRMAddress(ModRM);
+        tmp = GetMem48(ModRMAddress.seg, ModRMAddress.off);
+        cpu_gdtr_limit = tmp & 0xFFFF;
+        cpu_gdtr_base = 0xFFFFFFFF & (tmp >> 16);
+        break;
+    case 0x18: // LIDT
+        if(cpu_cpl_level != 0)
+            return cpu_trap(13);
+        if(ModRM >= 0xC0)
+            return i_undefined();
+        ModRMAddress = GetModRMAddress(ModRM);
+        tmp = GetMem48(ModRMAddress.seg, ModRMAddress.off);
+        cpu_idtr_limit = tmp & 0xFFFF;
+        cpu_idtr_base = 0xFFFFFFFF & (tmp >> 16);
+        break;
+    case 0x20: // SMSW
+        ModRMAddress = GetModRMAddress(ModRM);
+        SetModRMRMW(ModRM, cpu_msw);
+        break;
+    case 0x28: // undefined
+        return i_undefined();
+    case 0x30: // LMSW
+        if(cpu_cpl_level != 0)
+            return cpu_trap(13);
+        return load_msw(GetModRMRMW(ModRM));
+    case 0x38: // undefined
+        return i_undefined();
+    }
+}
+
+static void i_0f02()
+{
+    // LAR: load access rights: not implemented.
+    return i_undefined();
+}
+
+static void i_0f03()
+{
+    // LSL: load segment limit: not implemented.
+    return i_undefined();
+}
+
+static void i_clts()
+{
+    // In real mode, just perform
+    cpu_msw &= ~0x8;
+}
+
+static void i_0fpre(void)
+{
+    int ins = FETCH_B();
+
+    switch(ins)
+    {
+    case 0x00: return i_0f00();
+    case 0x01: return i_0f01();
+    case 0x02: return i_0f02();
+    case 0x03: return i_0f03();
+    case 0x06: return i_clts();
+    default: return i_undefined();
     }
 }
 
@@ -2274,17 +2602,17 @@ static void i_halt(void)
 
 static void debug_instruction(void)
 {
-    unsigned nip = (cpuGetIP() + 0xFFFF) & 0xFFFF; // substract 1!
-    const uint8_t *ip = memory + sregs[CS] * 16 + nip;
+    const uint8_t *ip = memory + seg_base[CS] + start_ip;
 
     debug(debug_cpu, "AX=%04X BX=%04X CX=%04X DX=%04X SP=%04X BP=%04X SI=%04X DI=%04X ",
           cpuGetAX(), cpuGetBX(), cpuGetCX(), cpuGetDX(), cpuGetSP(), cpuGetBP(),
           cpuGetSI(), cpuGetDI());
     debug(debug_cpu, "DS=%04X ES=%04X SS=%04X CS=%04X IP=%04X %s %s %s %s %s %s %s %s ",
-          cpuGetDS(), cpuGetES(), cpuGetSS(), cpuGetCS(), nip, OF ? "OV" : "NV",
+          cpuGetDS(), cpuGetES(), cpuGetSS(), cpuGetCS(), start_ip, OF ? "OV" : "NV",
           DF ? "DN" : "UP", IF ? "EI" : "DI", SF ? "NG" : "PL", ZF ? "ZR" : "NZ",
           AF ? "AC" : "NA", PF ? "PE" : "PO", CF ? "CY" : "NC");
-    debug(debug_cpu, "%04X:%04X %s\n", sregs[CS], nip, disa(ip, nip, segment_override));
+    debug(debug_cpu, "%04X:%04X %s\n", sregs[CS], start_ip,
+          disa(ip, start_ip, segment_override));
 }
 
 static void do_instruction(uint8_t code)
@@ -2300,7 +2628,7 @@ static void do_instruction(uint8_t code)
     case 0x04: OP_ald8(ADD);
     case 0x05: OP_axd16(ADD);
     case 0x06: PushWord(sregs[ES]);                            break;
-    case 0x07: sregs[ES] = PopWord();                          break;
+    case 0x07: SetSegment(ES, PopWord());                      break;
     case 0x08: OP_br8(OR);
     case 0x09: OP_wr16(OR);
     case 0x0A: OP_r8b(OR);
@@ -2308,7 +2636,7 @@ static void do_instruction(uint8_t code)
     case 0x0C: OP_ald8(OR);
     case 0x0D: OP_axd16(OR);
     case 0x0e: PushWord(sregs[CS]);                            break;
-    case 0x0f: i_undefined();                                  break;
+    case 0x0f: i_0fpre();                                      break;
     case 0x10: OP_br8(ADC);
     case 0x11: OP_wr16(ADC);
     case 0x12: OP_r8b(ADC);
@@ -2316,7 +2644,7 @@ static void do_instruction(uint8_t code)
     case 0x14: OP_ald8(ADC);
     case 0x15: OP_axd16(ADC);
     case 0x16: PushWord(sregs[SS]);                            break;
-    case 0x17: sregs[SS] = PopWord();                          break;
+    case 0x17: SetSegment(SS, PopWord());                      break;
     case 0x18: OP_br8(SBB);
     case 0x19: OP_wr16(SBB);
     case 0x1A: OP_r8b(SBB);
@@ -2324,7 +2652,7 @@ static void do_instruction(uint8_t code)
     case 0x1C: OP_ald8(SBB);
     case 0x1D: OP_axd16(SBB);
     case 0x1e: PushWord(sregs[DS]);                            break;
-    case 0x1f: sregs[DS] = PopWord();                          break;
+    case 0x1f: SetSegment(DS, PopWord());                      break;
     case 0x20: OP_br8(AND);
     case 0x21: OP_wr16(AND);
     case 0x22: OP_r8b(AND);
@@ -2571,10 +2899,10 @@ void cpuSetSP(unsigned v) { wregs[SP] = v; }
 void cpuSetBP(unsigned v) { wregs[BP] = v; }
 void cpuSetSI(unsigned v) { wregs[SI] = v; }
 void cpuSetDI(unsigned v) { wregs[DI] = v; }
-void cpuSetES(unsigned v) { sregs[ES] = v; }
-void cpuSetCS(unsigned v) { sregs[CS] = v; }
-void cpuSetSS(unsigned v) { sregs[SS] = v; }
-void cpuSetDS(unsigned v) { sregs[DS] = v; }
+void cpuSetES(unsigned v) { SetSegment(ES, v); }
+void cpuSetCS(unsigned v) { SetSegment(CS, v); }
+void cpuSetSS(unsigned v) { SetSegment(SS, v); }
+void cpuSetDS(unsigned v) { SetSegment(DS, v); }
 void cpuSetIP(unsigned v) { ip = v; }
 
 // Get CPU registers from outside
@@ -2631,12 +2959,12 @@ int cpuGetAddress(uint16_t segment, uint16_t offset)
 
 int cpuGetAddrDS(uint16_t offset)
 {
-    return memory_mask & (sregs[DS] * 16 + offset);
+    return memory_mask & (seg_base[DS] + offset);
 }
 
 int cpuGetAddrES(uint16_t offset)
 {
-    return memory_mask & (sregs[ES] * 16 + offset);
+    return memory_mask & (seg_base[ES] + offset);
 }
 
 uint16_t cpuGetStack(uint16_t disp)
