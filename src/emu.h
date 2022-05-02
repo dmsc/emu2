@@ -24,6 +24,7 @@ uint16_t cpuGetStack(uint16_t disp);
 uint8_t read_port(unsigned port);
 void write_port(unsigned port, uint8_t value);
 void bios_routine(unsigned inum);
+void handle_cpu_reset(void);
 
 // CPU interface
 void execute(void); // 1 ins.

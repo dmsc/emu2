@@ -20,6 +20,10 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+// CMOS status - used to handle "fast reset"
+static uint8_t cmos_register;
+static uint8_t cmos_reset_type;
+
 uint8_t read_port(unsigned port)
 {
     if(port == 0x3DA) // CGA status register
@@ -51,8 +55,43 @@ void write_port(unsigned port, uint8_t value)
         cpuSetA20(0 != (value & 2));
     else if(port >= 0x60 && port <= 0x65)
         return keyb_write_port(port, value);
+    else if(port == 0x70)
+        cmos_register = value & 0x7F;
+    else if(port == 0x71)
+    {
+        if(cmos_register == 0x0F)
+            cmos_reset_type = value;
+    }
     else
         debug(debug_port, "port write %04x <- %02x\n", port, value);
+}
+
+void handle_cpu_reset()
+{
+    // Detect "fast reset" and resume from code
+    switch(cmos_reset_type)
+    {
+    case 0x05: // Reset keyboard and jump
+    case 0x0A: // Jump through vector
+        cpuSetIP(memory[0x467] | (memory[0x468] << 8));
+        cpuSetCS(memory[0x469] | (memory[0x46A] << 8));
+        break;
+    case 0x0B: // IRET through vector
+        cpuSetIP(memory[0x467] | (memory[0x468] << 8));
+        cpuSetCS(memory[0x469] | (memory[0x46A] << 8));
+        cpuSetSS(0x40);
+        cpuSetSP(0x6D);
+        break;
+    case 0x0C: // RETF through vector
+        cpuSetIP(memory[0x467] | (memory[0x468] << 8));
+        cpuSetCS(memory[0x469] | (memory[0x46A] << 8));
+        cpuSetSS(0x40);
+        cpuSetSP(0x6B);
+        break;
+    default:
+        debug(debug_int, "System reset!\n");
+        exit(0);
+    }
 }
 
 void emulator_update(void)

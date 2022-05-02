@@ -442,8 +442,7 @@ void init_cpu(void)
 static void do_reset_cpu()
 {
     reset_cpu();
-    print_error("CPU RESET");
-    exit(1);
+    handle_cpu_reset();
 }
 
 static uint8_t GetModRMRegB(unsigned ModRM)
