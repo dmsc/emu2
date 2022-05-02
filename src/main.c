@@ -292,6 +292,18 @@ static void exit_handler(int x)
     exit(1);
 }
 
+static uint32_t bios_borland_crc_dif(void)
+{
+    uint32_t bios_at_rev2 = 0x2D92D60C;
+    uint32_t csum = 0;
+    for(int i = 0xF8000; i < 0x100000; i += 2)
+    {
+        int ax = memory[i] | (memory[i + 1] << 8);
+        csum = csum * 2 + ax + ((csum & 0x8000) ? 1 : 0);
+    }
+    return bios_at_rev2 - csum;
+}
+
 static void init_bios_mem(void)
 {
     // Some of those are also in video.c, we write a
@@ -320,6 +332,23 @@ static void init_bios_mem(void)
     memory[0xFFFFA] = 0x2F;
     memory[0xFFFFB] = 0x31;
     memory[0xFFFFC] = 0x37;
+    memory[0xFFFFD] = 0xFC;
+
+    // Fix-up bios checksum, used in DPMI16BI to detect machine,
+    uint32_t csum;
+
+    // Fixup 1: approximate
+    csum = bios_borland_crc_dif();
+    memory[0xFFFDE] = csum >> 16;
+    memory[0xFFFDF] = csum >> 24;
+
+    // Fixup 2: low part
+    csum = bios_borland_crc_dif();
+    memory[0xFFFFE] = csum & 0xFF;
+    memory[0xFFFFF] = csum >> 8;
+
+    if(bios_borland_crc_dif() != 0)
+        debug(debug_int, "WARNING: BIOS checksum differs from expected.\n");
 
     update_timer();
 }
