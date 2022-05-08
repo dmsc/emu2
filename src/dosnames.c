@@ -712,65 +712,90 @@ struct dos_file_list *dos_find_first_file_fcb(int addr, int label)
     return find_first_file(dos_unix_path_fcb(addr, 1, 0), label, 1);
 }
 
-char *dos_real_path(char drive, const char *unix_path)
+static char *dos_check_in_drive(int drive, const char *path)
 {
-    char *ret = 0;
-    // Start by normalizing both base and given paths
+    // Get normalized base drive path
     char *base = realpath(get_base_path(drive), 0);
     if(!base)
         return 0;
-    char *path = realpath(unix_path, 0);
-    if(!path)
-    {
-        free(base);
-        return 0;
-    }
-    debug(debug_dos, "dos_real_path: base='%s' path='%s'\n", base, path);
     // Now, see if the path is actually a descendent of base
     size_t l = strlen(base), k = strlen(path);
     if(strncmp(base, path, l) || (path[l] != '/' && path[l]))
     {
-        debug(debug_dos, "dos_real_path: no common base\n");
+        debug(debug_dos, "dos_real_path: no common base for drive %c\n", drive + 'A');
+        free(base);
+        return 0;
     }
     else if(k - l > 62)
     {
         debug(debug_dos, "dos_real_path: path too long for DOS\n");
+        free(base);
+        return 0;
     }
-    else
-    {
-        // Convert remaining components
-        ret = calloc(1, 65);
-        strncat(ret, "C:", 64);
+    return base;
+}
 
-        path[l] = 0;
-        while(++l < k)
+char *dos_real_path(const char *unix_path)
+{
+    // Normalize unix path:
+    char *path = realpath(unix_path, 0);
+    if(!path)
+        return 0;
+    debug(debug_dos, "dos_real_path: path='%s'\n", path);
+    // Check default drive first:
+    int drive = dos_get_default_drive();
+    char *base = dos_check_in_drive(drive, path);
+    if(!base)
+    {
+        // Now, check all other drives
+        for(drive = 0; drive < 26; drive++)
         {
-            // Extract one component
-            char *sep = strchr(path + l, '/');
-            // Cut string there
-            if(!sep)
-                sep = path + k;
-            else
-                *sep = 0;
-            // And search the DOS path name
-            struct dos_file_list *fl = dos_read_dir(path, "*.*", 0, 1);
-            path[l - 1] = '/';
-            const struct dos_file_list *sl = dos_search_unix_name(fl, path);
-            if(!sl)
-            {
-                dos_free_file_list(fl);
-                debug(debug_dos, "dos_real_path: path not found: '%s' in '%s'\n",
-                      path + l, path);
-                free(base);
-                free(path);
-                return 0;
-            }
-            strncat(ret, "\\", 64);
-            strncat(ret, (const char *)sl->dosname, 64);
-            dos_free_file_list(fl);
-            l = sep - path;
+            base = dos_check_in_drive(drive, path);
+            if(base)
+                break;
+        }
+        if(!base)
+        {
+            debug(debug_dos, "dos_real_path: no common base\n");
+            free(path);
+            return 0;
         }
     }
+    // Convert remaining components
+    size_t l = strlen(base), k = strlen(path);
+    char *ret = calloc(1, 65);
+    ret[0] = drive + 'A';
+    ret[1] = ':';
+
+    path[l] = 0;
+    while(++l < k)
+    {
+        // Extract one component
+        char *sep = strchr(path + l, '/');
+        // Cut string there
+        if(!sep)
+            sep = path + k;
+        else
+            *sep = 0;
+        // And search the DOS path name
+        struct dos_file_list *fl = dos_read_dir(path, "*.*", 0, 1);
+        path[l - 1] = '/';
+        const struct dos_file_list *sl = dos_search_unix_name(fl, path);
+        if(!sl)
+        {
+            dos_free_file_list(fl);
+            debug(debug_dos, "dos_real_path: path not found: '%s' in '%s'\n",
+                    path + l, path);
+            free(base);
+            free(path);
+            return 0;
+        }
+        strncat(ret, "\\", 64);
+        strncat(ret, (const char *)sl->dosname, 64);
+        dos_free_file_list(fl);
+        l = sep - path;
+    }
+    debug(debug_dos, "dos_real_path: located as '%s'\n", ret);
     free(base);
     free(path);
     return ret;

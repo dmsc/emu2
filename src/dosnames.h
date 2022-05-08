@@ -25,7 +25,7 @@ int dos_change_cwd(char *path);
 int dos_change_dir(int addr);
 
 // Returns a DOS path representing given Unix path in drive
-char *dos_real_path(char drive, const char *unix_path);
+char *dos_real_path(const char *unix_path);
 
 // Gets current working directory
 const uint8_t *dos_get_cwd(int drive);
