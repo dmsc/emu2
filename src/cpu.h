@@ -50,7 +50,7 @@ enum
 #define CompressFlags()                                                        \
     (uint16_t)(CF | 2 | (PF << 2) | (!(!AF) << 4) | (ZF << 6) |                \
                (!(!SF) << 7) | (TF << 8) | (IF << 9) | (DF << 10) |            \
-               (!(!OF) << 11))
+               (!(!OF) << 11) | GetProtectionBits())
 
 #define ExpandFlags(f)                                                         \
     {                                                                          \
@@ -63,4 +63,5 @@ enum
         IF = ((f)&512) == 512;                                                 \
         DF = ((f)&1024) == 1024;                                               \
         OF = (f)&2048;                                                         \
+        SetProtectionBits(f);                                                  \
     }

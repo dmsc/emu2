@@ -15,6 +15,7 @@ extern uint8_t memory[];
 extern uint32_t memory_mask;
 
 int cpuGetAddress(uint16_t segment, uint16_t offset);
+int cpuGetAddrCS(uint16_t offset);
 int cpuGetAddrDS(uint16_t offset);
 int cpuGetAddrES(uint16_t offset);
 
