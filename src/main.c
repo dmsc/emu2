@@ -36,6 +36,8 @@ uint8_t read_port(unsigned port)
         return video_crtc_read(port);
     else if(port >= 0x40 && port <= 0x43)
         return port_timer_read(port);
+    else if(port == 0x20)
+        return 0;
     else if(port >= 0x60 && port <= 0x65)
         return keyb_read_port(port);
     else if(port == 0x92)
