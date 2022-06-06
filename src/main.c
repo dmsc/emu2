@@ -170,7 +170,7 @@ static void int15(void)
             cpuSetFlag(cpuFlag_CF);
             return;
         }
-        if(desc[21] != 0x93 || desc[29] != 0x93)
+        if((desc[21] & 0xFE) != 0x92 || (desc[29] & 0xFE) != 0x92)
         {
             debug(debug_int, " invalid segment access rights\n");
             cpuSetAX((ax & 0xFF) | 0x0100);
