@@ -823,4 +823,6 @@ const char *disa(const uint8_t *ip, uint16_t reg_ip, int segment_override)
     case 0xfe: return decode_b(ip, table_fe[(ip[1] & 0x38) >> 3], segment_override);
     case 0xff: return decode_ff(ip, segment_override);
     }
+    /*NOTREACHED*/
+    return show(ip, "bug?");
 }
