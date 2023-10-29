@@ -26,7 +26,7 @@ uint8_t read_port(unsigned port)
     {
         static int retrace = 0;
         retrace++;
-        return retrace & 0x09;
+        return (retrace >> 1) & 0x09;
     }
     else if(port == 0x3D4 || port == 0x3D5)
         return video_crtc_read(port);
