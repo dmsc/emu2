@@ -2,6 +2,7 @@
 #include "codepage.h"
 #include "dbg.h"
 #include "emu.h"
+#include "env.h"
 #include "keyb.h"
 
 #include <errno.h>
@@ -39,7 +40,7 @@ static unsigned term_sx, term_sy;
 // Current emulated video sizes and cursor position
 static unsigned vid_posx[8], vid_posy[8], vid_cursor;
 static unsigned vid_sx, vid_sy, vid_color, vid_page;
-static unsigned vid_font_lines, vid_no_blank;
+static unsigned vid_font_lines, vid_scan_lines;
 // Signals that the terminal size needs updating
 static volatile int term_needs_update;
 // Terminal FD, allows video output even with redirection.
@@ -155,17 +156,39 @@ static void set_text_mode(int clear)
         vid_posx[i] = 0;
         vid_posy[i] = 0;
     }
+    // Get current scan lines from the configuration registers
+    int ega = memory[0x488] & 1;
+    int vga = memory[0x489] & 0x10;
+    if(!ega)
+        vid_scan_lines = 200; // CGA
+    else if(!vga)
+        vid_scan_lines = 350; // EGA
+    else
+        vid_scan_lines = 400; // VGA
+    // FIll internal variables
     vid_page = 0;
     vid_color = 0x07;
     vid_cursor = 1;
-    // TODO: support other video modes
     vid_sx = 80;
     vid_sy = 25;
-    vid_font_lines = 16;
-    memory[0x449] = 0x03; // video mode
-    memory[0x44A] = vid_sx;
-    memory[0x484] = vid_sy - 1;
-    update_posxy();
+    vid_font_lines = vid_scan_lines / vid_sy;
+    // Fill memory block
+    memory[0x449] = 0x03;                             // video mode
+    memory[0x44A] = vid_sx;                           // screen columns
+    memory[0x44B] = 0;                                // ...
+    update_posxy();                                   // Updates 0x4C to 0x5F and 0x62
+    memory[0x460] = 0x07;                             // cursor end scan line
+    memory[0x461] = 0x06;                             // cursor start scan line
+    memory[0x463] = 0xD4;                             // I/O port of video CRTC
+    memory[0x464] = 0x03;                             // ...
+    memory[0x465] = 0x29;                             // video mode select reg
+    memory[0x466] = 0x30;                             // CGA pallete select
+    memory[0x484] = vid_sy - 1;                       // screen rows - 1
+    memory[0x485] = vid_font_lines;                   // character font height
+    memory[0x486] = 0;                                // ...
+    memory[0x487] = clear ? 0x60 : 0xE0;              // EGA control
+    memory[0x488] = 0x09;                             // EGA switches
+    memory[0x489] = !ega ? 0xC1 : !vga ? 0x41 : 0x51; // MODE set option control
 }
 
 static unsigned get_last_used_row(void)
@@ -189,21 +212,6 @@ static void exit_video(void)
     fputs("\x1b[m", tty_file);
     fclose(tty_file);
     debug(debug_video, "exit video - row %d\n", max);
-}
-
-void video_init_mem(void)
-{
-    // Fill the functionality table
-    memory[0xC0100] = 0x08; // Only mode 3 supported
-    memory[0xC0101] = 0x00;
-    memory[0xC0102] = 0x00;
-    memory[0xC0107] = 0x07; // Support 300, 350 and 400 scanlines
-    memory[0xC0108] = 0x00; // Active character blocks?
-    memory[0xC0109] = 0x00; // MAximum character blocks?
-    memory[0xC0108] = 0xFF; // Support functions
-
-    // Set video mode and clear screen
-    set_text_mode(1);
 }
 
 static void init_video(void)
@@ -239,6 +247,67 @@ static void set_color(uint8_t c)
         fprintf(tty_file, "\x1b[%c;3%c;4%cm", (c & 0x08) ? '1' : '0', cn[c & 7],
                 cn[(c >> 4) & 7]);
         term_color = c;
+    }
+}
+
+static void vid_set_font(int lines)
+{
+    if(vid_font_lines == lines || lines < 4 || lines > 32)
+        return; // No change
+    // Get current and new number of "used" rows:
+    unsigned max = get_last_used_row();
+    unsigned rows = vid_scan_lines / lines;
+    if(rows > 64)
+        rows = 64;
+    else if(rows < 12)
+        rows = 12;
+    debug(debug_video, "set %d lines mode from %d\n", rows, max);
+
+    // Clear end-of-screen if we are reducing the height
+    if(video_active() && max > rows)
+    {
+        term_goto_xy(0, rows - 1);
+        set_color(0x07);
+        fputs("\x1b[J", tty_file);
+        for(int y = rows; y < 64; y++)
+            for(int x = 0; x < 256; x++)
+                term_screen[y][x] = get_cell(0x20, 0x07);
+        if(output_row > rows - 1)
+            output_row = rows - 1;
+    }
+    // Set new mode:
+    vid_sy = rows;
+    vid_font_lines = lines;
+    memory[0x484] = vid_sy - 1;
+    memory[0x485] = vid_font_lines;
+    memory[0x486] = 0;
+    update_posxy();
+}
+
+void video_init_mem(void)
+{
+    // Fill the functionality table
+    memory[0xC0100] = 0x08; // Only mode 3 supported
+    memory[0xC0101] = 0x00;
+    memory[0xC0102] = 0x00;
+    memory[0xC0107] = 0x07; // Support 300, 350 and 400 scanlines
+    memory[0xC0108] = 0x00; // Active character blocks?
+    memory[0xC0109] = 0x00; // MAximum character blocks?
+    memory[0xC0108] = 0xFF; // Support functions
+
+    // Need to setup VGA/EGA/CGA registers before calling set_text_mode:
+    memory[0x488] = 9;    // No CGA emulation
+    memory[0x489] = 0x10; // VGA, 400 lines
+    // Set video mode and clear screen
+    set_text_mode(1);
+    // Setup non-standard mode:
+    if(getenv(ENV_ROWS))
+    {
+        int rows = atoi(getenv(ENV_ROWS));
+        if(rows > 12 && rows <= 50)
+            vid_set_font(400 / rows);
+        else if(rows == 12)
+            vid_set_font(32);
     }
 }
 
@@ -533,16 +602,21 @@ void int10()
         if((ax & 0x7F) > 3)
             debug(debug_video, "-> SET GRAPHICS MODE %x<-\n", ax & 0xFF);
         else
-        {
             set_text_mode((ax & 0x80) == 0);
-            vid_no_blank = ax & 0x80;
-        }
         break;
     case 0x01:                              // SET CURSOR SHAPE
         if((cpuGetCX() & 0x6000) == 0x2000) // Hide cursor
+        {
             vid_cursor = 0;
+            memory[0x460] = 0;
+            memory[0x461] = 0;
+        }
         else
+        {
             vid_cursor = 1;
+            memory[0x460] = 7;
+            memory[0x461] = 6;
+        }
         break;
     case 0x02: // SET CURSOR POS
     {
@@ -630,8 +704,8 @@ void int10()
         break;
     }
     case 0x0F: // GET CURRENT VIDEO MODE
-        cpuSetAX((vid_sx << 8) | 0x0003 | vid_no_blank);
-        cpuSetBX((vid_page << 8) | (0xFF & cpuGetBX()));
+        cpuSetAX(memory[0x449] | (memory[0x487] & 0x80) | (memory[0x44A] << 8));
+        cpuSetBX((memory[0x462] << 8) | (0xFF & cpuGetBX()));
         break;
     case 0x10:
         if(ax == 0x1002) // TODO: Set pallete registers - ignore
@@ -646,42 +720,22 @@ void int10()
             cpuSetDX((vid_sy - 1) & 0xFF);
             cpuSetCX(vid_font_lines);
         }
-        else if(ax == 0x1104 || ax == 0x1111 || ax == 0x1114)
+        else if(ax == 0x1100 || ax == 0x1110)
         {
-            // Clear end-of-screen
-            unsigned max = get_last_used_row();
-            debug(debug_video, "set 25 lines mode %d\n", max);
-            if(max > 25)
-            {
-                term_goto_xy(0, 24);
-                set_color(0x07);
-                fputs("\x1b[J", tty_file);
-                for(int y = 25; y < 64; y++)
-                    for(int x = 0; x < 256; x++)
-                        term_screen[y][x] = get_cell(0x20, 0x07);
-                if(output_row > 24)
-                    output_row = 24;
-            }
-            // Set 8x16 font - 80x25 mode:
-            vid_sy = 25;
-            vid_font_lines = 16;
-            memory[0x484] = vid_sy - 1;
-            update_posxy();
-        }
-        else if(ax == 0x1102 || ax == 0x1112)
-        {
-            // Set 8x8 font - 80x43 or 80x50 mode:
-            debug(debug_video, "set 43/50 lines mode\n");
-            // Hack - QBASIC.EXE assumes that the mode is always 50 lines on VGA,
-            // and *sets* the height into the BIOS area!
-            if(memory[0x484] > 42)
-                vid_sy = 50;
+            int lines = cpuGetBX() >> 8;
+            if(lines < 6 || lines > 32)
+                debug(debug_video, "UNHANDLED FONT HEIGHT %d LINES\n", lines);
             else
-                vid_sy = 43;
-            vid_font_lines = 8;
-            memory[0x484] = vid_sy - 1;
-            update_posxy();
+                vid_set_font(lines);
         }
+        else if(ax == 0x1101 || ax == 0x1111)
+            vid_set_font(14);
+        else if(ax == 0x1102 || ax == 0x1112)
+            vid_set_font(8);
+        else if(ax == 0x1104 || ax == 0x1114)
+            vid_set_font(16);
+        else
+            debug(debug_video, "UNHANDLED INT 10, AX=%04x\n", ax);
         break;
     case 0x12: // ALT FUNCTION SELECT
     {
@@ -689,12 +743,36 @@ void int10()
         if(bl == 0x10) // GET EGA INFO
         {
             cpuSetBX(0x0003);
-            cpuSetCX(0x0000);
+            cpuSetCX(memory[0x488]);
             cpuSetAX(0);
         }
         else if(bl == 0x30) // SET VERTICAL RESOLUTION
         {
-            // TODO: select 25/28 lines
+            // Setup BIOS memory, applies in next set_mode call
+            if(ax == 0x1200)
+            {
+                // 200 lines:
+                memory[0x488] &= 0xFE;
+                memory[0x489] = (memory[0x489] & 0x6F) | 0x80;
+            }
+            else if(ax == 0x1201)
+            {
+                // 350 lines:
+                memory[0x488] |= 0x01;
+                memory[0x489] = (memory[0x489] & 0x6F) | 0x00;
+            }
+            else if(ax == 0x1202)
+            {
+                // 400 lines:
+                memory[0x488] |= 0x01;
+                memory[0x489] = (memory[0x489] & 0x6F) | 0x10;
+            }
+            else
+            {
+                debug(debug_video, "UNHANDLED INT 10, AH=12 BL=%02x\n", bl);
+                break;
+            }
+            // Return OK
             cpuSetAX(0x1212);
         }
         else
@@ -753,26 +831,13 @@ void int10()
             {
                 // Store state information
                 memset(memory + addr, 0, 64);
-                memory[addr + 0] = 0x00;
-                memory[addr + 1] = 0x01;
-                memory[addr + 2] = 0x00;
-                memory[addr + 3] = 0xC0; // static-func table at C000:0000
-                memory[addr + 4] = 0x03; // Video mode
-                memory[addr + 5] = vid_sx;
-                memory[addr + 6] = vid_sx >> 8;
-                for(int i = 0; i < 8; i++)
-                {
-                    memory[addr + 11 + i * 2] = vid_posx[i];
-                    memory[addr + 12 + i * 2] = vid_posy[i];
-                }
-                memory[addr + 27] = vid_cursor * 6; // cursor start scanline
-                memory[addr + 28] = vid_cursor * 7; // cursor end scanline
-                memory[addr + 29] = 0;              // current page
-                memory[addr + 30] = 0xD4;           //
-                memory[addr + 31] = 0x03;           // CRTC port: 03D4
-                memory[addr + 34] = vid_sy;
-                memory[addr + 35] = vid_font_lines;
-                memory[addr + 36] = 0x00;                // font lines: 0010
+                memory[addr + 0] = 0x00; // static-func table at C000:0100
+                memory[addr + 1] = 0x01; // ...
+                memory[addr + 2] = 0x00; // ...
+                memory[addr + 3] = 0xC0; // ...
+                // First 30 bytes copied from BIOS memory 40h:49h to 40h:66h
+                memcpy(memory + addr + 4, memory + 0x449, 30);
+                memcpy(memory + addr + 34, memory + 0x484, 5);
                 memory[addr + 39] = 0x10;                //
                 memory[addr + 40] = 0x00;                // # of colors: 0010
                 memory[addr + 41] = vid_sy > 25 ? 4 : 8; // # of pages
