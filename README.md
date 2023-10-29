@@ -56,7 +56,7 @@ The available environment variables are:
 
 - `EMU2_CODEPAGE`      Set DOS code-page to the specified string. Set to '?' to
                        show list of included code-pages, multiple aliases
-                       separeted with commas.  Set to a file name to read the
+                       separated with commas.  Set to a file name to read the
                        mapping table from a file with the unicode value for
                        each byte.  You can download mapping tables from
                        ftp://ftp.unicode.org/Public/MAPPINGS/VENDORS/MICSFT/PC/
@@ -66,7 +66,7 @@ The available environment variables are:
 
 - `EMU2_LOWMEM`        Limits main memory to 512KB, this fixes some old DOS
                        programs with a bug that checks available memory using
-                       "signed" comparison insructions (JLE instead of JBE).
+                       "signed" comparison instructions (JLE instead of JBE).
                        This is needed at least for MASM versions 1.0 and 1.10.
 
 
