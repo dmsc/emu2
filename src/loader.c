@@ -30,16 +30,16 @@ static int valid_fcb_char(int i)
 }
 
 // The FCB parsing states.
-#define FCB_PARSE_INIT 0
+#define FCB_PARSE_INIT      0
 #define FCB_PARSE_INIT_PLUS 10
-#define FCB_PARSE_FCB1 1
-#define FCB_PARSE_FCB1_EXT 2
-#define FCB_PARSE_SEP 3
-#define FCB_PARSE_SEP_PLUS 13
+#define FCB_PARSE_FCB1      1
+#define FCB_PARSE_FCB1_EXT  2
+#define FCB_PARSE_SEP       3
+#define FCB_PARSE_SEP_PLUS  13
 #define FCB_PARSE_SEP_PURGE 23
-#define FCB_PARSE_FCB2 4
-#define FCB_PARSE_FCB2_EXT 5
-#define FCB_PARSE_EXIT 6
+#define FCB_PARSE_FCB2      4
+#define FCB_PARSE_FCB2_EXT  5
+#define FCB_PARSE_EXIT      6
 
 static void cmdline_to_fcb(const char *cmd_line, uint8_t *fcb1, uint8_t *fcb2)
 {

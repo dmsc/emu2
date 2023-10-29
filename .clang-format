@@ -1,0 +1,11 @@
+# We'll use defaults from the LLVM style, but with 4 columns indentation.
+BasedOnStyle: LLVM
+IndentWidth: 4
+AlignAfterOpenBracket: true
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortCaseLabelsOnASingleLine: true
+BreakBeforeBraces: Allman
+SpaceBeforeParens: Never
+ColumnLimit: 90
+AlignConsecutiveMacros: true
+

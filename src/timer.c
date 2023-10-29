@@ -3,10 +3,10 @@
 #include "dbg.h"
 #include "emu.h"
 
+#include <inttypes.h>
 #include <math.h>
 #include <sys/time.h>
 #include <time.h>
-#include <inttypes.h>
 
 // Emulate BIOS time
 static uint32_t bios_timer = 0;
@@ -44,8 +44,8 @@ static struct i8253_timer
 } timers[3];
 
 // Timer Read/Write states:
-#define TIMER_LSB 0
-#define TIMER_MSB 1
+#define TIMER_LSB    0
+#define TIMER_MSB    1
 #define TIMER_WORD_L 2
 #define TIMER_WORD_M 3
 
