@@ -55,6 +55,7 @@ void emulator_update(void)
     update_timer();
     check_screen();
     update_keyb();
+    fflush(stdout);
 }
 
 // BIOS - GET EQUIPMENT FLAG

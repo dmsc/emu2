@@ -1078,9 +1078,13 @@ void int21()
         break;
     case 0xA: // BUFFERED INPUT
     {
-        // If we are reading from console, suspend keyboard handling
+        // If we are reading from console, suspend keyboard handling and update
+        // emulator state.
         if(devinfo[0] == 0x80D3)
+        {
             suspend_keyboard();
+            emulator_update();
+        }
 
         FILE *f = handles[0] ? handles[0] : stdin;
         int addr = cpuGetAddrDS(cpuGetDX());
