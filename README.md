@@ -69,6 +69,11 @@ The available environment variables are:
                        "signed" comparison instructions (JLE instead of JBE).
                        This is needed at least for MASM versions 1.0 and 1.10.
 
+- `EMU2_DOSVER`        Changes the reported DOS version, allowing programs that
+                       checks this version to run.  You can specify a major
+                       version or a major dot minor, for example "3.20", "2.11"
+                       or "5".
+
 - `EMU2_ROWS`          Setups the VGA text mode to the given number of rows,
                        from 12 to 50 at the program start. Some full-screen DOS
                        programs will retrieve this info and adjust the screen

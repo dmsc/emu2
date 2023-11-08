@@ -40,6 +40,9 @@ static const char *append_path()
 // Disk Transfer Area, buffer for find-first-file output.
 static int dosDTA;
 
+// Emulated DOS version: default to DOS 3.30
+static int dosver = 0x1E03;
+
 // Allocates memory for static DOS tables, from "rom" memory
 static uint32_t get_static_memory(uint16_t bytes, uint16_t align)
 {
@@ -1386,7 +1389,7 @@ void int21()
         cpuSetBX((dosDTA & 0x000FF));
         break;
     case 0x30: // DOS version: 3.30
-        cpuSetAX(0x1E03);
+        cpuSetAX(dosver);
         cpuSetBX(0x0000);
         break;
     case 0x33: // BREAK SETTINGS
@@ -2134,6 +2137,23 @@ void init_dos(int argc, char **argv)
     init_codepage();
     init_nls_data();
     init_append();
+
+    // Init DOS version
+    if(getenv(ENV_DOSVER))
+    {
+        const char *ver = getenv(ENV_DOSVER);
+        char *end = 0;
+        int minor = 0;
+        int major = strtol(ver, &end, 10);
+
+        if(*end == '.' && end[1])
+            minor = strtol(end + 1, &end, 10);
+
+        if(*end || major < 1 || major > 6 || minor < 0 || minor > 99)
+            print_error("invalid DOS version '%s'\n", ver);
+        dosver = (minor << 8) | major;
+        debug(debug_dos, "set dos version to '%s' = 0x%04x\n", ver, dosver);
+    }
 
     // Init INTERRUPT handlers - point to our own handlers
     for(int i = 0; i < 256; i++)
