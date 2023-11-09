@@ -743,7 +743,17 @@ static void dos_get_drive_info(uint8_t drive)
 static void dos_putchar(uint8_t ch)
 {
     if(devinfo[1] == 0x80D3 && video_active())
-        video_putch(ch);
+    {
+        // Handle TAB character here:
+        if(ch == 0x09)
+        {
+            int n = 8 - (7 & video_get_col());
+            while(n--)
+                video_putch(' ');
+        }
+        else
+            video_putch(ch);
+    }
     else if(!handles[1])
         putchar(ch);
     else
