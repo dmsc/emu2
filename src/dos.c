@@ -1493,6 +1493,7 @@ void int21()
         }
         if(devinfo[cpuGetBX()] == 0x80D3 && video_active())
         {
+            // TODO: should output via dos_putchar
             for(unsigned i = 0; i < len; i++)
                 video_putch(buf[i]);
             cpuSetAX(len);
@@ -2284,14 +2285,5 @@ void int29(void)
     // Fast video output
     debug(debug_int, "D-29: AX=%04X\n", ax);
     debug(debug_dos, "D-29:   fast console out  AX=%04X\n", ax);
-
-    int ch = ax & 0xFF;
-    // If stdout is redirected or video is active, writes to video screen:
-    if(devinfo[1] != 0x80D3 || video_active())
-        video_putch(ch);
-    // Else, write to console
-    else if(!handles[1])
-        putchar(ch);
-    else
-        fputc(ch, handles[1]);
+    dos_putchar(ax & 0xFF);
 }
