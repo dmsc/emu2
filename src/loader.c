@@ -20,7 +20,10 @@ uint16_t current_PSP;
 
 static int valid_fcb_sep(int i)
 {
-    return isspace(i) || i == ',' || i == '=' || i == ';';
+    // NOTE: in DOS 1.0 many other characters were valid FCB separators,
+    // then the list was restricted from DOS 1.1 upwards. The '/' was added
+    // back on DOS 3. See bug #61.
+    return isspace(i) || i == ',' || i == '=' || i == ';' || i == '/';
 }
 
 static int valid_fcb_char(int i)
