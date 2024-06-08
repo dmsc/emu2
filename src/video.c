@@ -384,6 +384,34 @@ static void put_vc_xy(uint8_t vc, uint8_t color, unsigned x, unsigned y)
         output_row = term_posy;
 }
 
+// Save screen dump to video log
+static void debug_screen(void)
+{
+    // Exit if not in video mode
+    if(!video_initialized || !debug_active(debug_video))
+        return;
+
+    uint16_t memp = (vid_page & 7) * (vid_sy > 25 ? 0x2000 : 0x1000);
+    uint16_t *vm = (uint16_t *)(memory + 0xB8000 + memp);
+
+    // Dump screen
+    char *buf = malloc(3 * vid_sx + 8);
+//    debug(debug_video, "- screen dump -\n");
+    for(unsigned y = 0; y < vid_sy; y++)
+    {
+        for(unsigned x = 0; x < vid_sx; x++)
+        {
+            // Output character
+            union term_cell cell;
+            int16_t vc = vm[x + y * vid_sx];
+            cell.value = vc;
+            buf[x] = cell.chr;
+        }
+        buf[vid_sx] = 0;
+        debug(debug_video, "%02d: %s\n", y, buf);
+    }
+}
+
 // Compares current screen with memory data
 void check_screen(void)
 {
@@ -392,6 +420,7 @@ void check_screen(void)
         return;
 
     debug(debug_video, "check_screen, redrawing\n");
+    debug_screen();
 
     uint16_t memp = (vid_page & 7) * (vid_sy > 25 ? 0x2000 : 0x1000);
     uint16_t *vm = (uint16_t *)(memory + 0xB8000 + memp);
@@ -461,6 +490,8 @@ static void vid_scroll_up(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1, int n,
             for(unsigned x = 0; x < term_sx; x++)
                 term_screen[y][x] = get_cell(0x20, 0x07);
     }
+    else
+        debug_screen();
 
     // Scroll VIDEO
     uint16_t memp = (page & 7) * (vid_sy > 25 ? 0x2000 : 0x1000);
@@ -472,12 +503,16 @@ static void vid_scroll_up(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1, int n,
     for(unsigned y = y1 - (n - 1); y <= y1; y++)
         for(unsigned x = x0; x <= x1; x++)
             vm[x + y * vid_sx] = get_cell(0x20, vid_color).value;
+
+    debug(debug_video, "after scroll\n");
+    debug_screen();
 }
 
 static void vid_scroll_dwn(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1, unsigned n,
                            int page)
 {
     debug(debug_video, "scroll down %d: (%d, %d) - (%d, %d)\n", n, x0, y0, x1, y1);
+    debug_screen();
 
     // Check parameters
     if(x1 >= vid_sx)
@@ -501,6 +536,9 @@ static void vid_scroll_dwn(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1, unsig
     for(unsigned y = y0; y < y0 + n; y++)
         for(unsigned x = x0; x <= x1; x++)
             vm[x + y * vid_sx] = get_cell(0x20, vid_color).value;
+
+    debug(debug_video, "after scroll\n");
+    debug_screen();
 }
 
 static uint16_t *addr_xy(unsigned x, unsigned y, int page)
