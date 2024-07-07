@@ -1496,6 +1496,22 @@ void int21()
             return;
         }
         unsigned len = cpuGetCX();
+        // If len=0, file is truncated at current position:
+        if(!len)
+        {
+            cpuClrFlag(cpuFlag_CF);
+            // flush output
+            int e = fflush(f);
+            if(e)
+                cpuSetFlag(cpuFlag_CF);
+            else if(devinfo[fd] != 0x80D3)
+            {
+                off_t pos = ftello(f);
+                if(pos != -1 && -1 == ftruncate(fileno(f), pos))
+                    cpuSetFlag(cpuFlag_CF);
+            }
+            break;
+        }
         uint8_t *buf = getptr(cpuGetAddrDS(cpuGetDX()), len);
         if(!buf)
         {
