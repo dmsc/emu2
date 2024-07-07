@@ -590,6 +590,12 @@ static void video_putchar(uint8_t ch, uint16_t at, int page)
         if(vid_posx[page] > 0)
             vid_posx[page]--;
     }
+    else if(ch == 0x07)
+    {
+        // BEL, just write to the terminal now
+        if(tty_file)
+            putc('\x07', tty_file);
+    }
     else
     {
         if(at & 0xFF00)
