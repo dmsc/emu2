@@ -1518,15 +1518,22 @@ void int21()
         if(!len)
         {
             cpuClrFlag(cpuFlag_CF);
+            cpuSetAX(0);
             // flush output
             int e = fflush(f);
             if(e)
+            {
                 cpuSetFlag(cpuFlag_CF);
+                cpuSetAX(5); // access denied
+            }
             else if(devinfo[fd] != 0x80D3)
             {
                 off_t pos = ftello(f);
                 if(pos != -1 && -1 == ftruncate(fileno(f), pos))
+                {
                     cpuSetFlag(cpuFlag_CF);
+                    cpuSetAX(5); // access denied
+                }
             }
             break;
         }
