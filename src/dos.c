@@ -92,7 +92,7 @@ static int get_new_handle(void)
     for(i = 0; i < max_handles; i++)
         if(!handles[i])
             return i;
-    return 0;
+    return -1;
 }
 
 static int dos_close_file(int h)
@@ -170,7 +170,7 @@ static void dos_open_file(int create)
 {
     int h = get_new_handle();
     int al = cpuGetAX() & 0xFF;
-    if(!h)
+    if(h < 0)
     {
         cpuSetAX(4);
         cpuSetFlag(cpuFlag_CF);
@@ -290,7 +290,7 @@ static void dos_show_fcb()
 static void dos_open_file_fcb(int create)
 {
     int h = get_new_handle();
-    if(!h)
+    if(h < 0)
     {
         cpuSetAL(0xFF);
         cpuSetFlag(cpuFlag_CF);
@@ -1696,7 +1696,7 @@ void int21()
             break;
         }
         int h = get_new_handle();
-        if(!h)
+        if(h < 0)
         {
             cpuSetAX(4);
             cpuSetFlag(cpuFlag_CF);
