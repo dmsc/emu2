@@ -2234,6 +2234,14 @@ void init_dos(int argc, char **argv)
     // Init SYSVARS
     dos_sysvars = get_static_memory(128, 0);
     put16(dos_sysvars + 22, 0x0080); // First MCB
+    // NUL driver
+    static const uint8_t null_device[] = {
+        0xff, 0xff, 0x00, 0x00,
+        0x04, 0x80,
+        0x00, 0x00, 0x00, 0x00,
+        'N', 'U', 'L', ' ', ' ', ' ', ' ', ' '
+    };
+    putmem(dos_sysvars + 24 + 0x22, null_device, sizeof(null_device));
 
     // Setup default drive
     if(getenv(ENV_DEF_DRIVE))
