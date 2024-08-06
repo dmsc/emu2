@@ -475,6 +475,10 @@ void update_keyb(void)
         kbhit();
 }
 
+// Keyboard controller status
+static uint8_t portB_ctl = 0;
+static uint8_t keyb_command = 0;
+
 // Handle keyboard controller port reading
 uint8_t keyb_read_port(unsigned port)
 {
@@ -483,8 +487,61 @@ uint8_t keyb_read_port(unsigned port)
     debug(debug_int, "keyboard read_port: %02X (key=%04X)\n", port, queued_key);
     if(port == 0x60)
         return queued_key >> 8;
+    else if(port == 0x61)
+        return portB_ctl; // Controller B, used for speaker output
+    else if(port == 0x64)
+        // bit0 == 1 if there is data available.
+        return (queued_key != -1) | ((keyb_command != 0) << 3);
     else
         return 0xFF;
+}
+
+// Handle keyboard controller port writes
+void keyb_write_port(unsigned port, uint8_t value)
+{
+    debug(debug_int, "keyboard write_port: %02X <- %02X\n", port, value);
+    if(port == 0x60)
+    {
+        // Write to keyboard data
+        if(keyb_command == 0)
+        {
+            queued_key = value << 8;
+        }
+        else
+        {
+            // Handle keyboard commands
+            if(keyb_command == 0xD1) // Write output port
+            {
+                if(value & 1)
+                {
+                    // System reset
+                    debug(debug_int, "System reset via invalid keyboard I/O!\n");
+                    exit(0);
+                }
+                keyb_command = 0;
+            }
+        }
+        return;
+    }
+    else if(port == 0x61)
+        // Store speaker control bits
+        portB_ctl = value & 0x03;
+    else if(port == 0x64)
+    {
+        // Commands to keyboard controller
+        keyb_command = value;
+        if((keyb_command & 0xF0) == 0xF0)
+        {
+            int bits = keyb_command & 0x0F;
+            if(bits & 1)
+            {
+                // System reset
+                debug(debug_int, "System reset via keyboard controller!\n");
+                exit(0);
+            }
+            keyb_command = 0;
+        }
+    }
 }
 
 // BIOS keyboards handler

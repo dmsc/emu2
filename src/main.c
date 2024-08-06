@@ -44,6 +44,8 @@ void write_port(unsigned port, uint8_t value)
         return port_timer_write(port, value);
     else if(port == 0x03D4 || port == 0x03D5)
         return video_crtc_write(port, value);
+    else if(port >= 0x60 && port <= 0x65)
+        return keyb_write_port(port, value);
     else
         debug(debug_port, "port write %04x <- %02x\n", port, value);
 }
