@@ -109,6 +109,21 @@ static inline unsigned get32(int addr)
     return get16(addr) + (get16(addr + 2) << 16);
 }
 
+// Push word to stack
+static inline void cpuPushWord(uint16_t w)
+{
+    cpuSetSP(cpuGetSP() - 2);
+    put16(cpuGetSS() * 16 + cpuGetSP(), w);
+}
+
+// Pop word from stack
+static inline int cpuPopWord(void)
+{
+    int w = get16(cpuGetSS() * 16 + cpuGetSP());
+    cpuSetSP(cpuGetSP() + 2);
+    return w;
+}
+
 // Copy data to CPU memory
 static inline int putmem(uint32_t dest, const uint8_t *src, unsigned size)
 {
