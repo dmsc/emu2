@@ -73,6 +73,28 @@ static void int12(void)
 // Network access, ignored.
 static void int2a(void) {}
 
+// Absolute disk read
+static void int25(void)
+{
+    debug(debug_int, "D-25%04X: CX=%04X\n", cpuGetAX(), cpuGetCX());
+    // AH=80 : timeout
+    // AL=02 : drive not ready
+    cpuSetAX(0x8002);
+    cpuSetFlag(cpuFlag_CF);
+
+    // This call returns via RETF instead of IRET, we simulate this by
+    // manipulating stack directly.
+    // POP IP / CS / FLAGS
+    int ip = cpuPopWord();
+    int cs = cpuPopWord();
+    int flags = cpuPopWord();
+    // PUSH flags twice
+    cpuPushWord(flags);
+    cpuPushWord(flags);
+    cpuPushWord(cs);
+    cpuPushWord(ip);
+}
+
 // System Reset
 static void int19(void)
 {
@@ -110,6 +132,8 @@ void bios_routine(unsigned inum)
     }
     else if(inum == 0x28)
         int28();
+    else if(inum == 0x25)
+        int25();
     else if(inum == 0x29)
         int29();
     else if(inum == 0x2A)
