@@ -4,6 +4,13 @@ EMU2: A simple text-mode x86 + DOS emulator
 This is a simple DOS emulator for the Linux text console, supporting basic DOS
 system calls and console I/O.
 
+Installation
+------------
+    make
+    sudo make install  
+    
+This installs to `$(DESTDIR)${PREFIX}/bin`.
+
 Using the emulator
 ------------------
 
