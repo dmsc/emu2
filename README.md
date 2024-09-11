@@ -6,10 +6,12 @@ system calls and console I/O.
 
 Installation
 ------------
+
     make
-    sudo make install  
-    
-This installs to `$(DESTDIR)${PREFIX}/bin`.
+    sudo make install
+
+The above installs `emu2` into `$(DESTDIR)${PREFIX}/bin/emu2`, this is
+`/usr/bin/emu2` by default.
 
 Using the emulator
 ------------------
