@@ -1111,6 +1111,19 @@ void int21()
         break;
     case 0xA: // BUFFERED INPUT
     {
+        unsigned addr = cpuGetAddrDS(cpuGetDX());
+        unsigned len = memory[addr];
+        if(!len)
+        {
+            debug(debug_dos, "\tbuffered input len = 0\n");
+            break;
+        }
+        if(addr + len + 2 >= 0x100000)
+        {
+            debug(debug_dos, "\tbuffer pointer invalid\n");
+            break;
+        }
+
         // If we are reading from console, suspend keyboard handling and update
         // emulator state.
         if(devinfo[0] == 0x80D3)
@@ -1120,19 +1133,17 @@ void int21()
         }
 
         FILE *f = handles[0] ? handles[0] : stdin;
-        int addr = cpuGetAddrDS(cpuGetDX());
-        unsigned len = memory[addr], i = 2;
-        while(i < len && addr + i < 0x100000)
+        unsigned i;
+        for(i = 0; i < len; i++)
         {
             int c = getc(f);
             if(c == '\n' || c == EOF)
                 c = '\r';
-            memory[addr + i] = (char)c;
+            memory[addr + i + 2] = (char)c;
             if(c == '\r')
                 break;
-            i++;
         }
-        memory[addr + 1] = i - 2;
+        memory[addr + 1] = i;
         break;
     }
     case 0xB: // STDIN STATUS
