@@ -1646,6 +1646,8 @@ void int21()
         case 0x00: // GET DEV INFO
             debug(debug_dos, "\t= %04x\n", devinfo[h]);
             cpuSetDX(devinfo[h]);
+            // Undocumented, needed for VEDIT INSTALL
+            cpuSetAX(devinfo[h]);
             break;
         case 0x01: // SET DEV INFO
         case 0x02: // IOCTL CHAR DEV READ
