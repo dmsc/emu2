@@ -10,3 +10,4 @@ void keyb_write_port(unsigned port, uint8_t value);
 void suspend_keyboard(void);
 // Disable throttling the next keyboard calls
 void keyb_wakeup(void);
+void keyb_handle_irq(void);

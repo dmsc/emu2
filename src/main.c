@@ -145,7 +145,7 @@ void bios_routine(unsigned inum)
     else if(inum == 0x8)
         ; // Timer interrupt - nothing to do
     else if(inum == 0x9)
-        ; // Keyboard interrupt - nothing to do
+        keyb_handle_irq(); // Keyboard interrupt
     else
         debug(debug_int, "UNHANDLED INT %02x, AX=%04x\n", inum, cpuGetAX());
 }

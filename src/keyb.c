@@ -26,6 +26,13 @@ static void update_bios_state(void)
     memory[0x417] = mod_state;
 }
 
+// Update keyboard buffer pointer
+void keyb_read_buffer(void)
+{
+    int ptr = (memory[0x41A] - 0x1E) & 0x1F;
+    memory[0x41A] = 0x1E + ((ptr + 2) & 0x1F);
+}
+
 // Table of scan codes for keys + modifiers:
 static uint8_t special_codes[23][4] = {
     {0x3B, 0x54, 0x5E, 0x68}, // F1
@@ -465,6 +472,8 @@ int getch(int detect_brk)
         raise(SIGINT);
     ret = queued_key;
     queued_key = -1;
+    keyb_read_buffer();
+    update_bios_state();
     return ret;
 }
 
@@ -544,6 +553,15 @@ void keyb_write_port(unsigned port, uint8_t value)
     }
 }
 
+void keyb_handle_irq(void)
+{
+    // The BIOS should read a key pressed here and add it to the keyboard buffer.
+    int ptr = (memory[0x41C] - 0x1E) & 0x1F;
+    memory[0x41E + ptr] = queued_key & 0xFF;
+    memory[0x41F + ptr] = queued_key >> 8;
+    memory[0x41C] = 0x1E + ((ptr + 2) & 0x1F);
+}
+
 // BIOS keyboards handler
 void int16()
 {
@@ -568,6 +586,8 @@ void int16()
             cpuClrFlag(cpuFlag_ZF);
         break;
     case 2: // GET SHIFT FLAGS
+        // Start keyboard handling and read key to fill mod_state
+        kbhit();
         cpuSetAX(mod_state);
         break;
     default:
