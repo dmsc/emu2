@@ -1252,6 +1252,10 @@ void int21()
     case 0x25: // set interrupt vector
         put16(4 * (ax & 0xFF), cpuGetDX());
         put16(4 * (ax & 0xFF) + 2, cpuGetDS());
+        // If the application installed a keyboard interrupt handler, we should
+        // enable keyboard emulation to actually generate the interrupts.
+        if(9 == (ax & 0xFF))
+            kbhit();
         break;
     case 0x26: // Create PSP (duplicate current PSP)
     {
