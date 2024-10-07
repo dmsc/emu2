@@ -632,7 +632,8 @@ static void dos_find_next_fcb(void)
     {
         debug(debug_dos, "\t'%s' ('%s')\n", d->dosname, d->unixname);
         // Fills output FCB at DTA - use extended or normal depending on input
-        int ofcb = memory[get_ex_fcb()] == 0xFF ? dosDTA + 7 : dosDTA;
+        int exfcb = memory[get_ex_fcb()] == 0xFF;
+        int ofcb = exfcb ? dosDTA + 7 : dosDTA;
         int pos = 1;
         for(uint8_t *c = d->dosname; *c; c++)
         {
@@ -669,6 +670,11 @@ static void dos_find_next_fcb(void)
             memory[ofcb + 0x0C] = 8;
             put32(ofcb + 0x17, get_time_date(time(0)));
             put32(ofcb + 0x1D, 0);
+        }
+        if(exfcb)
+        {
+            memory[dosDTA] = 0xFF;
+            memory[dosDTA + 6] = memory[ofcb, 0x0C];
         }
         p->find_first_ptr++;
         cpuSetAL(0x00);
