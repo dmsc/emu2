@@ -12,12 +12,14 @@
 #include <termios.h>
 #include <unistd.h>
 
+#define MAX_KEYB_CALLS 10
+
 static int term_raw = 0;
 static int tty_fd = -1;
 static int queued_key = -1;
 static int waiting_key = 0;
 static int mod_state = 0;
-static int throttle_calls = 4;
+static int throttle_calls = 0;
 
 // Copy mod-state to BIOS memory area
 static void update_bios_state(void)
@@ -414,7 +416,7 @@ void suspend_keyboard(void)
 
 void keyb_wakeup(void)
 {
-    throttle_calls = 4;
+    throttle_calls = 0;
 }
 
 int kbhit(void)
@@ -440,15 +442,16 @@ int kbhit(void)
                 // Arbitrary limit to 4 calls each 100Hz
                 if((t1 - last_time) < 10000)
                 {
-                    throttle_calls--;
-                    if(throttle_calls <= 0)
+                    throttle_calls++;
+                    if(throttle_calls > MAX_KEYB_CALLS)
                     {
                         debug(debug_int, "keyboard sleep.\n");
                         usleep(10000);
+                        throttle_calls = 0;
                     }
                 }
                 else
-                    throttle_calls = 4;
+                    throttle_calls = 0;
                 last_time = t1;
             }
         }

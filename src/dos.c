@@ -1096,6 +1096,9 @@ void int21()
         }
         else
         {
+            // Wake-up keyboard on character output. This is needed so that
+            // VEDIT writes faster to the screen, see issue #71
+            keyb_wakeup();
             dos_putchar(cpuGetDX() & 0xFF, 1);
             cpuSetAL(cpuGetDX());
         }
