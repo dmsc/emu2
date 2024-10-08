@@ -873,6 +873,10 @@ void int10()
             int addr = cpuGetAddrES(cpuGetDI());
             if(addr < 0xFFF00)
             {
+                int scan_code = vid_scan_lines <= 200   ? 0
+                                : vid_scan_lines <= 350 ? 1
+                                : vid_scan_lines <= 400 ? 2
+                                                        : 3;
                 // Store state information
                 memset(memory + addr, 0, 64);
                 memory[addr + 0] = 0x00; // static-func table at C000:0100
@@ -881,11 +885,15 @@ void int10()
                 memory[addr + 3] = 0xC0; // ...
                 // First 30 bytes copied from BIOS memory 40h:49h to 40h:66h
                 memcpy(memory + addr + 4, memory + 0x449, 30);
-                memcpy(memory + addr + 34, memory + 0x484, 5);
+                memory[addr + 34] = vid_sy;              // # of rows
+                memory[addr + 35] = vid_font_lines;      // # of scan lines in font
+                memory[addr + 36] = 0;                   //
+                memory[addr + 37] = 8;                   // combination code, analog VGA
+                memory[addr + 38] = 0;                   //
                 memory[addr + 39] = 0x10;                //
                 memory[addr + 40] = 0x00;                // # of colors: 0010
                 memory[addr + 41] = vid_sy > 25 ? 4 : 8; // # of pages
-                memory[addr + 42] = 2;                   // # of scan-lines - from vid_sy
+                memory[addr + 42] = scan_code;           // # of scan-lines
                 memory[addr + 49] = 3;                   // 256k memory
                 cpuSetAX(0x1B1B);
             }
