@@ -674,7 +674,7 @@ static void dos_find_next_fcb(void)
         if(exfcb)
         {
             memory[dosDTA] = 0xFF;
-            memory[dosDTA + 6] = memory[ofcb, 0x0C];
+            memory[dosDTA + 6] = memory[ofcb + 0x0C];
         }
         p->find_first_ptr++;
         cpuSetAL(0x00);
