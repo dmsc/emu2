@@ -328,8 +328,12 @@ static void dos_open_file_fcb(int create)
     put16(fcb_addr + 0x16, 0);   // time of last write
     put16(fcb_addr + 0x18, h);   // reserved - store DOS handle!
     memory[fcb_addr + 0x20] = 0; // current record
+    // Do not initialize random position - old DOS apps assume each FCB holds
+    // up to 33 bytes.
+#if 0
     put16(fcb_addr + 0x21, 0);   // random position - only 3 bytes
     memory[fcb_addr + 0x23] = 0;
+#endif
 
     debug(debug_dos, "OK.\n");
     cpuClrFlag(cpuFlag_CF);
