@@ -1216,10 +1216,7 @@ void int21()
             cpuSetAL(0xFF);
         }
         else
-        {
-            memory[fcb_addr + 0x1] = 0xE5; // Marker for file deleted
             cpuSetAL(0x00);
-        }
         break;
     }
     case 0x14: // SEQUENTIAL READ USING FCB
