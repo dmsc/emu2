@@ -1238,6 +1238,13 @@ void int21()
         {
             int fcb_addr = get_fcb();
             char *fname1 = dos_unix_path_fcb(fcb_addr, 0, append_path());
+            if(!fname1)
+            {
+                debug(debug_dos, "\t(file not found)\n");
+                cpuSetAL(0xFF);
+                cpuSetFlag(cpuFlag_CF);
+                break;
+            }
             // Backup old name, and copy new name to standard location
             uint8_t buf[11];
             memcpy(buf, memory + fcb_addr + 1, 11);
@@ -1245,9 +1252,10 @@ void int21()
             char *fname2 = dos_unix_path_fcb(fcb_addr, 1, append_path());
             // Restore name
             memcpy(memory + fcb_addr + 1, buf, 11);
-            if(!fname1 || !fname2)
+            if(!fname2)
             {
-                debug(debug_dos, "\t(file not found)\n");
+                free(fname1);
+                debug(debug_dos, "\t(destination invalid)\n");
                 cpuSetAL(0xFF);
                 cpuSetFlag(cpuFlag_CF);
                 break;
@@ -1993,8 +2001,17 @@ void int21()
             debug(debug_dos, "\t(file not found)\n");
             cpuSetAX(0x02);
             cpuSetFlag(cpuFlag_CF);
+            break;
         }
         char *fname2 = dos_unix_path(cpuGetAddrES(cpuGetDI()), 1, 0);
+        if(!fname2)
+        {
+            free(fname1);
+            debug(debug_dos, "\t(destination not found)\n");
+            cpuSetAX(0x03);
+            cpuSetFlag(cpuFlag_CF);
+            break;
+        }
         debug(debug_dos, "\t'%s' -> '%s'\n", fname1, fname2);
         int e = rename(fname1, fname2);
         free(fname2);
