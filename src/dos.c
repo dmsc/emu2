@@ -1230,6 +1230,37 @@ void int21()
     case 0x16: // CREATE FILE USING FCB
         dos_open_file_fcb(1);
         break;
+    case 0x17: // RENAME FILE USING FCB
+        {
+            int fcb_addr = get_fcb();
+            char *fname1 = dos_unix_path_fcb(fcb_addr, 0, append_path());
+            // Backup old name, and copy new name to standard location
+            uint8_t buf[11];
+            memcpy(buf, memory + fcb_addr + 1, 11);
+            memcpy(memory + fcb_addr + 1, memory + fcb_addr + 0x11, 11);
+            char *fname2 = dos_unix_path_fcb(fcb_addr, 1, append_path());
+            // Restore name
+            memcpy(memory + fcb_addr + 1, buf, 11);
+            if(!fname1 || !fname2)
+            {
+                debug(debug_dos, "\t(file not found)\n");
+                cpuSetAL(0xFF);
+                cpuSetFlag(cpuFlag_CF);
+                break;
+            }
+            int e = rename(fname1, fname2);
+            free(fname2);
+            free(fname1);
+            if(e)
+            {
+                cpuSetAL(0xFF);
+                cpuSetFlag(cpuFlag_CF);
+                break;
+            }
+            cpuSetAL(0);
+            cpuClrFlag(cpuFlag_CF);
+        }
+        break;
     case 0x19: // GET DEFAULT DRIVE
         debug(debug_dos, "\tget default drive = '%c'\n", dos_get_default_drive() + 'A');
         cpuSetAL(dos_get_default_drive());
