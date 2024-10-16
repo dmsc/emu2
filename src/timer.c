@@ -13,28 +13,31 @@ static uint32_t bios_timer = 0;
 static uint16_t bios_dater = 0;
 static uint64_t start_timer = 0;
 
-// Reads BIOS timer, real frequency is (19663/1080)Hz
-int64_t time_to_bios(struct timeval tv, struct timezone *tz)
+// Reads BIOS timer.
+// We emulate the timer as counting exactly 1573040 (0x1800B0) counts per day,
+// as per IBM PC standard; this gives a frequency of (19663/1080)Hz
+static int64_t time_to_bios(struct timeval tv)
 {
-    int64_t sec = tv.tv_sec - tz->tz_minuteswest * 60;
+    int64_t sec = tv.tv_sec;
     int64_t usec = tv.tv_usec;
-
     return sec * 19663 / 1080 + usec * 19663 / 1080000000;
 }
 
 void update_timer(void)
 {
     struct timeval tv;
-    struct timezone tz;
-    gettimeofday(&tv, &tz);
+    gettimeofday(&tv, 0);
     if(start_timer == 0) {
+        // Create a time_t value at the start of the day, in local time
         struct timeval td = tv;
-        int day = (tv.tv_sec - tz.tz_minuteswest * 60) / (24 * 60 * 60);
-        td.tv_sec = day * (24 * 60 * 60) + tz.tz_minuteswest * 60;
-        start_timer = time_to_bios(td, &tz);
+        struct tm lt;
+        localtime_r(&td.tv_sec, &lt);
+        lt.tm_sec = lt.tm_min = lt.tm_hour = 0;
+        td.tv_sec = mktime(&lt);
+        start_timer = time_to_bios(td);
     }
 
-    long cnt = time_to_bios(tv, &tz) - start_timer;
+    long cnt = time_to_bios(tv) - start_timer;
     bios_timer = cnt % 0x1800B0;
     bios_dater = (cnt / 0x1800B0) & 0xFF;
     put32(0x46C, bios_timer);
@@ -42,12 +45,11 @@ void update_timer(void)
 }
 
 // Set BIOS timer directly
-void set_timer(unsigned x)
+static void set_timer(unsigned x)
 {
     struct timeval tv;
-    struct timezone tz;
-    gettimeofday(&tv, &tz);
-    start_timer = time_to_bios(tv, &tz) + x;
+    gettimeofday(&tv, 0);
+    start_timer = time_to_bios(tv) + x;
     update_timer();
 }
 
