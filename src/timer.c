@@ -11,22 +11,44 @@
 // Emulate BIOS time
 static uint32_t bios_timer = 0;
 static uint16_t bios_dater = 0;
+static uint64_t start_timer = 0;
+
+// Reads BIOS timer, real frequency is (19663/1080)Hz
+int64_t time_to_bios(struct timeval tv, struct timezone *tz)
+{
+    int64_t sec = tv.tv_sec - tz->tz_minuteswest * 60;
+    int64_t usec = tv.tv_usec;
+
+    return sec * 19663 / 1080 + usec * 19663 / 1080000000;
+}
+
 void update_timer(void)
 {
     struct timeval tv;
     struct timezone tz;
-    static long start_day = 0;
     gettimeofday(&tv, &tz);
-    if(start_day == 0)
-        start_day = (tv.tv_sec - tz.tz_minuteswest * 60) / (24 * 60 * 60);
+    if(start_timer == 0) {
+        struct timeval td = tv;
+        int day = (tv.tv_sec - tz.tz_minuteswest * 60) / (24 * 60 * 60);
+        td.tv_sec = day * (24 * 60 * 60) + tz.tz_minuteswest * 60;
+        start_timer = time_to_bios(td, &tz);
+    }
 
-    int isec = (tv.tv_sec - tz.tz_minuteswest * 60) - (24 * 60 * 60) * start_day;
-    long cnt = lrint((isec + tv.tv_usec * 0.000001) * 19663.0 / 1080.0);
-
+    long cnt = time_to_bios(tv, &tz) - start_timer;
     bios_timer = cnt % 0x1800B0;
-    bios_dater = cnt / 0x1800B0;
+    bios_dater = (cnt / 0x1800B0) & 0xFF;
     put32(0x46C, bios_timer);
-    memory[0x470] = bios_dater & 0xFF;
+    memory[0x470] = bios_dater;
+}
+
+// Set BIOS timer directly
+void set_timer(unsigned x)
+{
+    struct timeval tv;
+    struct timezone tz;
+    gettimeofday(&tv, &tz);
+    start_timer = time_to_bios(tv, &tz) + x;
+    update_timer();
 }
 
 // Emulate i8253 timers
@@ -237,6 +259,14 @@ void int1A(void)
         cpuSetCX((bios_timer >> 16) & 0xFFFF);
         cpuSetAX(bios_dater);
         debug(debug_int, "GET TIME: %02x:%04x:%04x\n", cpuGetAX(), cpuGetCX(),
+              cpuGetDX());
+        break;
+    }
+    case 1: // SET SYSTEM TIME
+    {
+        unsigned t = cpuGetDX() + (cpuGetCX() << 16);
+        set_timer(t);
+        debug(debug_int, "SET TIME: %02x:%04x:%04x\n", cpuGetAX(), cpuGetCX(),
               cpuGetDX());
         break;
     }
