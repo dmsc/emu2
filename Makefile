@@ -22,7 +22,7 @@ OBJS=\
 all: obj emu2
 
 emu2: $(OBJS:%=obj/%)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LDLIBS)
 
 obj/%.o: src/%.c
 	$(CC) $(CFLAGS) -c -o $@ $<
@@ -32,7 +32,7 @@ obj:
 clean:
 	rm -f $(OBJS:%=obj/%)
 	rm -f emu2
-	rmdir obj
+	test -d obj && rmdir obj || true
 
 install: emu2
 	$(INSTALL) -d $(DESTDIR)${PREFIX}/bin
