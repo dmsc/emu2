@@ -1,10 +1,11 @@
-CC=cc
-CFLAGS=-O3 -flto -Wall -g -Werror=implicit-function-declaration -Werror=int-conversion
-LDLIBS=-lm
-INSTALL=install
-PREFIX=/usr
+CC?=cc
+CFLAGS?=-O3 -flto -Wall -g -Werror=implicit-function-declaration -Werror=int-conversion
+LDLIBS?=-lm
+INSTALL?=install
+PREFIX?=/usr
 
 OBJS=\
+ asprintf.o\
  cpu.o\
  loader.o\
  main.o\
@@ -22,7 +23,7 @@ OBJS=\
 all: obj emu2
 
 emu2: $(OBJS:%=obj/%)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LDLIBS)
 
 obj/%.o: src/%.c
 	$(CC) $(CFLAGS) -c -o $@ $<
@@ -32,7 +33,7 @@ obj:
 clean:
 	rm -f $(OBJS:%=obj/%)
 	rm -f emu2
-	rmdir obj
+	test -d obj && rmdir obj || true
 
 install: emu2
 	$(INSTALL) -d $(DESTDIR)${PREFIX}/bin

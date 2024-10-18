@@ -118,7 +118,7 @@ void bios_routine(unsigned inum)
     else if(inum == 0x19)
         int19();
     else if(inum == 0x16)
-        int16();
+        xint16();
     else if(inum == 0x10)
         int10();
     else if(inum == 0x11)
