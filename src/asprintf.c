@@ -26,6 +26,12 @@
 #include <stdio.h> /* for vsnprintf */
 #include <stdlib.h>
 
+#ifdef _AIX
+# ifndef HAVE_VA_COPY
+#  define HAVE_VA_COPY
+# endif
+#endif
+
 #ifndef VA_COPY
 # ifdef HAVE_VA_COPY
 #  define VA_COPY(dest, src) va_copy(dest, src)
