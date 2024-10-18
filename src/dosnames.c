@@ -5,6 +5,7 @@
 #include "dbg.h"
 #include "emu.h"
 #include "env.h"
+#include "asprintf.h"
 #include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
