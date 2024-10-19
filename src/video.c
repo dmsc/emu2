@@ -629,7 +629,7 @@ void video_putch(char ch)
 }
 
 // VIDEO int
-void int10()
+void intr10()
 {
     debug(debug_int, "V-10%04X: BX=%04X\n", cpuGetAX(), cpuGetBX());
     debug(debug_video, "V-10%04X: BX=%04X CX=%04X DX=%04X\n", cpuGetAX(), cpuGetBX(),

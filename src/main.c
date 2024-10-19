@@ -61,22 +61,22 @@ void emulator_update(void)
 }
 
 // BIOS - GET EQUIPMENT FLAG
-static void int11(void)
+static void intr11(void)
 {
     cpuSetAX(0x0021);
 }
 
 // BIOS - GET MEMORY
-static void int12(void)
+static void intr12(void)
 {
     cpuSetAX(640);
 }
 
 // Network access, ignored.
-static void int2a(void) {}
+static void intr2a(void) {}
 
 // Absolute disk read
-static void int25(void)
+static void intr25(void)
 {
     debug(debug_int, "D-25%04X: CX=%04X\n", cpuGetAX(), cpuGetCX());
     // AH=80 : timeout
@@ -98,7 +98,7 @@ static void int25(void)
 }
 
 // System Reset
-static void int19(void)
+static void intr19(void)
 {
     debug(debug_int, "INT 19: System reset!\n");
     exit(0);
@@ -108,23 +108,23 @@ static void int19(void)
 void bios_routine(unsigned inum)
 {
     if(inum == 0x21)
-        int21();
+        intr21();
     else if(inum == 0x20)
-        int20();
+        intr20();
     else if(inum == 0x22)
-        int22();
+        intr22();
     else if(inum == 0x1A)
-        int1A();
+        intr1A();
     else if(inum == 0x19)
-        int19();
+        intr19();
     else if(inum == 0x16)
-        int16();
+        intr16();
     else if(inum == 0x10)
-        int10();
+        intr10();
     else if(inum == 0x11)
-        int11();
+        intr11();
     else if(inum == 0x12)
-        int12();
+        intr12();
     else if(inum == 0x06)
     {
         uint16_t ip = cpuGetStack(0);
@@ -133,15 +133,15 @@ void bios_routine(unsigned inum)
                     memory[cpuGetAddress(cs, ip)], cs, ip);
     }
     else if(inum == 0x28)
-        int28();
+        intr28();
     else if(inum == 0x25)
-        int25();
+        intr25();
     else if(inum == 0x29)
-        int29();
+        intr29();
     else if(inum == 0x2A)
-        int2a();
+        intr2a();
     else if(inum == 0x2f)
-        int2f();
+        intr2f();
     else if(inum == 0x8)
         ; // Timer interrupt - nothing to do
     else if(inum == 0x9)

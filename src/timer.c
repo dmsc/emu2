@@ -248,7 +248,7 @@ static uint16_t bcd(uint16_t v, int digits)
 }
 
 // BIOS TIMER
-void int1A(void)
+void intr1A(void)
 {
     debug(debug_int, "B-1A%04X: BX=%04X\n", cpuGetAX(), cpuGetBX());
     unsigned ax = cpuGetAX();

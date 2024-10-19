@@ -443,7 +443,7 @@ static int get_attributes(mode_t md)
 }
 
 // DOS int 21, ah=43
-static void int21_43(void)
+static void intr21_43(void)
 {
     unsigned al = cpuGetAX() & 0xFF;
     int dname = cpuGetAddrDS(cpuGetDX());
@@ -700,7 +700,7 @@ static void dos_find_first_fcb(void)
 }
 
 // DOS int 21, ah=57
-static void int21_57(void)
+static void intr21_57(void)
 {
     unsigned al = cpuGetAX() & 0xFF;
     FILE *f = handles[cpuGetBX()];
@@ -772,7 +772,7 @@ static void dos_putchar(uint8_t ch, int fd)
         fputc(ch, handles[fd]);
 }
 
-static void int21_9(void)
+static void intr21_9(void)
 {
     int i = cpuGetAddrDS(cpuGetDX());
 
@@ -856,7 +856,7 @@ static int run_emulator(char *file, const char *prgname, char *cmdline, char *en
 }
 
 // DOS exit
-void int20()
+void intr20()
 {
     exit(0);
 }
@@ -952,7 +952,7 @@ static int line_input(FILE *f, uint8_t *buf, int max)
     }
 }
 
-static void int21_debug(void)
+static void intr21_debug(void)
 {
     static const char *func_names[] =
     {
@@ -1009,7 +1009,7 @@ static void int21_debug(void)
 
 // DOS int 2f
 // Static set of functions used for DOS devices/extensions and TSR installation checks
-void int2f()
+void intr2f()
 {
     debug(debug_int, "D-2F%04X: BX=%04X\n", cpuGetAX(), cpuGetBX());
     unsigned ax = cpuGetAX();
@@ -1041,7 +1041,7 @@ void int2f()
 }
 
 // DOS int 21
-void int21()
+void intr21()
 {
     // Check CP/M call, INT 21h from address 0x000C0
     if(cpuGetAddress(cpuGetStack(2), cpuGetStack(0)) == 0xC2)
@@ -1058,14 +1058,14 @@ void int21()
         put16(stack + 2, cs);
         put16(stack + 4, flags);
         // Call ourselves
-        int21();
+        intr21();
         // Restore AH
         cpuSetAX((old_ax & 0xFF00) | (cpuGetAX() & 0xFF));
         return;
     }
     debug(debug_int, "D-21%04X: BX=%04X\n", cpuGetAX(), cpuGetBX());
     if(debug_active(debug_dos))
-        int21_debug();
+        intr21_debug();
 
     // Process interrupt
     unsigned ax = cpuGetAX(), ah = ax >> 8;
@@ -1120,7 +1120,7 @@ void int21()
         char_input(1);
         break;
     case 0x9: // WRITE STRING
-        int21_9();
+        intr21_9();
         break;
     case 0xA: // BUFFERED INPUT
     {
@@ -1176,7 +1176,7 @@ void int21()
         case 0x08:
         case 0x0A:
             cpuSetAX(ax << 8);
-            int21();
+            intr21();
             return;
         }
         break;
@@ -1689,7 +1689,7 @@ void int21()
         break;
     }
     case 0x43: // DOS 2+ file attributes
-        int21_43();
+        intr21_43();
         break;
     case 0x44:
     {
@@ -2031,7 +2031,7 @@ void int21()
         break;
     }
     case 0x57: // DATE/TIME
-        int21_57();
+        intr21_57();
         break;
     case 0x58: // MEMORY ALLOCATION STRATEGY
     {
@@ -2124,7 +2124,7 @@ void int21()
 }
 
 // DOS int 22 - TERMINATE ADDRESS
-void int22()
+void intr22()
 {
     debug(debug_dos, "D-22: TERMINATE HANDLER CALLED\n");
     // If we reached here, we must terminate now
@@ -2410,12 +2410,12 @@ void init_dos(int argc, char **argv)
     cpuClrStartupFlag(cpuFlag_TF);
 }
 
-void int28(void)
+void intr28(void)
 {
     usleep(1); // TODO: process messages?
 }
 
-void int29(void)
+void intr29(void)
 {
     int ax = cpuGetAX();
     // Fast video output

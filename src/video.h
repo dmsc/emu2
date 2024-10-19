@@ -2,7 +2,7 @@
 
 #include <stdint.h>
 
-void int10(void);
+void intr10(void);
 // Redraws terminal screen
 void check_screen(void);
 // Returns 1 if video emulation is active.
