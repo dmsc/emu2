@@ -791,8 +791,8 @@ static int run_emulator(char *file, const char *prgname, char *cmdline, char *en
         print_error("fork error, %s\n", strerror(errno));
     else if(pid != 0)
     {
-        int ret, status;
-        while((ret = waitpid(pid, &status, 0)) == -1)
+        int status;
+        while(waitpid(pid, &status, 0) == -1)
         {
             if(errno != EINTR)
             {
