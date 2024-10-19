@@ -658,7 +658,6 @@ char *dos_unix_path_fcb(int addr, int force, const char *append)
     // Build complete path, copy current directory and add FCB file name
     char path[64];
     memcpy(path, dos_cwd[drive], 64);
-    opos = strlen(path);
 
     if(snprintf(path, 64, "%s\\%s", dos_cwd[drive], filename) >= 64)
         return 0; // Path too long
@@ -789,6 +788,7 @@ char *dos_real_path(const char *unix_path)
                     path + l, path);
             free(base);
             free(path);
+            free(ret);
             return 0;
         }
         strncat(ret, "\\", 64);
