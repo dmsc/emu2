@@ -2426,10 +2426,10 @@ static void do_instruction(uint8_t code)
     case 0x85: OP_wr16(TEST);
     case 0x86: i_xchg_br8();                                   break;
     case 0x87: i_xchg_wr16();                                  break;
-    case 0x88: OP_br8(MOV);                                    break;
-    case 0x89: OP_wr16(MOV);                                   break;
-    case 0x8a: OP_r8b(MOV);                                    break;
-    case 0x8b: OP_r16w(MOV);                                   break;
+    case 0x88: OP_br8(MOV);
+    case 0x89: OP_wr16(MOV);
+    case 0x8a: OP_r8b(MOV);
+    case 0x8b: OP_r16w(MOV);
     case 0x8c: i_mov_wsreg();                                  break;
     case 0x8d: i_lea();                                        break;
     case 0x8e: i_mov_sregw();                                  break;
