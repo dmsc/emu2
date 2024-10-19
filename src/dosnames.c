@@ -788,7 +788,6 @@ char *dos_real_path(const char *unix_path)
                     path + l, path);
             free(base);
             free(path);
-            free(ret);
             return 0;
         }
         strncat(ret, "\\", 64);

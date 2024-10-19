@@ -410,7 +410,6 @@ static void debug_screen(void)
         buf[vid_sx] = 0;
         debug(debug_video, "%02d: %s\n", y, buf);
     }
-    free(buf);
 }
 
 // Compares current screen with memory data

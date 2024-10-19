@@ -269,7 +269,6 @@ void set_codepage(const char *cp_name)
                 return;
             }
         }
-        free(names);
     }
     if(!read_codepage_file(cp_name))
         print_error("missing or unknown codepage '%s', use '?' for a list.\n", cp_name);
