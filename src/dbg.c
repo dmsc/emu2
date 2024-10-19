@@ -8,10 +8,22 @@
 
 char *prog_name;
 
+void print_version(int quit)
+{
+    printf("EMU2 - Simple x86 + DOS Emulator, version " EMU2_VERSION
+#ifdef __DATE__
+           "  (Compiled " __DATE__ ")"
+#endif
+           "\n");
+
+    if (quit)
+        exit(EXIT_SUCCESS);
+}
+
 void print_usage(void)
 {
-    printf("EMU2 - Simple x86 + DOS Emulator, version " EMU2_VERSION "\n"
-           "\n"
+    print_version(0);
+    printf("\n"
            "Usage: %s [options] <prog.exe> [args...] [-- environment vars]\n"
            "\n"
            "Options (processed before program name):\n"

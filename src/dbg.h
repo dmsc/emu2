@@ -4,6 +4,7 @@
 
 extern char *prog_name;
 
+void print_version(int quit);
 void print_usage(void);
 void print_usage_error(const char *format, ...) __attribute__((format(printf, 1, 2)));
 void print_error(const char *format, ...) __attribute__((format(printf, 1, 2)));
