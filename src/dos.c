@@ -792,7 +792,7 @@ static int run_emulator(char *file, const char *prgname, char *cmdline, char *en
     else if(pid != 0)
     {
         int status;
-        while((waitpid(pid, &status, 0)) == -1)
+        while(waitpid(pid, &status, 0) == -1)
         {
             if(errno != EINTR)
             {
