@@ -109,7 +109,7 @@ void init_debug(const char *base)
 
 int debug_active(enum debug_type dt)
 {
-    if(dt >= 0 && dt < debug_MAX)
+    if(dt < debug_MAX)
         return debug_files[dt] != 0;
     else
         return 0;
