@@ -200,8 +200,8 @@ static struct dos_file_list *dos_read_dir(const char *path, const char *glob, in
     int i;
     for(i = 0; i < n; free(dir[i]), i++)
     {
-        char *fpath;
-        if(-1 == asprintf(&fpath, "%s/%s", path, dir[i]->d_name))
+        char *fpath = malloc(strlen(path) + strlen(dir[i]->d_name) + 2);
+        if(!fpath || -1 == sprintf(fpath, "%s/%s", path, dir[i]->d_name))
             continue;
         // Spacial case "." and "..", only on "full directory" mode
         if(!strcmp(dir[i]->d_name, ".") || !strcmp(dir[i]->d_name, ".."))
@@ -323,10 +323,11 @@ static void str_lcase(char *str)
 static char *dos_unix_name(const char *path, const char *dosN, int force)
 {
     // First, try the name as given:
-    char *ret;
     struct stat st;
     const char *bpath = strcmp(path, "/") ? path : "";
-    if(-1 == asprintf(&ret, "%s/%s", bpath, dosN))
+    // Allocate a buffer big enough
+    char *ret = malloc(strlen(bpath) + strlen(dosN) + 2);
+    if(!ret || -1 == sprintf(ret, "%s/%s", bpath, dosN))
         return 0;
     if(0 == stat(ret, &st))
         return ret;
