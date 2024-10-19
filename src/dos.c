@@ -618,7 +618,7 @@ static void dos_find_first(void)
     p->find_first_list = dos_find_first_file(cpuGetAddrDS(cpuGetDX()), do_label, do_dirs);
 
     p->find_first_ptr = p->find_first_list;
-    return dos_find_next(1);
+    dos_find_next(1);
 }
 
 static void dos_find_next_fcb(void)
@@ -696,7 +696,7 @@ static void dos_find_first_fcb(void)
     int do_label = (memory[efcb] == 0xFF && memory[efcb + 6] == 0x08);
     p->find_first_list = dos_find_first_file_fcb(get_fcb(), do_label);
     p->find_first_ptr = p->find_first_list;
-    return dos_find_next_fcb();
+    dos_find_next_fcb();
 }
 
 // DOS int 21, ah=57
