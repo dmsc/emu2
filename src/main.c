@@ -320,13 +320,19 @@ int main(int argc, char **argv)
     else
         init_dos(argc - 1, argv + 1);
 
-    signal(SIGALRM, timer_alarm);
+    struct sigaction timer_action, exit_action;
+    exit_action.sa_handler = exit_handler;
+    timer_action.sa_handler = timer_alarm;
+    sigemptyset(&exit_action.sa_mask);
+    sigemptyset(&timer_action.sa_mask);
+    exit_action.sa_flags = timer_action.sa_flags = 0;
+    sigaction(SIGALRM, &timer_action, NULL);
     // Install an exit handler to allow exit functions to run
-    signal(SIGHUP, exit_handler);
-    signal(SIGINT, exit_handler);
-    signal(SIGQUIT, exit_handler);
-    signal(SIGPIPE, exit_handler);
-    signal(SIGTERM, exit_handler);
+    sigaction(SIGHUP, &exit_action, NULL);
+    sigaction(SIGINT, &exit_action, NULL);
+    sigaction(SIGQUIT, &exit_action, NULL);
+    sigaction(SIGPIPE, &exit_action, NULL);
+    sigaction(SIGTERM, &exit_action, NULL);
     struct itimerval itv;
     itv.it_interval.tv_sec = 0;
     itv.it_interval.tv_usec = 54925;
