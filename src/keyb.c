@@ -2,6 +2,7 @@
 #include "codepage.h"
 #include "dbg.h"
 #include "emu.h"
+#include "os.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -377,7 +378,15 @@ static void set_raw_term(int raw)
         struct termios newattr;
         tcgetattr(tty_fd, &oldattr);
         newattr = oldattr;
+#if defined(NO_CFMAKERAW)
+        newattr.c_iflag &= ~(IMAXBEL|IGNBRK|BRKINT|PARMRK|ISTRIP|INLCR|IGNCR|ICRNL|IXON);
+        newattr.c_oflag &= ~OPOST;
+        newattr.c_lflag &= ~(ECHO|ECHONL|ICANON|ISIG|IEXTEN);
+        newattr.c_cflag &= ~(CSIZE|PARENB);
+        newattr.c_cflag |= CS8;
+#else
         cfmakeraw(&newattr);
+#endif
         newattr.c_cc[VMIN] = 0;
         newattr.c_cc[VTIME] = 0;
         tcsetattr(tty_fd, TCSANOW, &newattr);
