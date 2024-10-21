@@ -575,7 +575,7 @@ void keyb_handle_irq(void)
 }
 
 // BIOS keyboards handler
-void intr16()
+void intr16(void)
 {
     debug(debug_int, "B-16%04X: BX=%04X\n", cpuGetAX(), cpuGetBX());
     unsigned ax = cpuGetAX();
