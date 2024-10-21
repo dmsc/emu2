@@ -8,6 +8,7 @@
 #include "keyb.h"
 #include "timer.h"
 #include "video.h"
+#include "os.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -98,7 +99,7 @@ static void intr25(void)
 }
 
 // System Reset
-static void intr19(void)
+__noreturn static void intr19(void)
 {
     debug(debug_int, "INT 19: System reset!\n");
     exit(0);
@@ -185,7 +186,7 @@ static void timer_alarm(int x)
     exit_cpu = 1;
 }
 
-static void exit_handler(int x)
+__noreturn static void exit_handler(int x)
 {
     exit(1);
 }
