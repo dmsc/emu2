@@ -32,7 +32,7 @@ static uint32_t dos_sysvars;
 static uint32_t dos_append;
 
 // Returns "APPEND" path, if activated:
-static const char *append_path()
+static const char *append_path(void)
 {
     return (memory[dos_append] & 0x01) ? ((char *)memory + dos_append + 2) : 0;
 }
@@ -272,7 +272,7 @@ static int get_fcb_handle(void)
     return get16(0x18 + get_fcb());
 }
 
-static void dos_show_fcb()
+static void dos_show_fcb(void)
 {
     if(!debug_active(debug_dos))
         return;
@@ -856,7 +856,7 @@ static int run_emulator(char *file, const char *prgname, char *cmdline, char *en
 }
 
 // DOS exit
-void intr20()
+void intr20(void)
 {
     exit(0);
 }
@@ -884,7 +884,7 @@ static void char_input(int brk)
 }
 
 // Returns true if a character to read is pending
-static int char_pending()
+static int char_pending(void)
 {
     return (inp_last_key != 0) || kbhit();
 }
@@ -1009,7 +1009,7 @@ static void intr21_debug(void)
 
 // DOS int 2f
 // Static set of functions used for DOS devices/extensions and TSR installation checks
-void intr2f()
+void intr2f(void)
 {
     debug(debug_int, "D-2F%04X: BX=%04X\n", cpuGetAX(), cpuGetBX());
     unsigned ax = cpuGetAX();
@@ -1041,7 +1041,7 @@ void intr2f()
 }
 
 // DOS int 21
-void intr21()
+void intr21(void)
 {
     // Check CP/M call, INT 21h from address 0x000C0
     if(cpuGetAddress(cpuGetStack(2), cpuGetStack(0)) == 0xC2)
@@ -2124,7 +2124,7 @@ void intr21()
 }
 
 // DOS int 22 - TERMINATE ADDRESS
-void intr22()
+void intr22(void)
 {
     debug(debug_dos, "D-22: TERMINATE HANDLER CALLED\n");
     // If we reached here, we must terminate now
