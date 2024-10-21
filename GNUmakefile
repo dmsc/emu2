@@ -1,8 +1,11 @@
+SHELL=/bin/sh
 CC?=cc
-CFLAGS?=-O3 -flto -Wall -g -Werror=implicit-function-declaration -Werror=int-conversion
+CFLAGS?=-O3 -g
 LDLIBS?=-lm
 INSTALL?=install
 PREFIX?=/usr
+
+include platform.mk
 
 OBJS=\
  cpu.o\
@@ -22,7 +25,7 @@ OBJS=\
 all: obj emu2
 
 emu2: $(OBJS:%=obj/%)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LDLIBS)
+	$(CC) -o $@ $^ $(LDFLAGS) $(LDLIBS)
 
 obj/%.o: src/%.c
 	$(CC) $(CFLAGS) -c -o $@ $<
