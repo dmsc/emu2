@@ -405,8 +405,8 @@ static void mcb_new(int mcb, int owner, int size, int last)
     memory[mcb * 16 + 0] = last ? 'Z' : 'M';
     put16(mcb * 16 + 1, owner);
     put16(mcb * 16 + 3, size);
-    debug(debug_dos, "\tmcb_new: mcb:$%04X type:%c owner:$%04X size:$%04X\n", mcb,
-          last ? 'Z' : 'M', owner, size);
+    debug(debug_dos, "\tmcb_new: mcb:$%04X type:%c owner:$%04X size:$%04X\n",
+          (unsigned)mcb, last ? 'Z' : 'M', (unsigned)owner, (unsigned)size);
 }
 
 static int mcb_size(int mcb)
@@ -546,7 +546,7 @@ int mcb_alloc_new(int size, int owner, int *max)
 
 int mcb_resize(int mcb, int size)
 {
-    debug(debug_dos, "\tmcb_resize: mcb:$%04X new size:$%04X\n", mcb, size);
+    debug(debug_dos, "\tmcb_resize: mcb:$%04X new size:$%04X\n", (unsigned)mcb, (unsigned)size);
     if(mcb_size(mcb) == size) // Do nothing!
         return size;
     int max = mcb_grow_max(mcb);
@@ -648,7 +648,7 @@ uint16_t create_PSP(const char *cmdline, const char *environment, int env_size,
             debug(debug_dos, "\tenv: '%s'\n", p);
             p += strlen(p) + 1;
         }
-        debug(debug_dos, "\tenv size: %d at $%04x\n", env_size, env_mcb + 1);
+        debug(debug_dos, "\tenv size: %d at $%04x\n", env_size, (unsigned)(env_mcb + 1));
     }
 
     // Fill MCB owners:
@@ -829,7 +829,7 @@ int dos_load_exe(FILE *f, uint16_t psp_mcb)
     int extra_bytes = g16(buf + 2);
     if(data_blocks & 0xF800)
     {
-        debug(debug_dos, "\tinvalid number of blocks ($%04x), fixing.\n", data_blocks);
+        debug(debug_dos, "\tinvalid number of blocks ($%04x), fixing.\n", (unsigned)data_blocks);
         data_blocks &= 0x07FF;
     }
     int data_size = data_blocks * 512 - head_size;
@@ -852,7 +852,8 @@ int dos_load_exe(FILE *f, uint16_t psp_mcb)
     }
 
     debug(debug_dos, "\texe: bin=%04x min=%04x max=%04x, alloc %04x segments of memory\n",
-          exe_sz, g16(buf + 10), g16(buf + 12), mcb_size(psp_mcb));
+          (unsigned)exe_sz, (unsigned)g16(buf + 10),
+          (unsigned)g16(buf + 12), (unsigned)mcb_size(psp_mcb));
 
     // Fill top program address in PSP
     put16(psp_mcb * 16 + 16 + 2, psp_mcb + mcb_size(psp_mcb) + 1);
@@ -875,8 +876,8 @@ int dos_load_exe(FILE *f, uint16_t psp_mcb)
     // EXE start at load address
     int start = load_seg * 16;
     // PSP located just 0x100 bytes before
-    debug(debug_dos, "\tPSP location: $%04X\n", psp_mcb + 1);
-    debug(debug_dos, "\tEXE start:    $%04X\n", start >> 4);
+    debug(debug_dos, "\tPSP location: $%04X\n", (unsigned)(psp_mcb + 1));
+    debug(debug_dos, "\tEXE start:    $%04X\n", (unsigned)(start >> 4));
 
     // Get segment values
     cpuSetSS((load_seg + g16(buf + 14)) & 0xFFFF);

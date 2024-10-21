@@ -147,7 +147,7 @@ uint8_t port_timer_read(uint16_t port)
     }
 
     debug(debug_int, "timer port read $%02x = %02x (mode=%02x, r_state=%d, latch=%d)\n",
-          port, ret, t->op_mode, t->rd_mode, t->latched);
+          port, (unsigned)ret, t->op_mode, t->rd_mode, t->latched);
 
     return ret;
 }

@@ -134,7 +134,7 @@ static void create_dir(void)
             cpuSetAX(5);
         else
             cpuSetAX(1);
-        debug(debug_dos, "ERROR %d\n", cpuGetAX());
+        debug(debug_dos, "ERROR %u\n", cpuGetAX());
         return;
     }
     debug(debug_dos, "OK\n");
@@ -158,7 +158,7 @@ static void remove_dir(void)
             cpuSetAX(2);
         else
             cpuSetAX(1);
-        debug(debug_dos, "ERROR %d\n", cpuGetAX());
+        debug(debug_dos, "ERROR %u\n", cpuGetAX());
         return;
     }
     debug(debug_dos, "OK\n");
@@ -207,7 +207,7 @@ static void dos_open_file(int create)
             return;
         }
     }
-    debug(debug_dos, "\topen '%s', '%s', %04x ", fname, mode, h);
+    debug(debug_dos, "\topen '%s', '%s', %04x ", fname, mode, (unsigned)h);
     if(create == 2)
     {
         // Force exclusive access. We could use mode = "x+" in glibc.
@@ -282,9 +282,9 @@ static void dos_show_fcb()
     debug(debug_dos,
           "\tFCB:"
           "[d=%02x:n=%.8s.%.3s:bn=%04x:rs=%04x:fs=%08x:h=%04x:rn=%02x:ra=%08x]\n",
-          memory[addr], name, name + 8, get16(addr + 0x0C), get16(addr + 0x0E),
-          get32(addr + 0x10), get16(addr + 0x18), memory[addr + 0x20],
-          get32(addr + 0x21));
+          memory[addr], name, name + 8, (unsigned)get16(addr + 0x0C),
+          (unsigned)get16(addr + 0x0E), get32(addr + 0x10),
+          (unsigned)get16(addr + 0x18), memory[addr + 0x20], get32(addr + 0x21));
 }
 
 static void dos_open_file_fcb(int create)
@@ -306,7 +306,7 @@ static void dos_open_file_fcb(int create)
         return;
     }
     const char *mode = create ? "w+b" : "r+b";
-    debug(debug_dos, "\topen fcb '%s', '%s', %04x ", fname, mode, h);
+    debug(debug_dos, "\topen fcb '%s', '%s', %04x ", fname, mode, (unsigned)h);
     handles[h] = fopen(fname, mode);
     if(!handles[h])
     {
@@ -473,7 +473,7 @@ static void intr21_43(void)
             else
                 cpuSetAX(1);
             free(fname);
-            debug(debug_dos, "ERROR %d\n", cpuGetAX());
+            debug(debug_dos, "ERROR %u\n", cpuGetAX());
             return;
         }
         int current = get_attributes(st.st_mode);
@@ -491,7 +491,7 @@ static void intr21_43(void)
                 cpuSetFlag(cpuFlag_CF);
                 cpuSetAX(5);
                 free(fname);
-                debug(debug_dos, "ERROR %d\n", cpuGetAX());
+                debug(debug_dos, "ERROR %u\n", cpuGetAX());
                 return;
             }
         }
@@ -804,7 +804,7 @@ static int run_emulator(char *file, const char *prgname, char *cmdline, char *en
         if(!WIFEXITED(status))
             return_code |= 0x100;
         if(return_code)
-            debug(debug_dos, "child exited with code %04x\n", return_code);
+            debug(debug_dos, "child exited with code %04x\n", (unsigned)return_code);
         return return_code > 0xFF;
     }
     else
@@ -1004,7 +1004,8 @@ static void intr21_debug(void)
         fn = "(unknown)";
 
     debug(debug_dos, "D-21%04X: %-15s BX=%04X CX:%04X DX:%04X DI=%04X DS:%04X ES:%04X\n",
-          cur.ax, fn, cur.bx, cur.cx, cur.dx, cur.di, cur.ds, cur.es);
+          (unsigned)cur.ax, fn, (unsigned)cur.bx, (unsigned)cur.cx, (unsigned)cur.dx,
+          (unsigned)cur.di, (unsigned)cur.ds, (unsigned)cur.es);
 }
 
 // DOS int 2f
@@ -1708,7 +1709,7 @@ void intr21()
         switch(al)
         {
         case 0x00: // GET DEV INFO
-            debug(debug_dos, "\t= %04x\n", devinfo[h]);
+            debug(debug_dos, "\t= %04x\n", (unsigned)devinfo[h]);
             cpuSetDX(devinfo[h]);
             // Undocumented, needed for VEDIT INSTALL
             cpuSetAX(devinfo[h]);
@@ -1775,7 +1776,7 @@ void intr21()
             cpuSetFlag(cpuFlag_CF);
             break;
         }
-        debug(debug_dos, "\t%04x -> %04x\n", cpuGetBX(), h);
+        debug(debug_dos, "\t%04x -> %04x\n", cpuGetBX(), (unsigned)h);
         handles[h] = handles[cpuGetBX()];
         devinfo[h] = devinfo[cpuGetBX()];
         cpuSetAX(h);
@@ -1803,7 +1804,7 @@ void intr21()
     {
         // Note: ignore drive letter in DL
         const uint8_t *path = dos_get_cwd(cpuGetDX() & 0xFF);
-        debug(debug_dos, "\tcwd '%c' = '%s'\n", '@' + (cpuGetDX() & 0xFF), path);
+        debug(debug_dos, "\tcwd '%c' = '%s'\n", (char)('@' + (cpuGetDX() & 0xFF)), path);
         putmem(cpuGetAddrDS(cpuGetSI()), path, 64);
         cpuSetAX(0x0100);
         cpuClrFlag(cpuFlag_CF);
@@ -1815,13 +1816,13 @@ void intr21()
         seg = mem_alloc_segment(cpuGetBX(), &max);
         if(seg)
         {
-            debug(debug_dos, "\tallocated at %04x.\n", seg);
+            debug(debug_dos, "\tallocated at %04x.\n", (unsigned)seg);
             cpuSetAX(seg);
             cpuClrFlag(cpuFlag_CF);
         }
         else
         {
-            debug(debug_dos, "\tnot enough memory, max=$%04x paragraphs\n", max);
+            debug(debug_dos, "\tnot enough memory, max=$%04x paragraphs\n", (unsigned)max);
             cpuSetAX(0x8);
             cpuSetBX(max);
             cpuSetFlag(cpuFlag_CF);
@@ -1845,7 +1846,7 @@ void intr21()
             cpuSetAX(0x8);
             cpuSetBX(sz);
             cpuSetFlag(cpuFlag_CF);
-            debug(debug_dos, "\tmax memory available: $%04x\n", sz);
+            debug(debug_dos, "\tmax memory available: $%04x\n", (unsigned)sz);
         }
         break;
     }
@@ -1926,7 +1927,7 @@ void intr21()
     case 0x4C: // EXIT
         // Detect if our PSP is last one
         debug(debug_dos, "\texit PSP:'%04x', PARENT:%04x.\n", get_current_PSP(),
-              get16(cpuGetAddress(get_current_PSP(), 22)));
+              (unsigned)get16(cpuGetAddress(get_current_PSP(), 22)));
         if(0xFFFE == get16(cpuGetAddress(get_current_PSP(), 22)))
             exit(ax & 0xFF);
         else
@@ -2281,7 +2282,7 @@ void init_dos(int argc, char **argv)
         if(*end || major < 1 || major > 6 || minor < 0 || minor > 99)
             print_error("invalid DOS version '%s'\n", ver);
         dosver = (minor << 8) | major;
-        debug(debug_dos, "set dos version to '%s' = 0x%04x\n", ver, dosver);
+        debug(debug_dos, "set dos version to '%s' = 0x%04x\n", ver, (unsigned)dosver);
     }
 
     // Init INTERRUPT handlers - point to our own handlers
@@ -2419,7 +2420,7 @@ void intr29(void)
 {
     int ax = cpuGetAX();
     // Fast video output
-    debug(debug_int, "D-29: AX=%04X\n", ax);
-    debug(debug_dos, "D-29:   fast console out  AX=%04X\n", ax);
+    debug(debug_int, "D-29: AX=%04X\n", (unsigned)ax);
+    debug(debug_dos, "D-29:   fast console out  AX=%04X\n", (unsigned)ax);
     dos_putchar(ax & 0xFF, 1);
 }

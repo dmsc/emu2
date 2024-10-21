@@ -83,13 +83,13 @@ static void term_get_size(void)
             term_sx = 240;
         if(term_sy > 64)
             term_sy = 64;
-        debug(debug_video, "terminal size: %dx%d\n", term_sx, term_sy);
+        debug(debug_video, "terminal size: %ux%u\n", term_sx, term_sy);
     }
     else
     {
         term_sx = 80;
         term_sy = 25;
-        debug(debug_video, "can't get terminal size, assuming %dx%d\n", term_sx, term_sy);
+        debug(debug_video, "can't get terminal size, assuming %ux%u\n", term_sx, term_sy);
     }
 }
 
@@ -211,7 +211,7 @@ static void exit_video(void)
     fputs("\x1b[?7h", tty_file); // Re-enable margin
     fputs("\x1b[m", tty_file);
     fclose(tty_file);
-    debug(debug_video, "exit video - row %d\n", max);
+    debug(debug_video, "exit video - row %u\n", max);
 }
 
 static void init_video(void)
@@ -261,7 +261,7 @@ static void vid_set_font(int lines)
         rows = 64;
     else if(rows < 12)
         rows = 12;
-    debug(debug_video, "set %d lines mode from %d\n", rows, max);
+    debug(debug_video, "set %u lines mode from %u\n", rows, max);
 
     // Clear end-of-screen if we are reducing the height
     if(video_active() && max > rows)
@@ -356,7 +356,7 @@ static void term_goto_xy(unsigned x, unsigned y)
     }
     if(term_posy > y)
     {
-        fprintf(tty_file, "\x1b[%dA", term_posy - y);
+        fprintf(tty_file, "\x1b[%uA", term_posy - y);
         term_posy = y;
     }
     if(x != term_posx)
@@ -364,7 +364,7 @@ static void term_goto_xy(unsigned x, unsigned y)
         if(term_posx != 0)
             putc('\r', tty_file);
         if(x != 0)
-            fprintf(tty_file, "\x1b[%dC", x);
+            fprintf(tty_file, "\x1b[%uC", x);
         term_posx = x;
     }
 }
@@ -408,7 +408,7 @@ static void debug_screen(void)
             buf[x] = cell.chr;
         }
         buf[vid_sx] = 0;
-        debug(debug_video, "%02d: %s\n", y, buf);
+        debug(debug_video, "%02u: %s\n", y, buf);
     }
     free(buf);
 }
@@ -512,7 +512,7 @@ static void vid_scroll_up(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1, int n,
 static void vid_scroll_dwn(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1, unsigned n,
                            int page)
 {
-    debug(debug_video, "scroll down %d: (%d, %d) - (%d, %d)\n", n, x0, y0, x1, y1);
+    debug(debug_video, "scroll down %u: (%d, %d) - (%d, %d)\n", n, x0, y0, x1, y1);
     debug_screen();
 
     // Check parameters
@@ -623,8 +623,8 @@ void video_putch(char ch)
     if(!video_initialized)
         init_video();
     reload_posxy(vid_page);
-    debug(debug_video, "putchar %02x at (%d,%d)\n", ch & 0xFF, vid_posx[vid_page],
-          vid_posy[vid_page]);
+    debug(debug_video, "putchar %02x at (%u,%u)\n", (unsigned)(ch & 0xFF),
+          vid_posx[vid_page], vid_posy[vid_page]);
     video_putchar(ch, 0xFF00, vid_page);
 }
 
@@ -814,14 +814,14 @@ void intr10()
             }
             else
             {
-                debug(debug_video, "UNHANDLED INT 10, AH=12 BL=%02x\n", bl);
+                debug(debug_video, "UNHANDLED INT 10, AH=12 BL=%02x\n", (unsigned)bl);
                 break;
             }
             // Return OK
             cpuSetAX(0x1212);
         }
         else
-            debug(debug_video, "UNHANDLED INT 10, AH=12 BL=%02x\n", bl);
+            debug(debug_video, "UNHANDLED INT 10, AH=12 BL=%02x\n", (unsigned)bl);
     }
     break;
     case 0x13: // WRITE STRING
