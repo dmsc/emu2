@@ -9,6 +9,7 @@
 #include "timer.h"
 #include "utils.h"
 #include "video.h"
+#include "os.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -856,7 +857,7 @@ static int run_emulator(char *file, const char *prgname, char *cmdline, char *en
 }
 
 // DOS exit
-void intr20()
+__noreturn void intr20()
 {
     exit(0);
 }
@@ -2124,7 +2125,7 @@ void intr21()
 }
 
 // DOS int 22 - TERMINATE ADDRESS
-void intr22()
+__noreturn void intr22()
 {
     debug(debug_dos, "D-22: TERMINATE HANDLER CALLED\n");
     // If we reached here, we must terminate now

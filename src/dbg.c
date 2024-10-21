@@ -1,6 +1,8 @@
 #include "dbg.h"
 #include "env.h"
 #include "version.h"
+#include "os.h"
+
 #include <fcntl.h>
 #include <stdarg.h>
 #include <stdlib.h>
@@ -20,7 +22,7 @@ void print_version(int quit)
         exit(EXIT_SUCCESS);
 }
 
-void print_usage(void)
+__noreturn void print_usage(void)
 {
     print_version(0);
     printf("\n"
@@ -52,7 +54,7 @@ void print_usage(void)
     exit(EXIT_SUCCESS);
 }
 
-void print_usage_error(const char *format, ...)
+__noreturn void print_usage_error(const char *format, ...)
 {
     va_list ap;
     fprintf(stderr, "%s: ", prog_name);
@@ -63,7 +65,7 @@ void print_usage_error(const char *format, ...)
     exit(EXIT_FAILURE);
 }
 
-void print_error(const char *format, ...)
+__noreturn void print_error(const char *format, ...)
 {
     va_list ap;
     fprintf(stderr, "%s: ", prog_name);
