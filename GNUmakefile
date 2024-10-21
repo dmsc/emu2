@@ -31,9 +31,8 @@ obj:
 
 .PHONY: clean distclean
 clean distclean:
-	rm -f $(OBJS:%=obj/%)
+	rm -rf obj
 	rm -f emu2
-	test -d obj && rmdir obj || true
 
 .PHONY: install
 install: emu2
