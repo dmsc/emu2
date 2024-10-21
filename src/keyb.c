@@ -30,7 +30,7 @@ static void update_bios_state(void)
 }
 
 // Update keyboard buffer pointer
-void keyb_read_buffer(void)
+static void keyb_read_buffer(void)
 {
     int ptr = (memory[0x41A] - 0x1E) & 0x1F;
     memory[0x41A] = 0x1E + ((ptr + 2) & 0x1F);
