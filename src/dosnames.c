@@ -327,8 +327,12 @@ static char *dos_unix_name(const char *path, const char *dosN, int force)
     const char *bpath = strcmp(path, "/") ? path : "";
     // Allocate a buffer big enough
     char *ret = malloc(strlen(bpath) + strlen(dosN) + 2);
-    if(!ret || -1 == sprintf(ret, "%s/%s", bpath, dosN))
+    if(!ret)
         return 0;
+    if(-1 == sprintf(ret, "%s/%s", bpath, dosN)) {
+        free(ret);
+        return 0;
+    }
     if(0 == stat(ret, &st))
         return ret;
     // See if 'dosN' has glob patterns, and exists in that case,
