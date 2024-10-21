@@ -1,6 +1,8 @@
 #include "dbg.h"
 #include "env.h"
 #include "version.h"
+#include "os.h"
+
 #include <fcntl.h>
 #include <stdarg.h>
 #include <stdlib.h>
@@ -52,7 +54,8 @@ void print_usage(void)
     exit(EXIT_SUCCESS);
 }
 
-void print_usage_error(const char *format, ...)
+PRINTF_FORMAT_ATTR(1, 2)
+void print_usage_error(PRINTF_FORMAT const char *format, ...)
 {
     va_list ap;
     fprintf(stderr, "%s: ", prog_name);
@@ -63,7 +66,8 @@ void print_usage_error(const char *format, ...)
     exit(EXIT_FAILURE);
 }
 
-void print_error(const char *format, ...)
+PRINTF_FORMAT_ATTR(1, 2)
+void print_error(PRINTF_FORMAT const char *format, ...)
 {
     va_list ap;
     fprintf(stderr, "%s: ", prog_name);
@@ -115,7 +119,8 @@ int debug_active(enum debug_type dt)
         return 0;
 }
 
-void debug(enum debug_type dt, const char *format, ...)
+PRINTF_FORMAT_ATTR(2, 3)
+void debug(enum debug_type dt, PRINTF_FORMAT const char *format, ...)
 {
     va_list ap;
     if(debug_active(dt))
