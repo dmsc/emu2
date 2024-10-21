@@ -9,11 +9,11 @@
 // Main Memory (17 * 64K, no overlap)
 uint8_t memory[0x110000];
 // First MCB
-uint16_t mcb_start = 0x40;
+static uint16_t mcb_start = 0x40;
 // MCB allocation strategy
-uint8_t mcb_alloc_st = 0;
+static uint8_t mcb_alloc_st = 0;
 // PSP (Program Segment Prefix) location
-uint16_t current_PSP;
+static uint16_t current_PSP;
 
 // MS-DOS version to emulate on FCB command line parsing.
 #define FCB_PARSE_DOS (3)
@@ -490,13 +490,13 @@ static int mcb_grow_max(int mcb)
     return total;
 }
 
-void mcb_free(int mcb)
+static void mcb_free(int mcb)
 {
     mcb_set_owner(mcb, 0);
     mcb_grow_max(mcb);
 }
 
-int mcb_alloc_new(int size, int owner, int *max)
+static int mcb_alloc_new(int size, int owner, int *max)
 {
     int mcb = mcb_start;
     int stg = mcb_alloc_st & 0x3F;
@@ -544,7 +544,7 @@ int mcb_alloc_new(int size, int owner, int *max)
     }
 }
 
-int mcb_resize(int mcb, int size)
+static int mcb_resize(int mcb, int size)
 {
     debug(debug_dos, "\tmcb_resize: mcb:$%04X new size:$%04X\n", (unsigned)mcb, (unsigned)size);
     if(mcb_size(mcb) == size) // Do nothing!

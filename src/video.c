@@ -116,7 +116,7 @@ static void reload_posxy(int page)
     vid_posy[page] = memory[0x451 + page * 2];
 }
 
-static void reload_posxy_all()
+static void reload_posxy_all(void)
 {
     for(int i = 0; i < 8; i++)
     {
@@ -629,7 +629,7 @@ void video_putch(char ch)
 }
 
 // VIDEO int
-void intr10()
+void intr10(void)
 {
     debug(debug_int, "V-10%04X: BX=%04X\n", cpuGetAX(), cpuGetBX());
     debug(debug_video, "V-10%04X: BX=%04X CX=%04X DX=%04X\n", cpuGetAX(), cpuGetBX(),
