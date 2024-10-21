@@ -11,6 +11,9 @@ ifeq "$(GCC_CL)" "1"
  CFLAGS += $(EXTRA_CFLAGS)
 endif
 
+# Determine OS via `uname -s`
+UNAME_S:=$(shell uname -s 2> /dev/null)
+
 # Determine LTO invocation: Try `-flto=auto`, fall back to `-ftlo`
 LTOSYN:=$(shell $(CC) -flto=auto -E - < /dev/null > /dev/null 2>&1 && \
          printf '%s\n' "-flto=auto" || printf '%s\n' "-flto")
@@ -49,13 +52,13 @@ else
 endif
 
 # Solaris or illumos: Force `-flto=auto` to `-flto`
-ifneq "$(findstring SunOS,$(shell uname -s 2> /dev/null))" ""
+ifneq "$(findstring SunOS,$(UNAME_S))" ""
  CFLAGS := $(subst -flto=auto,-flto,$(CFLAGS))
  LDFLAGS := $(subst -flto=auto,-flto,$(LDFLAGS))
 endif
 
 # AIX with GCC: no LTO
-ifneq "$(findstring AIX,$(shell uname -s 2> /dev/null))" ""
+ifneq "$(findstring AIX,$(UNAME_S))" ""
  ifneq "$(findstring gcc,$(CC))" ""
   CFLAGS := $(subst -flto=auto,-flto,$(CFLAGS))
   CFLAGS := $(subst -flto,,$(CFLAGS))
@@ -65,7 +68,7 @@ ifneq "$(findstring AIX,$(shell uname -s 2> /dev/null))" ""
 endif
 
 # OS/400 with GCC: no LTO
-ifneq "$(findstring OS400,$(shell uname -s 2> /dev/null))" ""
+ifneq "$(findstring OS400,$(UNAME_S))" ""
  ifneq "$(findstring gcc,$(CC))" ""
   CFLAGS := $(subst -flto=auto,-flto,$(CFLAGS))
   CFLAGS := $(subst -flto,,$(CFLAGS))
