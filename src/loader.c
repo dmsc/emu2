@@ -9,11 +9,11 @@
 // Main Memory (17 * 64K, no overlap)
 uint8_t memory[0x110000];
 // First MCB
-uint16_t mcb_start = 0x40;
+static uint16_t mcb_start = 0x40;
 // MCB allocation strategy
-uint8_t mcb_alloc_st = 0;
+static uint8_t mcb_alloc_st = 0;
 // PSP (Program Segment Prefix) location
-uint16_t current_PSP;
+static uint16_t current_PSP;
 
 // MS-DOS version to emulate on FCB command line parsing.
 #define FCB_PARSE_DOS (3)
