@@ -505,7 +505,7 @@ uint8_t keyb_read_port(unsigned port)
 {
     if(queued_key == -1)
         kbhit();
-    debug(debug_int, "keyboard read_port: %02X (key=%04X)\n", port, queued_key);
+    debug(debug_int, "keyboard read_port: %02X (key=%04X)\n", port, (unsigned)queued_key);
     if(port == 0x60)
         return queued_key >> 8;
     else if(port == 0x61)
