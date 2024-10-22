@@ -2264,7 +2264,7 @@ static void i_leave(void)
     wregs[BP] = PopWord();
 }
 
-__noreturn static void i_halt(void)
+NORETURN static void i_halt(void)
 {
     printf("HALT instruction!\n");
     exit(0);

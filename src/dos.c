@@ -857,7 +857,7 @@ static int run_emulator(char *file, const char *prgname, char *cmdline, char *en
 }
 
 // DOS exit
-__noreturn void intr20(void)
+NORETURN void intr20(void)
 {
     exit(0);
 }
@@ -2124,7 +2124,7 @@ void intr21(void)
 }
 
 // DOS int 22 - TERMINATE ADDRESS
-__noreturn void intr22(void)
+NORETURN void intr22(void)
 {
     debug(debug_dos, "D-22: TERMINATE HANDLER CALLED\n");
     // If we reached here, we must terminate now

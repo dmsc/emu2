@@ -99,7 +99,7 @@ static void intr25(void)
 }
 
 // System Reset
-__noreturn static void intr19(void)
+NORETURN static void intr19(void)
 {
     debug(debug_int, "INT 19: System reset!\n");
     exit(0);
@@ -186,7 +186,7 @@ static void timer_alarm(int x)
     exit_cpu = 1;
 }
 
-__noreturn static void exit_handler(int x)
+NORETURN static void exit_handler(int x)
 {
     exit(1);
 }

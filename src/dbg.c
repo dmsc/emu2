@@ -22,7 +22,7 @@ void print_version(int quit)
         exit(EXIT_SUCCESS);
 }
 
-__noreturn void print_usage(void)
+NORETURN void print_usage(void)
 {
     print_version(0);
     printf("\n"
@@ -54,7 +54,7 @@ __noreturn void print_usage(void)
     exit(EXIT_SUCCESS);
 }
 
-__noreturn void print_usage_error(const char *format, ...)
+NORETURN void print_usage_error(const char *format, ...)
 {
     va_list ap;
     fprintf(stderr, "%s: ", prog_name);
@@ -65,7 +65,7 @@ __noreturn void print_usage_error(const char *format, ...)
     exit(EXIT_FAILURE);
 }
 
-__noreturn void print_error(const char *format, ...)
+NORETURN void print_error(const char *format, ...)
 {
     va_list ap;
     fprintf(stderr, "%s: ", prog_name);
