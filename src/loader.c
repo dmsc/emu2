@@ -398,10 +398,8 @@ static void cmdline_to_fcb(const char *cmd_line, uint8_t *fcb1, uint8_t *fcb2)
 }
 
 // Mem handling
-static void mcb_new(int mcb, int owner, int size, int last)
+static void mcb_new(uint16_t mcb, uint16_t owner, uint16_t size, int last)
 {
-    if(mcb < 0)
-        return;
     memory[mcb * 16 + 0] = last ? 'Z' : 'M';
     put16(mcb * 16 + 1, owner);
     put16(mcb * 16 + 3, size);
@@ -409,75 +407,59 @@ static void mcb_new(int mcb, int owner, int size, int last)
           last ? 'Z' : 'M', owner, size);
 }
 
-static int mcb_size(int mcb)
+static uint16_t mcb_size(uint16_t mcb)
 {
-    if(mcb < 0)
-        return 0;
     return get16(mcb * 16 + 3);
 }
 
-static void mcb_set_size(int mcb, int sz)
+static void mcb_set_size(uint16_t mcb, uint16_t sz)
 {
-    if(mcb < 0)
-        return;
     put16(mcb * 16 + 3, sz);
 }
 
-static int mcb_owner(int mcb)
+static uint16_t mcb_owner(uint16_t mcb)
 {
-    if(mcb < 0 || mcb >= 0x10000)
-        return 0;
     return get16(mcb * 16 + 1);
 }
 
-static void mcb_set_owner(int mcb, int owner)
+static void mcb_set_owner(uint16_t mcb, uint16_t owner)
 {
-    if(mcb < 0)
-        return;
     put16(mcb * 16 + 1, owner);
 }
 
-static int mcb_ok(int mcb)
+static uint16_t mcb_ok(uint16_t mcb)
 {
-    if(mcb < 0 || mcb >= 0x10000)
-        return 0;
     return memory[mcb * 16] == 'Z' || memory[mcb * 16] == 'M';
 }
 
-static int mcb_is_last(int mcb)
+static int mcb_is_last(uint16_t mcb)
 {
-    if(mcb < 0 || mcb >= 0x10000)
-        return 1;
     return memory[mcb * 16] == 'Z';
 }
 
-static int mcb_next(int mcb)
+static uint16_t mcb_next(uint16_t mcb)
 {
     if(mcb <= 0 || mcb_is_last(mcb))
         return 0;
     return mcb + mcb_size(mcb) + 1;
 }
 
-static void mcb_set_last(int mcb, int last)
+static void mcb_set_last(uint16_t mcb, int last)
 {
-    if(mcb < 0)
-        return;
     memory[mcb * 16 + 0] = last ? 'Z' : 'M';
 }
 
-static int mcb_is_free(int mcb)
+static int mcb_is_free(uint16_t mcb)
 {
-    if(mcb < 0 || mcb >= 0x10000)
-        return 0;
     return mcb_ok(mcb) && mcb_owner(mcb) == 0;
 }
 
-static int mcb_grow_max(int mcb)
+static uint16_t mcb_grow_max(uint16_t mcb)
 {
-    int total = mcb_size(mcb);
+    uint16_t total = mcb_size(mcb);
     if(mcb_is_last(mcb))
         return total;
-    int nxt = mcb_next(mcb);
+    uint16_t nxt = mcb_next(mcb);
     while(mcb_is_free(nxt))
     {
         total += 1 + mcb_size(nxt);
@@ -490,17 +472,17 @@ static int mcb_grow_max(int mcb)
     return total;
 }
 
-static void mcb_free(int mcb)
+static void mcb_free(uint16_t mcb)
 {
     mcb_set_owner(mcb, 0);
     mcb_grow_max(mcb);
 }
 
-static int mcb_alloc_new(int size, int owner, int *max)
+static uint16_t mcb_alloc_new(uint16_t size, uint16_t owner, uint16_t *max)
 {
-    int mcb = mcb_start;
+    uint16_t mcb = mcb_start, best = 0;
     int stg = mcb_alloc_st & 0x3F;
-    int best = 0, best_size = 0xFFFFF;
+    int best_slack = 0xFFFFF;
     *max = 0;
     while(1)
     {
@@ -509,9 +491,9 @@ static int mcb_alloc_new(int size, int owner, int *max)
             int slack = mcb_size(mcb) - size;
             if(slack >= 0)
             {
-                if(!best || (stg == 1 && slack < best_size) || (stg >= 2))
+                if(!best || (stg == 1 && slack < best_slack) || (stg >= 2))
                 {
-                    best_size = slack;
+                    best_slack = slack;
                     best = mcb;
                 }
             }
@@ -524,7 +506,7 @@ static int mcb_alloc_new(int size, int owner, int *max)
     }
     if(!best)
         return 0; // No mcb is big enough
-    if(!best_size)
+    if(!best_slack)
     {
         // mcb is the exact size
         mcb_new(best, owner, size, mcb_is_last(best));
@@ -532,24 +514,24 @@ static int mcb_alloc_new(int size, int owner, int *max)
     }
     if(stg >= 2)
     {
-        mcb_new(best + best_size, owner, size, mcb_is_last(best));
-        mcb_new(best, 0, best_size - 1, 0);
-        return best + best_size;
+        mcb_new(best + best_slack, owner, size, mcb_is_last(best));
+        mcb_new(best, 0, best_slack - 1, 0);
+        return best + best_slack;
     }
     else
     {
-        mcb_new(best + size + 1, 0, best_size - 1, mcb_is_last(best));
+        mcb_new(best + size + 1, 0, best_slack - 1, mcb_is_last(best));
         mcb_new(best, owner, size, 0);
         return best;
     }
 }
 
-static int mcb_resize(int mcb, int size)
+static uint16_t mcb_resize(uint16_t mcb, uint16_t size)
 {
     debug(debug_dos, "\tmcb_resize: mcb:$%04X new size:$%04X\n", mcb, size);
     if(mcb_size(mcb) == size) // Do nothing!
         return size;
-    int max = mcb_grow_max(mcb);
+    uint16_t max = mcb_grow_max(mcb);
     if(mcb_size(mcb) > size)
     {
         mcb_new(mcb + size + 1, 0, mcb_size(mcb) - size - 1, mcb_is_last(mcb));
@@ -579,19 +561,19 @@ void mem_set_alloc_strategy(uint8_t s)
     mcb_alloc_st = s;
 }
 
-int mem_resize_segment(int seg, int size)
+uint16_t mem_resize_segment(uint16_t seg, uint16_t size)
 {
     return mcb_resize(seg - 1, size);
 }
 
-void mem_free_segment(int seg)
+void mem_free_segment(uint16_t seg)
 {
     mcb_free(seg - 1);
 }
 
-int mem_alloc_segment(int size, int *max)
+uint16_t mem_alloc_segment(uint16_t size, uint16_t *max)
 {
-    int mcb = mcb_alloc_new(size, current_PSP, max);
+    uint16_t mcb = mcb_alloc_new(size, current_PSP, max);
     if(mcb)
         return 1 + mcb;
     else
@@ -619,14 +601,14 @@ Offset  Length  Description
 81h     127     Command line string  */
 
 // Creates main PSP
-uint16_t create_PSP(const char *cmdline, const char *environment, int env_size,
+uint16_t create_PSP(const char *cmdline, const char *environment, uint16_t env_size,
                     const char *progname)
 {
     // Put environment before PSP and program name, use rounded up environment size:
-    int max;
-    int env_mcb = mcb_alloc_new((env_size + 64 + 2 + 15) >> 4, 1, &max);
+    uint16_t max;
+    uint16_t env_mcb = mcb_alloc_new((env_size + 64 + 2 + 15) >> 4, 1, &max);
     // Creates a mcb to hold the PSP and the loaded program
-    int psp_mcb = mcb_alloc_new(16, 1, &max);
+    uint16_t psp_mcb = mcb_alloc_new(16, 1, &max);
 
     if(!env_mcb || !psp_mcb)
     {
@@ -648,7 +630,7 @@ uint16_t create_PSP(const char *cmdline, const char *environment, int env_size,
             debug(debug_dos, "\tenv: '%s'\n", p);
             p += strlen(p) + 1;
         }
-        debug(debug_dos, "\tenv size: %d at $%04x\n", env_size, env_mcb + 1);
+        debug(debug_dos, "\tenv size: %u at $%04x\n", env_size, env_mcb + 1U);
     }
 
     // Fill MCB owners:
@@ -713,12 +695,12 @@ unsigned get_current_PSP(void)
     return current_PSP;
 }
 
-void set_current_PSP(unsigned psp_seg)
+void set_current_PSP(uint16_t psp_seg)
 {
     current_PSP = psp_seg;
 }
 
-static int g16(uint8_t *buf)
+static unsigned g16(uint8_t *buf)
 {
     return buf[0] + (buf[1] << 8);
 }
@@ -727,7 +709,7 @@ int dos_read_overlay(FILE *f, uint16_t load_seg, uint16_t reloc_seg)
 {
     // First, read one block
     uint8_t buf[32];
-    int n = fread(buf, 1, sizeof(buf), f);
+    unsigned n = fread(buf, 1, sizeof(buf), f);
     if(n < 28 || g16(buf) != 0x5a4d)
     {
         // COM file. Read rest of data
@@ -744,12 +726,12 @@ int dos_read_overlay(FILE *f, uint16_t load_seg, uint16_t reloc_seg)
     }
 
     // An EXE file, read rest of blocks
-    int head_size = g16(buf + 8) * 16;
-    int data_size = g16(buf + 4) * 512 + g16(buf + 2) - head_size;
+    unsigned head_size = g16(buf + 8) * 16;
+    unsigned data_size = g16(buf + 4) * 512 + g16(buf + 2) - head_size;
     if(g16(buf + 2))
         data_size -= 512;
 
-    if(load_seg * 16 + data_size >= 0x100000)
+    if(data_size >= 0x100000 || load_seg * 16 + data_size >= 0x100000)
     {
         debug(debug_dos, "\texe size too big for memory\n");
         return 1;
@@ -758,11 +740,11 @@ int dos_read_overlay(FILE *f, uint16_t load_seg, uint16_t reloc_seg)
     // Seek to start of data
     fseek(f, head_size, SEEK_SET);
     n = fread(memory + load_seg * 16, 1, data_size, f);
-    debug(debug_dos, "\texe read %d of %d data bytes\n", n, data_size);
+    debug(debug_dos, "\texe read %u of %u data bytes\n", n, data_size);
     if(n < data_size)
         return 1;
 
-    int reloc_off = g16(buf + 24);
+    unsigned reloc_off = g16(buf + 24);
     int nreloc = g16(buf + 6);
 
     // Seek to start of relocation data
@@ -787,7 +769,7 @@ int dos_load_exe(FILE *f, uint16_t psp_mcb)
 {
     // First, read exe header
     uint8_t buf[32];
-    int n = fread(buf, 1, sizeof(buf), f);
+    unsigned n = fread(buf, 1, sizeof(buf), f);
     if(n < 28 || g16(buf) != 0x5a4d)
     {
         // COM file. Read rest of data
@@ -824,27 +806,27 @@ int dos_load_exe(FILE *f, uint16_t psp_mcb)
     }
 
     // An EXE file, read rest of blocks
-    int head_size = g16(buf + 8) * 16;
-    int data_blocks = g16(buf + 4);
-    int extra_bytes = g16(buf + 2);
+    unsigned head_size = g16(buf + 8) * 16;
+    unsigned data_blocks = g16(buf + 4);
+    unsigned extra_bytes = g16(buf + 2);
     if(data_blocks & 0xF800)
     {
         debug(debug_dos, "\tinvalid number of blocks ($%04x), fixing.\n", data_blocks);
         data_blocks &= 0x07FF;
     }
-    int data_size = data_blocks * 512 - head_size;
-    int load_seg = psp_mcb + 17;
+    unsigned data_size = data_blocks * 512 - head_size;
+    unsigned load_seg = psp_mcb + 17;
 
     // Get max and min memory needed
     // EXE size is size of data + PSP:
-    int exe_sz = (data_size + 256 + 15) >> 4;
-    int min_sz = g16(buf + 10) + exe_sz;
-    int max_sz = g16(buf + 12) ? g16(buf + 12) + exe_sz : 0xFFFF;
+    unsigned exe_sz = (data_size + 256 + 15) >> 4;
+    unsigned min_sz = g16(buf + 10) + exe_sz;
+    unsigned max_sz = g16(buf + 12) ? g16(buf + 12) + exe_sz : 0xFFFF;
     if(max_sz > 0xFFFF)
         max_sz = 0xFFFF;
 
     // Try to resize PSP MCB
-    int psp_sz = mcb_resize(psp_mcb, max_sz);
+    uint16_t psp_sz = mcb_resize(psp_mcb, max_sz);
     if(psp_sz < min_sz && psp_sz < max_sz)
     {
         debug(debug_dos, "\texe read, not enough memory!\n");
@@ -863,7 +845,7 @@ int dos_load_exe(FILE *f, uint16_t psp_mcb)
     // Adjust data_size depending on extra_bytes
     if(extra_bytes)
         data_size = data_size - 512 + extra_bytes;
-    debug(debug_dos, "\texe read %d of %d data bytes\n", n, data_size);
+    debug(debug_dos, "\texe read %u of %u data bytes\n", n, data_size);
     if(!n)
     {
         debug(debug_dos, "\texe too short!\n");
@@ -873,9 +855,9 @@ int dos_load_exe(FILE *f, uint16_t psp_mcb)
         debug(debug_dos, "\tWARNING: short program!\n");
 
     // EXE start at load address
-    int start = load_seg * 16;
+    unsigned start = load_seg * 16;
     // PSP located just 0x100 bytes before
-    debug(debug_dos, "\tPSP location: $%04X\n", psp_mcb + 1);
+    debug(debug_dos, "\tPSP location: $%04X\n", psp_mcb + 1U);
     debug(debug_dos, "\tEXE start:    $%04X\n", start >> 4);
 
     // Get segment values
@@ -893,7 +875,7 @@ int dos_load_exe(FILE *f, uint16_t psp_mcb)
     cpuSetSI(cpuGetIP());
     cpuSetDI(cpuGetSP());
 
-    int reloc_off = g16(buf + 24);
+    unsigned reloc_off = g16(buf + 24);
     int nreloc = g16(buf + 6);
     // Seek to start of relocation data
     fseek(f, reloc_off, SEEK_SET);

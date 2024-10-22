@@ -98,7 +98,7 @@ static inline void put32(int addr, unsigned v)
 }
 
 // Write 16 bit number
-static inline int get16(int addr)
+static inline unsigned get16(int addr)
 {
     return memory[0xFFFFF & addr] + (memory[0xFFFFF & (addr + 1)] << 8);
 }
