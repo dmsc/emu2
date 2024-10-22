@@ -982,7 +982,7 @@ static void intr21_debug(void)
     static int count = 0;
     static struct regs
     {
-        int ax, bx, cx, dx, di, ds, es;
+        uint16_t ax, bx, cx, dx, di, ds, es;
     } last = {0, 0, 0, 0, 0, 0, 0};
     struct regs cur = {cpuGetAX(), cpuGetBX(), cpuGetCX(), cpuGetDX(),
                        cpuGetDI(), cpuGetDS(), cpuGetES()};
