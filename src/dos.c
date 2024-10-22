@@ -1811,7 +1811,7 @@ void intr21(void)
     }
     case 0x48: // ALLOC MEMORY BLOCK
     {
-        int seg, max = 0;
+        uint16_t seg, max = 0;
         seg = mem_alloc_segment(cpuGetBX(), &max);
         if(seg)
         {
@@ -1836,8 +1836,7 @@ void intr21(void)
     }
     case 0x4A: // RESIZE MEMORY BLOCK
     {
-        int sz;
-        sz = mem_resize_segment(cpuGetES(), cpuGetBX());
+        uint16_t sz = mem_resize_segment(cpuGetES(), cpuGetBX());
         if(sz == cpuGetBX())
             cpuClrFlag(cpuFlag_CF);
         else

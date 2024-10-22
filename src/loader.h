@@ -4,15 +4,15 @@
 #include <stdio.h>
 
 // EXE loader
-uint16_t create_PSP(const char *cmdline, const char *environment, int env_size,
+uint16_t create_PSP(const char *cmdline, const char *environment, uint16_t env_size,
                     const char *progname);
 unsigned get_current_PSP(void);
-void set_current_PSP(unsigned psp_seg);
+void set_current_PSP(uint16_t psp_seg);
 
 // DOS Memory handling
-int mem_resize_segment(int seg, int size);
-void mem_free_segment(int seg);
-int mem_alloc_segment(int size, int *max);
+uint16_t mem_resize_segment(uint16_t seg, uint16_t size);
+void mem_free_segment(uint16_t seg);
+uint16_t mem_alloc_segment(uint16_t size, uint16_t *max);
 uint8_t mem_get_alloc_strategy(void);
 void mem_set_alloc_strategy(uint8_t s);
 
