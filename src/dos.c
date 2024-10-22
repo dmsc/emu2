@@ -543,6 +543,14 @@ static struct find_first_dta *get_find_first_dta(void)
     return &find_first_dta[i];
 }
 
+// Frees the find_first_dta list before terminating program
+static void free_find_first_dta(void)
+{
+    for(int i = 0; i < NUM_FIND_FIRST_DTA; i++)
+        if(find_first_dta[i].find_first_list)
+            dos_free_file_list(find_first_dta[i].find_first_list);
+}
+
 // Removes a DTA from the list
 static void clear_find_first_dta(struct find_first_dta *p)
 {
@@ -2266,6 +2274,9 @@ void init_dos(int argc, char **argv)
     init_codepage();
     init_nls_data();
     init_append();
+
+    // frees the find-first-list on exit
+    atexit(free_find_first_dta);
 
     // Init DOS version
     if(getenv(ENV_DOSVER))
