@@ -130,7 +130,7 @@ uint8_t port_timer_read(uint16_t port)
         tval = get_actual_timer(t);
 
     // Convert internal timer value to port read
-    int ret = 0;
+    uint8_t ret = 0;
     if(t->rd_mode == TIMER_LSB)
         ret = tval & 0xFF;
     else if(t->rd_mode == TIMER_MSB)
@@ -147,7 +147,7 @@ uint8_t port_timer_read(uint16_t port)
     }
 
     debug(debug_int, "timer port read $%02x = %02x (mode=%02x, r_state=%d, latch=%d)\n",
-          port, ret, t->op_mode, t->rd_mode, t->latched);
+          port, ret, (unsigned)(t->op_mode), t->rd_mode, t->latched);
 
     return ret;
 }

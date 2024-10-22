@@ -38,10 +38,10 @@ static const char *append_path(void)
 }
 
 // Disk Transfer Area, buffer for find-first-file output.
-static int dosDTA;
+static unsigned dosDTA;
 
 // Emulated DOS version: default to DOS 3.30
-static int dosver = 0x1E03;
+static unsigned dosver = 0x1E03;
 
 // Allocates memory for static DOS tables, from "rom" memory
 static uint32_t get_static_memory(uint16_t bytes, uint16_t align)
@@ -134,7 +134,7 @@ static void create_dir(void)
             cpuSetAX(5);
         else
             cpuSetAX(1);
-        debug(debug_dos, "ERROR %d\n", cpuGetAX());
+        debug(debug_dos, "ERROR %u\n", cpuGetAX());
         return;
     }
     debug(debug_dos, "OK\n");
@@ -158,7 +158,7 @@ static void remove_dir(void)
             cpuSetAX(2);
         else
             cpuSetAX(1);
-        debug(debug_dos, "ERROR %d\n", cpuGetAX());
+        debug(debug_dos, "ERROR %u\n", cpuGetAX());
         return;
     }
     debug(debug_dos, "OK\n");
@@ -207,7 +207,7 @@ static void dos_open_file(int create)
             return;
         }
     }
-    debug(debug_dos, "\topen '%s', '%s', %04x ", fname, mode, h);
+    debug(debug_dos, "\topen '%s', '%s', %04x ", fname, mode, (unsigned)h);
     if(create == 2)
     {
         // Force exclusive access. We could use mode = "x+" in glibc.
@@ -306,7 +306,7 @@ static void dos_open_file_fcb(int create)
         return;
     }
     const char *mode = create ? "w+b" : "r+b";
-    debug(debug_dos, "\topen fcb '%s', '%s', %04x ", fname, mode, h);
+    debug(debug_dos, "\topen fcb '%s', '%s', %04x ", fname, mode, (unsigned)h);
     handles[h] = fopen(fname, mode);
     if(!handles[h])
     {
@@ -354,7 +354,7 @@ static void dos_seq_to_rand_fcb(int fcb)
         memory[0x24 + fcb] = rand >> 24;
 }
 
-static int dos_rw_record_fcb(int addr, int write, int update, int seq)
+static int dos_rw_record_fcb(unsigned addr, int write, int update, int seq)
 {
     FILE *f = handles[get_fcb_handle()];
     if(!f)
@@ -473,7 +473,7 @@ static void intr21_43(void)
             else
                 cpuSetAX(1);
             free(fname);
-            debug(debug_dos, "ERROR %d\n", cpuGetAX());
+            debug(debug_dos, "ERROR %u\n", cpuGetAX());
             return;
         }
         int current = get_attributes(st.st_mode);
@@ -491,7 +491,7 @@ static void intr21_43(void)
                 cpuSetFlag(cpuFlag_CF);
                 cpuSetAX(5);
                 free(fname);
-                debug(debug_dos, "ERROR %d\n", cpuGetAX());
+                debug(debug_dos, "ERROR %u\n", cpuGetAX());
                 return;
             }
         }
@@ -782,7 +782,7 @@ static void intr21_9(void)
     cpuSetAL(0x24);
 }
 
-static int return_code;
+static unsigned return_code;
 // Runs the emulator again with given parameters
 static int run_emulator(char *file, const char *prgname, char *cmdline, char *env)
 {
@@ -1327,7 +1327,7 @@ void intr21(void)
         unsigned count = cpuGetCX();
         unsigned rsize = get16(0x0E + fcb);
         unsigned e = 0;
-        int target = dosDTA;
+        unsigned target = dosDTA;
 
         while(!e && count)
         {
@@ -1775,7 +1775,7 @@ void intr21(void)
             cpuSetFlag(cpuFlag_CF);
             break;
         }
-        debug(debug_dos, "\t%04x -> %04x\n", cpuGetBX(), h);
+        debug(debug_dos, "\t%04x -> %04x\n", cpuGetBX(), (unsigned)h);
         handles[h] = handles[cpuGetBX()];
         devinfo[h] = devinfo[cpuGetBX()];
         cpuSetAX(h);
@@ -1803,7 +1803,7 @@ void intr21(void)
     {
         // Note: ignore drive letter in DL
         const uint8_t *path = dos_get_cwd(cpuGetDX() & 0xFF);
-        debug(debug_dos, "\tcwd '%c' = '%s'\n", '@' + (cpuGetDX() & 0xFF), path);
+        debug(debug_dos, "\tcwd '%c' = '%s'\n", '@' + (int)(cpuGetDX() & 0xFF), path);
         putmem(cpuGetAddrDS(cpuGetSI()), path, 64);
         cpuSetAX(0x0100);
         cpuClrFlag(cpuFlag_CF);
@@ -2416,7 +2416,7 @@ void intr28(void)
 
 void intr29(void)
 {
-    int ax = cpuGetAX();
+    uint16_t ax = cpuGetAX();
     // Fast video output
     debug(debug_int, "D-29: AX=%04X\n", ax);
     debug(debug_dos, "D-29:   fast console out  AX=%04X\n", ax);
