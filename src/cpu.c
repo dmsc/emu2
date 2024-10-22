@@ -5,6 +5,7 @@
 #include "dbg.h"
 #include "dis.h"
 #include "emu.h"
+#include "os.h"
 
 // Forward declarations
 static void do_instruction(uint8_t code);
@@ -2263,7 +2264,7 @@ static void i_leave(void)
     wregs[BP] = PopWord();
 }
 
-static void i_halt(void)
+NORETURN static void i_halt(void)
 {
     printf("HALT instruction!\n");
     exit(0);
