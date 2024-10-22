@@ -1,13 +1,15 @@
 #pragma once
 
+#include "os.h"
+
 #include <stdio.h>
 
 extern char *prog_name;
 
 void print_version(int quit);
 void print_usage(void);
-void print_usage_error(const char *format, ...) __attribute__((format(printf, 1, 2)));
-void print_error(const char *format, ...) __attribute__((format(printf, 1, 2)));
+void print_usage_error(PRINTF_FORMAT const char *format, ...) PRINTF_FORMAT_ATTR(1, 2);
+void print_error(PRINTF_FORMAT const char *format, ...) PRINTF_FORMAT_ATTR(1, 2);
 
 enum debug_type
 {
@@ -20,6 +22,5 @@ enum debug_type
 };
 
 void init_debug(const char *name);
-void debug(enum debug_type, const char *format, ...)
-    __attribute__((format(printf, 2, 3)));
+void debug(enum debug_type, PRINTF_FORMAT const char *format, ...) PRINTF_FORMAT_ATTR(2, 3);
 int debug_active(enum debug_type);
