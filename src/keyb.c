@@ -30,7 +30,7 @@ static void update_bios_state(void)
 }
 
 // Update keyboard buffer pointer
-void keyb_read_buffer(void)
+static void keyb_read_buffer(void)
 {
     int ptr = (memory[0x41A] - 0x1E) & 0x1F;
     memory[0x41A] = 0x1E + ((ptr + 2) & 0x1F);
@@ -505,7 +505,7 @@ uint8_t keyb_read_port(unsigned port)
 {
     if(queued_key == -1)
         kbhit();
-    debug(debug_int, "keyboard read_port: %02X (key=%04X)\n", port, queued_key);
+    debug(debug_int, "keyboard read_port: %02X (key=%04X)\n", port, 0xFFFFU & queued_key);
     if(port == 0x60)
         return queued_key >> 8;
     else if(port == 0x61)
@@ -575,7 +575,7 @@ void keyb_handle_irq(void)
 }
 
 // BIOS keyboards handler
-void intr16()
+void intr16(void)
 {
     debug(debug_int, "B-16%04X: BX=%04X\n", cpuGetAX(), cpuGetBX());
     unsigned ax = cpuGetAX();

@@ -2576,19 +2576,19 @@ void cpuSetDS(unsigned v) { sregs[DS] = v; }
 void cpuSetIP(unsigned v) { ip = v; }
 
 // Get CPU registers from outside
-unsigned cpuGetAX() { return wregs[AX]; }
-unsigned cpuGetCX() { return wregs[CX]; }
-unsigned cpuGetDX() { return wregs[DX]; }
-unsigned cpuGetBX() { return wregs[BX]; }
-unsigned cpuGetSP() { return wregs[SP]; }
-unsigned cpuGetBP() { return wregs[BP]; }
-unsigned cpuGetSI() { return wregs[SI]; }
-unsigned cpuGetDI() { return wregs[DI]; }
-unsigned cpuGetES() { return sregs[ES]; }
-unsigned cpuGetCS() { return sregs[CS]; }
-unsigned cpuGetSS() { return sregs[SS]; }
-unsigned cpuGetDS() { return sregs[DS]; }
-unsigned cpuGetIP() { return ip; }
+unsigned cpuGetAX(void) { return wregs[AX]; }
+unsigned cpuGetCX(void) { return wregs[CX]; }
+unsigned cpuGetDX(void) { return wregs[DX]; }
+unsigned cpuGetBX(void) { return wregs[BX]; }
+unsigned cpuGetSP(void) { return wregs[SP]; }
+unsigned cpuGetBP(void) { return wregs[BP]; }
+unsigned cpuGetSI(void) { return wregs[SI]; }
+unsigned cpuGetDI(void) { return wregs[DI]; }
+unsigned cpuGetES(void) { return sregs[ES]; }
+unsigned cpuGetCS(void) { return sregs[CS]; }
+unsigned cpuGetSS(void) { return sregs[SS]; }
+unsigned cpuGetDS(void) { return sregs[DS]; }
+unsigned cpuGetIP(void) { return ip; }
 
 // Address of flags in stack when in interrupt handler
 static uint8_t *flagAddr(void)

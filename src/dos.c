@@ -33,16 +33,16 @@ static uint32_t dos_sysvars;
 static uint32_t dos_append;
 
 // Returns "APPEND" path, if activated:
-static const char *append_path()
+static const char *append_path(void)
 {
     return (memory[dos_append] & 0x01) ? ((char *)memory + dos_append + 2) : 0;
 }
 
 // Disk Transfer Area, buffer for find-first-file output.
-static int dosDTA;
+static unsigned dosDTA;
 
 // Emulated DOS version: default to DOS 3.30
-static int dosver = 0x1E03;
+static unsigned dosver = 0x1E03;
 
 // Allocates memory for static DOS tables, from "rom" memory
 static uint32_t get_static_memory(uint16_t bytes, uint16_t align)
@@ -60,9 +60,9 @@ static uint32_t get_static_memory(uint16_t bytes, uint16_t align)
 // DOS file handles
 #define max_handles (0x10000)
 static FILE *handles[max_handles];
-static int devinfo[max_handles];
+static uint16_t devinfo[max_handles];
 
-static int guess_devinfo(FILE *f)
+static uint16_t guess_devinfo(FILE *f)
 {
     int fn = fileno(f);
     if(isatty(fn))
@@ -135,7 +135,7 @@ static void create_dir(void)
             cpuSetAX(5);
         else
             cpuSetAX(1);
-        debug(debug_dos, "ERROR %d\n", cpuGetAX());
+        debug(debug_dos, "ERROR %u\n", cpuGetAX());
         return;
     }
     debug(debug_dos, "OK\n");
@@ -159,7 +159,7 @@ static void remove_dir(void)
             cpuSetAX(2);
         else
             cpuSetAX(1);
-        debug(debug_dos, "ERROR %d\n", cpuGetAX());
+        debug(debug_dos, "ERROR %u\n", cpuGetAX());
         return;
     }
     debug(debug_dos, "OK\n");
@@ -208,7 +208,7 @@ static void dos_open_file(int create)
             return;
         }
     }
-    debug(debug_dos, "\topen '%s', '%s', %04x ", fname, mode, h);
+    debug(debug_dos, "\topen '%s', '%s', %04x ", fname, mode, (unsigned)h);
     if(create == 2)
     {
         // Force exclusive access. We could use mode = "x+" in glibc.
@@ -273,7 +273,7 @@ static int get_fcb_handle(void)
     return get16(0x18 + get_fcb());
 }
 
-static void dos_show_fcb()
+static void dos_show_fcb(void)
 {
     if(!debug_active(debug_dos))
         return;
@@ -307,7 +307,7 @@ static void dos_open_file_fcb(int create)
         return;
     }
     const char *mode = create ? "w+b" : "r+b";
-    debug(debug_dos, "\topen fcb '%s', '%s', %04x ", fname, mode, h);
+    debug(debug_dos, "\topen fcb '%s', '%s', %04x ", fname, mode, (unsigned)h);
     handles[h] = fopen(fname, mode);
     if(!handles[h])
     {
@@ -355,7 +355,7 @@ static void dos_seq_to_rand_fcb(int fcb)
         memory[0x24 + fcb] = rand >> 24;
 }
 
-static int dos_rw_record_fcb(int addr, int write, int update, int seq)
+static int dos_rw_record_fcb(unsigned addr, int write, int update, int seq)
 {
     FILE *f = handles[get_fcb_handle()];
     if(!f)
@@ -474,7 +474,7 @@ static void intr21_43(void)
             else
                 cpuSetAX(1);
             free(fname);
-            debug(debug_dos, "ERROR %d\n", cpuGetAX());
+            debug(debug_dos, "ERROR %u\n", cpuGetAX());
             return;
         }
         int current = get_attributes(st.st_mode);
@@ -492,7 +492,7 @@ static void intr21_43(void)
                 cpuSetFlag(cpuFlag_CF);
                 cpuSetAX(5);
                 free(fname);
-                debug(debug_dos, "ERROR %d\n", cpuGetAX());
+                debug(debug_dos, "ERROR %u\n", cpuGetAX());
                 return;
             }
         }
@@ -783,7 +783,7 @@ static void intr21_9(void)
     cpuSetAL(0x24);
 }
 
-static int return_code;
+static unsigned return_code;
 // Runs the emulator again with given parameters
 static int run_emulator(char *file, const char *prgname, char *cmdline, char *env)
 {
@@ -857,7 +857,7 @@ static int run_emulator(char *file, const char *prgname, char *cmdline, char *en
 }
 
 // DOS exit
-__noreturn void intr20()
+__noreturn void intr20(void)
 {
     exit(0);
 }
@@ -885,7 +885,7 @@ static void char_input(int brk)
 }
 
 // Returns true if a character to read is pending
-static int char_pending()
+static int char_pending(void)
 {
     return (inp_last_key != 0) || kbhit();
 }
@@ -983,7 +983,7 @@ static void intr21_debug(void)
     static int count = 0;
     static struct regs
     {
-        int ax, bx, cx, dx, di, ds, es;
+        uint16_t ax, bx, cx, dx, di, ds, es;
     } last = {0, 0, 0, 0, 0, 0, 0};
     struct regs cur = {cpuGetAX(), cpuGetBX(), cpuGetCX(), cpuGetDX(),
                        cpuGetDI(), cpuGetDS(), cpuGetES()};
@@ -1010,7 +1010,7 @@ static void intr21_debug(void)
 
 // DOS int 2f
 // Static set of functions used for DOS devices/extensions and TSR installation checks
-void intr2f()
+void intr2f(void)
 {
     debug(debug_int, "D-2F%04X: BX=%04X\n", cpuGetAX(), cpuGetBX());
     unsigned ax = cpuGetAX();
@@ -1042,7 +1042,7 @@ void intr2f()
 }
 
 // DOS int 21
-void intr21()
+void intr21(void)
 {
     // Check CP/M call, INT 21h from address 0x000C0
     if(cpuGetAddress(cpuGetStack(2), cpuGetStack(0)) == 0xC2)
@@ -1328,7 +1328,7 @@ void intr21()
         unsigned count = cpuGetCX();
         unsigned rsize = get16(0x0E + fcb);
         unsigned e = 0;
-        int target = dosDTA;
+        unsigned target = dosDTA;
 
         while(!e && count)
         {
@@ -1776,7 +1776,7 @@ void intr21()
             cpuSetFlag(cpuFlag_CF);
             break;
         }
-        debug(debug_dos, "\t%04x -> %04x\n", cpuGetBX(), h);
+        debug(debug_dos, "\t%04x -> %04x\n", cpuGetBX(), (unsigned)h);
         handles[h] = handles[cpuGetBX()];
         devinfo[h] = devinfo[cpuGetBX()];
         cpuSetAX(h);
@@ -1804,7 +1804,7 @@ void intr21()
     {
         // Note: ignore drive letter in DL
         const uint8_t *path = dos_get_cwd(cpuGetDX() & 0xFF);
-        debug(debug_dos, "\tcwd '%c' = '%s'\n", '@' + (cpuGetDX() & 0xFF), path);
+        debug(debug_dos, "\tcwd '%c' = '%s'\n", '@' + (int)(cpuGetDX() & 0xFF), path);
         putmem(cpuGetAddrDS(cpuGetSI()), path, 64);
         cpuSetAX(0x0100);
         cpuClrFlag(cpuFlag_CF);
@@ -1812,7 +1812,7 @@ void intr21()
     }
     case 0x48: // ALLOC MEMORY BLOCK
     {
-        int seg, max = 0;
+        uint16_t seg, max = 0;
         seg = mem_alloc_segment(cpuGetBX(), &max);
         if(seg)
         {
@@ -1837,8 +1837,7 @@ void intr21()
     }
     case 0x4A: // RESIZE MEMORY BLOCK
     {
-        int sz;
-        sz = mem_resize_segment(cpuGetES(), cpuGetBX());
+        uint16_t sz = mem_resize_segment(cpuGetES(), cpuGetBX());
         if(sz == cpuGetBX())
             cpuClrFlag(cpuFlag_CF);
         else
@@ -2125,7 +2124,7 @@ void intr21()
 }
 
 // DOS int 22 - TERMINATE ADDRESS
-__noreturn void intr22()
+__noreturn void intr22(void)
 {
     debug(debug_dos, "D-22: TERMINATE HANDLER CALLED\n");
     // If we reached here, we must terminate now
@@ -2418,7 +2417,7 @@ void intr28(void)
 
 void intr29(void)
 {
-    int ax = cpuGetAX();
+    uint16_t ax = cpuGetAX();
     // Fast video output
     debug(debug_int, "D-29: AX=%04X\n", ax);
     debug(debug_dos, "D-29:   fast console out  AX=%04X\n", ax);
