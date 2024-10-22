@@ -2393,15 +2393,19 @@ void init_dos(int argc, char **argv)
     }
 
     const char *progname = getenv(ENV_PROGNAME);
+    char *buf = 0;
     if(!progname)
     {
-        progname = dos_real_path(argv[0]);
-        if(!progname)
+        buf = dos_real_path(argv[0]);
+        if(!buf)
             progname = argv[0];
+        else
+            progname = buf;
     }
 
     // Create main PSP
     int psp_mcb = create_PSP(args, environ, p - environ + 1, progname);
+    free(buf);
 
     // Load program
     const char *name = argv[0];
