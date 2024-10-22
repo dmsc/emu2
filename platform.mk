@@ -15,64 +15,70 @@ endif
 UNAME_S:=$(shell uname -s 2> /dev/null)
 
 # Determine LTO invocation: Try `-flto=auto`, fall back to `-ftlo`
-LTOSYN:=$(shell $(CC) -flto=auto -E - < /dev/null > /dev/null 2>&1 && \
-         printf '%s\n' "-flto=auto" || printf '%s\n' "-flto")
-ifeq "$(findstring xlc,$(CC))" ""
- ifeq "$(findstring nvc,$(CC))" ""
-  ifeq "$(findstring suncc,$(CC))" ""
-   ifeq "$(findstring clang,$(CC))" ""
-    ifeq "$(findstring gcc,$(CC))" ""
-     ifeq "$(findstring icc,$(CC))" ""
-      # Others? try LTO
-      CFLAGS += $(LTOSYN)
-      LDFLAGS += $(LTOSYN)
+ifndef NO_LTO
+ LTOSYN:=$(shell $(CC) -flto=auto -E - < /dev/null > /dev/null 2>&1 && \
+          printf '%s\n' "-flto=auto" || printf '%s\n' "-flto")
+ ifeq "$(findstring pcc,$(CC))" ""
+  ifeq "$(findstring xlc,$(CC))" ""
+   ifeq "$(findstring nvc,$(CC))" ""
+    ifeq "$(findstring suncc,$(CC))" ""
+     ifeq "$(findstring clang,$(CC))" ""
+      ifeq "$(findstring gcc,$(CC))" ""
+       ifeq "$(findstring icc,$(CC))" ""
+        # Others? try LTO
+        CFLAGS += $(LTOSYN)
+        LDFLAGS += $(LTOSYN)
+       else
+        # Intel C Compiler Classic: use IPO
+        CFLAGS += -ipo -diag-disable=10440
+        LDFLAGS += -ipo -diag-disable=10440
+       endif
+      else
+       # GCC
+       CFLAGS += $(LTOSYN)
+       LDFLAGS += $(LTOSYN)
+      endif
      else
-      # Intel C Compiler Classic: use IPO
-      CFLAGS += -ipo -diag-disable=10440
-      LDFLAGS += -ipo -diag-disable=10440
+      # Clang
+      CFLAGS += $(LTOSYN) -Wno-ignored-optimization-argument
+      LDFLAGS += $(LTOSYN) -Wno-ignored-optimization-argument
      endif
     else
-     # GCC
-     CFLAGS += $(LTOSYN)
-     LDFLAGS += $(LTOSYN)
+     # Oracle Studio: no LTO
     endif
    else
-    # Clang
-    CFLAGS += $(LTOSYN) -Wno-ignored-optimization-argument
-    LDFLAGS += $(LTOSYN) -Wno-ignored-optimization-argument
+    # NVIDIA HPC SDK: no LTO
    endif
   else
-   # Oracle Studio: no LTO
+   # IBM XLC (V16): no LTO
   endif
  else
-  # NVIDIA HPC SDK: no LTO
+ # Portable C Compiler: no LTO
  endif
-else
- # IBM XLC (V16): no LTO
-endif
 
-# Solaris or illumos: Force `-flto=auto` to `-flto`
-ifneq "$(findstring SunOS,$(UNAME_S))" ""
- CFLAGS := $(subst -flto=auto,-flto,$(CFLAGS))
- LDFLAGS := $(subst -flto=auto,-flto,$(LDFLAGS))
-endif
-
-# AIX with GCC: no LTO
-ifneq "$(findstring AIX,$(UNAME_S))" ""
- ifneq "$(findstring gcc,$(CC))" ""
+ # Solaris or illumos: Force `-flto=auto` to `-flto`
+ ifneq "$(findstring SunOS,$(UNAME_S))" ""
   CFLAGS := $(subst -flto=auto,-flto,$(CFLAGS))
-  CFLAGS := $(subst -flto,,$(CFLAGS))
   LDFLAGS := $(subst -flto=auto,-flto,$(LDFLAGS))
-  LDFLAGS := $(subst -flto,,$(LDFLAGS))
  endif
-endif
 
-# OS/400 with GCC: no LTO
-ifneq "$(findstring OS400,$(UNAME_S))" ""
- ifneq "$(findstring gcc,$(CC))" ""
-  CFLAGS := $(subst -flto=auto,-flto,$(CFLAGS))
-  CFLAGS := $(subst -flto,,$(CFLAGS))
-  LDFLAGS := $(subst -flto=auto,-flto,$(LDFLAGS))
-  LDFLAGS := $(subst -flto,,$(LDFLAGS))
+ # AIX with GCC: no LTO
+ ifneq "$(findstring AIX,$(UNAME_S))" ""
+  ifneq "$(findstring gcc,$(CC))" ""
+   CFLAGS := $(subst -flto=auto,-flto,$(CFLAGS))
+   CFLAGS := $(subst -flto,,$(CFLAGS))
+   LDFLAGS := $(subst -flto=auto,-flto,$(LDFLAGS))
+   LDFLAGS := $(subst -flto,,$(LDFLAGS))
+  endif
+ endif
+
+ # OS/400 with GCC: no LTO
+ ifneq "$(findstring OS400,$(UNAME_S))" ""
+  ifneq "$(findstring gcc,$(CC))" ""
+   CFLAGS := $(subst -flto=auto,-flto,$(CFLAGS))
+   CFLAGS := $(subst -flto,,$(CFLAGS))
+   LDFLAGS := $(subst -flto=auto,-flto,$(LDFLAGS))
+   LDFLAGS := $(subst -flto,,$(LDFLAGS))
+  endif
  endif
 endif
