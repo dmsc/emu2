@@ -59,9 +59,9 @@ static uint32_t get_static_memory(uint16_t bytes, uint16_t align)
 // DOS file handles
 #define max_handles (0x10000)
 static FILE *handles[max_handles];
-static int devinfo[max_handles];
+static uint16_t devinfo[max_handles];
 
-static int guess_devinfo(FILE *f)
+static uint16_t guess_devinfo(FILE *f)
 {
     int fn = fileno(f);
     if(isatty(fn))
