@@ -42,7 +42,7 @@ static char *get_mem(unsigned ModRM, const uint8_t *ip, const char *rg[],
                      const char *cast, int seg_over)
 {
     static char buffer[100];
-    int num;
+    unsigned num;
     char ch;
     switch(ModRM & 0xc0)
     {
@@ -137,7 +137,7 @@ static const char *decode_jump8(const uint8_t *ip, const char *ins, uint16_t reg
 static const char *decode_far(const uint8_t *ip, const char *ins)
 {
     fillbytes(ip, 5);
-    sprintf(IPOS, "%-7s %04X:%04X", ins, ip[4] * 256 + ip[3], ip[2] * 256 + ip[1]);
+    sprintf(IPOS, "%-7s %04X:%04X", ins, ip[4] * 256U + ip[3], ip[2] * 256U + ip[1]);
     return buf;
 }
 
@@ -374,7 +374,7 @@ static const char *decode_imul_b(const uint8_t *ip, const char *ins, int seg_ove
     fillbytes(ip, 3 + get_mem_len(ModRM));
     sprintf(IPOS, "%-7s %s,%s,%c%02X", ins, WREG,
             get_mem(ModRM, ip + 1, word_reg, "", seg_over), d1 > 0x7F ? '-' : '+',
-            d1 > 0x7F ? 0x100 - d1 : d1);
+            d1 > 0x7F ? 0x100U - d1 : d1);
     return buf;
 }
 
