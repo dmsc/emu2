@@ -548,7 +548,10 @@ static void free_find_first_dta(void)
 {
     for(int i = 0; i < NUM_FIND_FIRST_DTA; i++)
         if(find_first_dta[i].find_first_list)
+        {
             dos_free_file_list(find_first_dta[i].find_first_list);
+            find_first_dta[i].find_first_list = 0;
+        }
 }
 
 // Removes a DTA from the list
@@ -560,6 +563,7 @@ static void clear_find_first_dta(struct find_first_dta *p)
     p->dta_addr = 0;
     p->find_first_ptr = 0;
     dos_free_file_list(p->find_first_list);
+    p->find_first_list = 0;
 }
 
 // DOS int 21, ah=4f
