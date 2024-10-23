@@ -90,6 +90,16 @@ static FILE *open_log_file(const char *base, const char *type)
     return fdopen(fd, "w");
 }
 
+static void close_log_files(void)
+{
+    for(int i = 0; i < debug_MAX; i++)
+        if(debug_files[i] != 0)
+        {
+            fclose(debug_files[i]);
+            debug_files[i] = 0;
+        }
+}
+
 void init_debug(const char *base)
 {
     if(getenv(ENV_DBG_NAME))
@@ -103,6 +113,7 @@ void init_debug(const char *base)
             if(strstr(spec, debug_names[i]))
                 debug_files[i] = open_log_file(base, debug_names[i]);
         }
+        atexit(close_log_files);
     }
 }
 
