@@ -252,7 +252,8 @@ int main(int argc, char **argv)
         case 'h':
             print_usage();
         case 'v':
-            print_version(1);
+            print_version();
+            exit(EXIT_SUCCESS);
         case 'b':
             bin_load_addr = strtol(opt, &ep, 0);
             if(*ep || bin_load_addr < 0 || bin_load_addr > 0xFFFF0)

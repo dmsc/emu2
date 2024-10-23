@@ -10,21 +10,18 @@
 
 char *prog_name;
 
-void print_version(int quit)
+void print_version(void)
 {
     printf("EMU2 - Simple x86 + DOS Emulator, version " EMU2_VERSION
 #ifdef __DATE__
            "  (Compiled " __DATE__ ")"
 #endif
            "\n");
-
-    if (quit)
-        exit(EXIT_SUCCESS);
 }
 
 NORETURN void print_usage(void)
 {
-    print_version(0);
+    print_version();
     printf("\n"
            "Usage: %s [options] <prog.exe> [args...] [-- environment vars]\n"
            "\n"
