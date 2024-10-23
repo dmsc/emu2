@@ -7,9 +7,9 @@
 extern char *prog_name;
 
 void print_version(void);
-void print_usage(void);
-void print_usage_error(PRINTF_FORMAT const char *format, ...) PRINTF_FORMAT_ATTR(1, 2);
-void print_error(PRINTF_FORMAT const char *format, ...) PRINTF_FORMAT_ATTR(1, 2);
+NORETURN void print_usage(void);
+NORETURN void print_usage_error(PRINTF_FORMAT const char *format, ...) PRINTF_FORMAT_ATTR(1, 2);
+NORETURN void print_error(PRINTF_FORMAT const char *format, ...) PRINTF_FORMAT_ATTR(1, 2);
 
 enum debug_type
 {
