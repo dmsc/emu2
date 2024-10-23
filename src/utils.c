@@ -7,14 +7,34 @@
 #include <mach-o/dyld.h>
 #endif
 
+#if defined(__illumos__) || ((defined(__sun) || defined(__sun__)) && \
+           (defined(__SVR4) || defined(__svr4__)))
+# define LIKE_SOLARIS
+#endif
+#if defined(__GNU__) && !defined(__linux__) && !defined(__HAIKU__)
+# define GNU_HURD
+#endif
+#if defined(__linux__) || defined(__CYGWIN__) || \
+    defined(__serenity__) || defined(GNU_HURD) || defined(__EMSCRIPTEN__)
+# define PROC_SELF "/proc/self/exe"
+#elif defined(__NetBSD__)
+# define PROC_SELF "/proc/curproc/exe"
+#elif defined(__DragonFly__)
+# define PROC_SELF "/proc/curproc/file"
+#elif defined(LIKE_SOLARIS)
+# define PROC_SELF "/proc/self/path/a.out"
+#endif
+
 const char *get_program_exe_path(void)
 {
-#if defined(__linux__) || defined(__CYGWIN__)
+#if defined(__linux__) || defined(__NetBSD__) || defined(LIKE_SOLARIS) || \
+    defined(__DragonFly__) || defined(__CYGWIN__) || defined(__serenity__) || \
+    defined(GNU_HURD) || defined(__EMSCRIPTEN__)
 
     static char exe_path[4096] = {
         0,
     };
-    if(readlink("/proc/self/exe", exe_path, 4095) == -1)
+    if(readlink(PROC_SELF, exe_path, 4095) == -1)
         return 0;
     else
         return exe_path;
