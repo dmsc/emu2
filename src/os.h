@@ -41,7 +41,7 @@
 #endif
 
 /* Platforms which are missing cfmakeraw() */
-#if defined(__sun)
+#if defined(__illumos__) || defined(__sun)
 # if !defined(NO_CFMAKERAW)
 #  define NO_CFMAKERAW
 # endif

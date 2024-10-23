@@ -7,10 +7,6 @@
 #include <mach-o/dyld.h>
 #endif
 
-#if defined(__illumos__) || ((defined(__sun) || defined(__sun__)) && \
-           (defined(__SVR4) || defined(__svr4__)))
-# define LIKE_SOLARIS
-#endif
 #if defined(__GNU__) && !defined(__linux__) && !defined(__HAIKU__)
 # define GNU_HURD
 #endif
@@ -21,15 +17,15 @@
 # define PROC_SELF "/proc/curproc/exe"
 #elif defined(__DragonFly__)
 # define PROC_SELF "/proc/curproc/file"
-#elif defined(LIKE_SOLARIS)
+#elif defined(__illumos__) || defined(__sun)
 # define PROC_SELF "/proc/self/path/a.out"
 #endif
 
 const char *get_program_exe_path(void)
 {
-#if defined(__linux__) || defined(__NetBSD__) || defined(LIKE_SOLARIS) || \
-    defined(__DragonFly__) || defined(__CYGWIN__) || defined(__serenity__) || \
-    defined(GNU_HURD) || defined(__EMSCRIPTEN__)
+#if defined(__linux__) || defined(__NetBSD__) || defined(__illumos__) || \
+    defined(__sun) || defined(__DragonFly__) || defined(__CYGWIN__) || \
+    defined(__serenity__) || defined(GNU_HURD) || defined(__EMSCRIPTEN__)
 
     static char exe_path[4096] = {
         0,
