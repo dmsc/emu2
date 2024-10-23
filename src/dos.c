@@ -832,9 +832,11 @@ static int run_emulator(char *file, const char *prgname, char *cmdline, char *en
             {
                 int f1 = fileno(handles[i]);
                 int f2 = (f1 < 3) ? dup(f1) : f1;
+                if(f2 < 0)
+                    f2 = f1;
                 dup2(f2, i);
                 close(f2);
-                if(f1 >= 3)
+                if(f1 >= 3 && f1 != f2)
                     close(f1);
             }
         // Accumulate args:

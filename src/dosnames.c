@@ -187,6 +187,12 @@ static struct dos_file_list *dos_read_dir(const char *path, const char *glob, in
 
     // Always allocate two extra items: the drive label and the terminating element
     ret = calloc(n + 2, sizeof(struct dos_file_list));
+    if(!ret)
+    {
+        for(int i = 0; i < n; free(dir[i]), i++);
+        free(dir);
+        return 0;
+    }
     struct dos_file_list *dirp = ret;
 
     // Adds label
@@ -202,7 +208,10 @@ static struct dos_file_list *dos_read_dir(const char *path, const char *glob, in
     {
         char *fpath = malloc(strlen(path) + strlen(dir[i]->d_name) + 2);
         if(!fpath || -1 == sprintf(fpath, "%s/%s", path, dir[i]->d_name))
+        {
+            free(fpath);
             continue;
+        }
         // Spacial case "." and "..", only on "full directory" mode
         if(!strcmp(dir[i]->d_name, ".") || !strcmp(dir[i]->d_name, ".."))
         {
@@ -768,6 +777,12 @@ char *dos_real_path(const char *unix_path)
     // Convert remaining components
     size_t l = strlen(base), k = strlen(path);
     char *ret = calloc(1, 65);
+    if(!ret)
+    {
+        free(base);
+        free(path);
+        return 0;
+    }
     ret[0] = drive + 'A';
     ret[1] = ':';
 

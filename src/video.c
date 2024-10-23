@@ -224,6 +224,11 @@ static void init_video(void)
         exit(1);
     }
     tty_file = fdopen(tty_fd, "w");
+    if(!tty_file)
+    {
+        print_error("error at open TTY, %s\n", strerror(errno));
+        exit(1);
+    }
     fputs("\x1b[?7l", tty_file); // Disable automatic margin
     atexit(exit_video);
     video_initialized = 1;
@@ -396,6 +401,8 @@ static void debug_screen(void)
 
     // Dump screen
     char *buf = malloc(3 * vid_sx + 8);
+    if(!buf)
+        return;
 //    debug(debug_video, "- screen dump -\n");
     for(unsigned y = 0; y < vid_sy; y++)
     {

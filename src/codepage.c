@@ -212,6 +212,11 @@ static int read_codepage_file(const char *fname)
         return 0;
     // Note: this leaks memory, so this function should be called only once.
     uint16_t *new_table = malloc(sizeof(cp_table[0]) * 256);
+    if(!new_table)
+    {
+        fclose(f);
+        return 0;
+    }
     // Start with a copy of CP437
     memcpy(new_table, cp_data[0].table, sizeof(cp_table[0]) * 256);
     // Read all lines in file
@@ -235,6 +240,8 @@ static int read_codepage_file(const char *fname)
                 fclose(f);
                 print_error("reading codepage '%s', line '%s', invalid byte value %d\n",
                             fname, line, dcode);
+                free(new_table);
+                return 0;
             }
             // Ignore control-codes
             if(dcode < 32 || dcode == 127)
@@ -245,6 +252,8 @@ static int read_codepage_file(const char *fname)
                 print_error(
                     "reading codepage '%s', line '%s', invalid unicode value %d\n", fname,
                     line, ucode);
+                free(new_table);
+                return 0;
             }
             new_table[dcode] = ucode;
         }
