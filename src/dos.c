@@ -1162,14 +1162,18 @@ void intr21(void)
 
         FILE *f = handles[0] ? handles[0] : stdin;
         unsigned i;
-        for(i = 0; i < len; i++)
+        for(i = 0; i < len;)
         {
             int c = getc(f);
+            // Retry if we were interrupted
+            if(c == EOF && errno == EINTR)
+                continue;
             if(c == '\n' || c == EOF)
                 c = '\r';
             memory[addr + i + 2] = (char)c;
             if(c == '\r')
                 break;
+            i++;
         }
         memory[addr + 1] = i;
         break;
