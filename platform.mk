@@ -7,8 +7,10 @@ GCC_CLANG=$(shell $(CC) -v 2>&1 | \
   printf '%s\n' "1")
 
 # Detect if CC is Sun CC with `-V`
-SUNCC_CMP=$(shell $(CC) -V 2>&1 | \
-  grep -q -e "Sun C" 2> /dev/null && printf '%s\n' "1")
+ifneq ($(GCC_CLANG),1)
+ SUNCC_CMP=$(shell $(CC) -V 2>&1 | \
+   grep -q -e "Sun C" 2> /dev/null && printf '%s\n' "1")
+endif
 
 # Sun CC: Disable LTO
 ifeq ($(SUNCC_CMP),1)
