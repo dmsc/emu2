@@ -2535,7 +2535,7 @@ static void do_instruction(uint8_t code)
     case 0xf1: i_undefined();                                  break;
     case 0xf2: rep(0);                                         break;
     case 0xf3: rep(1);                                         break;
-    case 0xf4: i_halt();                                       break;
+    case 0xf4: i_halt();
     case 0xf5: CF = !CF;                                       break;
     case 0xf6: i_f6pre();                                      break;
     case 0xf7: i_f7pre();                                      break;

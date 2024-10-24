@@ -409,7 +409,6 @@ static void init_keyboard(void)
         if(tty_fd < 0)
         {
             print_error("error at open TTY, %s\n", strerror(errno));
-            exit(1);
         }
         atexit(exit_keyboard);
     }
