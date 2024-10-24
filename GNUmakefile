@@ -1,38 +1,39 @@
-CC?=cc
-CFLAGS?=-O3 -flto -Wall -g -Werror=implicit-function-declaration -Werror=int-conversion
+SHELL=/bin/sh
+CFLAGS?=-O3
 LDLIBS?=-lm
 INSTALL?=install
 PREFIX?=/usr
 
+include platform.mk
+
 OBJS=\
- cpu.o\
- loader.o\
- main.o\
  codepage.o\
- dosnames.o\
+ cpu.o\
+ dbg.o\
  dis.o\
+ dosnames.o\
  dos.o\
  keyb.o\
- dbg.o\
+ loader.o\
+ main.o\
  timer.o\
  utils.o\
  video.o\
 
 .PHONY: all
-all: obj emu2
+all: emu2
 
 emu2: $(OBJS:%=obj/%)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LDLIBS)
+	$(CC) -o $@ $^ $(LDFLAGS) $(LDLIBS)
 
-obj/%.o: src/%.c
+obj/%.o: src/%.c obj
 	$(CC) $(CFLAGS) -c -o $@ $<
 obj:
 	mkdir -p obj
 
 .PHONY: clean distclean
 clean distclean:
-	rm -f $(OBJS:%=obj/%)
-	rm -f emu2
+	rm -f .test.c .test.out $(OBJS:%=obj/%) emu2
 	test -d obj && rmdir obj || true
 
 .PHONY: install
