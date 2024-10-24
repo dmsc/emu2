@@ -2076,7 +2076,8 @@ void intr21(void)
         break;
     case 0x65: // GET NLS DATA
     {
-        uint32_t addr = cpuGetAddrES(cpuGetDI());
+        uint32_t addr;
+        addr = cpuGetAddrES(cpuGetDI());
         cpuClrFlag(cpuFlag_CF);
         switch(ax & 0xFF)
         {
