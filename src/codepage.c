@@ -238,10 +238,9 @@ static int read_codepage_file(const char *fname)
             if(dcode < 0 || dcode > 256)
             {
                 fclose(f);
+                free(new_table);
                 print_error("reading codepage '%s', line '%s', invalid byte value %d\n",
                             fname, line, dcode);
-                free(new_table);
-                return 0;
             }
             // Ignore control-codes
             if(dcode < 32 || dcode == 127)
@@ -249,11 +248,10 @@ static int read_codepage_file(const char *fname)
             if(ucode < 32 || ucode > 0xFFFF)
             {
                 fclose(f);
+                free(new_table);
                 print_error(
                     "reading codepage '%s', line '%s', invalid unicode value %d\n", fname,
                     line, ucode);
-                free(new_table);
-                return 0;
             }
             new_table[dcode] = ucode;
         }

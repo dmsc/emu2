@@ -221,13 +221,11 @@ static void init_video(void)
     if(tty_fd < 0)
     {
         print_error("error at open TTY, %s\n", strerror(errno));
-        exit(1);
     }
     tty_file = fdopen(tty_fd, "w");
     if(!tty_file)
     {
         print_error("error at open TTY, %s\n", strerror(errno));
-        exit(1);
     }
     fputs("\x1b[?7l", tty_file); // Disable automatic margin
     atexit(exit_video);
