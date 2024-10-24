@@ -3,13 +3,13 @@ UNAME_S:=$(shell uname -s 2> /dev/null)
 
 # Detect if CC is GCC or Clang with `-v`
 GCC_CLANG=$(shell $(CC) -v 2>&1 | \
-  grep -q -i -e "gcc version" -e "clang version" 2> /dev/null && \
+ grep -q -i -e "gcc version" -e "clang version" 2> /dev/null && \
   printf '%s\n' "1")
 
 # Detect if CC is Sun CC with `-V`
 ifneq ($(GCC_CLANG),1)
  SUNCC_CMP=$(shell $(CC) -V 2>&1 | \
-   grep -q -e "Sun C" 2> /dev/null && printf '%s\n' "1")
+  grep -q -e "Sun C" 2> /dev/null && printf '%s\n' "1")
 endif
 
 # Sun CC: Disable LTO
@@ -36,22 +36,22 @@ endif
 # Detect if CC supports `-flto`
 ifndef NO_LTO
  FLTO_WR:=$(shell printf '%s\n' "int main(void){return 0;}" > .test.c; \
-   $(CC) -flto .test.c -o .test.out > /dev/null 2>&1; \
-     echo $$?; rm -f .test.c .test.out > /dev/null 2>&1)
+  $(CC) -flto .test.c -o .test.out > /dev/null 2>&1; \
+   echo $$?; rm -f .test.c .test.out > /dev/null 2>&1)
  ifeq ($(FLTO_WR),0)
   FLTO_OK:=$(shell printf '%s\n' "int main(void){return 0;}" > .test.c; \
-    $(CC) -Werror -flto .test.c -o .test.out > /dev/null 2>&1; \
-      echo $$?; rm -f .test.c .test.out > /dev/null 2>&1)
+   $(CC) -Werror -flto .test.c -o .test.out > /dev/null 2>&1; \
+    echo $$?; rm -f .test.c .test.out > /dev/null 2>&1)
   ifeq ($(FLTO_OK),0)
    LTO_FLAGS:=-flto
    # Detect if CC supports `-flto=auto`
    AUTO_WR:=$(shell printf '%s\n' "int main(void){return 0;}" > .test.c; \
-     $(CC) -flto=auto .test.c -o .test.out > /dev/null 2>&1; \
-       echo $$?; rm -f .test.c .test.out > /dev/null 2>&1)
+    $(CC) -flto=auto .test.c -o .test.out > /dev/null 2>&1; \
+     echo $$?; rm -f .test.c .test.out > /dev/null 2>&1)
    ifeq ($(AUTO_WR),0)
     AUTO_OK:=$(shell printf '%s\n' "int main(void){return 0;}" > .test.c; \
-      $(CC) -Werror -flto=auto .test.c -o .test.out > /dev/null 2>&1; \
-        echo $$?; rm -f .test.c .test.out > /dev/null 2>&1)
+     $(CC) -Werror -flto=auto .test.c -o .test.out > /dev/null 2>&1; \
+      echo $$?; rm -f .test.c .test.out > /dev/null 2>&1)
     ifeq ($(AUTO_OK),0)
      LTO_FLAGS:=-flto=auto
     endif
