@@ -23,23 +23,23 @@ ifeq ($(GCC_CLANG),1)
 endif
 
 # Detect if CC supports `-flto`
-FLTO_WR:=$(shell printf '%s\n' "int main (void){return 0;}" > .test.c; \
+FLTO_WR:=$(shell printf '%s\n' "int main(void){return 0;}" > .test.c; \
   $(CC) -flto .test.c -o .test.out > /dev/null 2>&1; \
-    echo $$?; rm -f .test.c > /dev/null 2>&1)
+    echo $$?; rm -f .test.c .test.out > /dev/null 2>&1)
 ifeq ($(FLTO_WR),0)
- FLTO_OK:=$(shell printf '%s\n' "int main (void){return 0;}" > .test.c; \
+ FLTO_OK:=$(shell printf '%s\n' "int main(void){return 0;}" > .test.c; \
    $(CC) -Werror -flto .test.c -o .test.out > /dev/null 2>&1; \
-     echo $$?; rm -f .test.c > /dev/null 2>&1)
+     echo $$?; rm -f .test.c .test.out > /dev/null 2>&1)
  ifeq ($(FLTO_OK),0)
   LTO_FLAGS:=-flto
   # Detect if CC supports `-flto=auto`
-  AUTO_WR:=$(shell printf '%s\n' "int main (void){return 0;}" > .test.c; \
+  AUTO_WR:=$(shell printf '%s\n' "int main(void){return 0;}" > .test.c; \
     $(CC) -flto=auto .test.c -o .test.out > /dev/null 2>&1; \
-      echo $$?; rm -f .test.c > /dev/null 2>&1)
+      echo $$?; rm -f .test.c .test.out > /dev/null 2>&1)
   ifeq ($(AUTO_WR),0)
-   AUTO_OK:=$(shell printf '%s\n' "int main (void){return 0;}" > .test.c; \
+   AUTO_OK:=$(shell printf '%s\n' "int main(void){return 0;}" > .test.c; \
      $(CC) -Werror -flto=auto .test.c -o .test.out > /dev/null 2>&1; \
-       echo $$?; rm -f .test.c > /dev/null 2>&1)
+       echo $$?; rm -f .test.c .test.out > /dev/null 2>&1)
    ifeq ($(AUTO_OK),0)
     LTO_FLAGS:=-flto=auto
    endif
