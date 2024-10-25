@@ -1,2 +1,4 @@
 emu2
 obj/
+.test.c
+.test.out
