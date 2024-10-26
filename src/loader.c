@@ -720,9 +720,9 @@ int dos_read_overlay(FILE *f, uint16_t load_seg, uint16_t reloc_seg)
         int max = 0x100000 - mem - 512;
 
         fseek(f, 0, SEEK_SET);
-        fread(memory + mem, 1, max, f);
+        n = fread(memory + mem, 1, max, f);
 
-        return 0;
+        return n == 0;
     }
 
     // An EXE file, read rest of blocks
@@ -774,7 +774,7 @@ int dos_load_exe(FILE *f, uint16_t psp_mcb)
     {
         // COM file. Read rest of data
         if(!n)
-            return 1;
+            return 0;
 
         // Expand MCB to fill all memory
         mcb_resize(psp_mcb, 0xFFFF);
@@ -783,7 +783,9 @@ int dos_load_exe(FILE *f, uint16_t psp_mcb)
 
         int mem = (psp_mcb + 17) * 16;
         fseek(f, 0, SEEK_SET);
-        fread(memory + mem, 1, max, f);
+        n = fread(memory + mem, 1, max, f);
+        if(!n)
+            return 0;
 
         // Fill top program address in PSP
         put16(psp_mcb * 16 + 16 + 2, psp_mcb + mcb_size(psp_mcb) + 1);

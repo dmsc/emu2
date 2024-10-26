@@ -156,8 +156,9 @@ static int load_binary_prog(const char *name, int bin_load_addr)
     FILE *f = fopen(name, "rb");
     if(!f)
         print_error("can't open '%s': %s\n", name, strerror(errno));
-    fread(memory + bin_load_addr, 1, 0x100000 - bin_load_addr, f);
+    unsigned n = fread(memory + bin_load_addr, 1, 0x100000 - bin_load_addr, f);
     fclose(f);
+    debug(debug_int, "load binary of %02x bytes\n", n);
     return 0;
 }
 

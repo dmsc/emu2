@@ -227,7 +227,8 @@ static int read_codepage_file(const char *fname)
         if(1 != fscanf(f, " %255[^\n\r#]%*[^\n\r]\n", line))
         {
             // Try to consume comments
-            fscanf(f, "%*[^\n\r]\n");
+            if(EOF == fscanf(f, "%*[^\n\r]\n"))
+                break;
             continue;
         }
 
