@@ -28,7 +28,7 @@ ifneq "$(findstring clang,$(CC))" ""
 endif
 
 # Extra CFLAGS for GCC or Clang
-EXTRA_CFLAGS?=-Wall -g -Werror=implicit-function-declaration -Werror=int-conversion
+EXTRA_CFLAGS?=-Wall -g -Werror=implicit-function-declaration -pedantic-errors
 ifeq ($(GCC_CLANG),1)
  CFLAGS+=$(EXTRA_CFLAGS)
 endif
