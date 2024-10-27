@@ -2129,6 +2129,7 @@ void intr21(void)
             break;
         }
         break;
+    }
     case 0x66: // GET GLOBAL CODE PAGE
         cpuSetBX(437);
         cpuSetDX(437);
@@ -2137,7 +2138,6 @@ void intr21(void)
     case 0x67: // SET HANDLE COUNT
         cpuClrFlag(cpuFlag_CF);
         break;
-    }
     default:
         debug(debug_dos, "UNHANDLED INT 21, AX=%04x\n", cpuGetAX());
         debug(debug_int, "UNHANDLED INT 21, AX=%04x\n", cpuGetAX());
