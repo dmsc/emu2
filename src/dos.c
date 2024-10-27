@@ -167,31 +167,29 @@ static void remove_dir(void)
     cpuClrFlag(cpuFlag_CF);
 }
 
-static void dos_open_file(int create)
+static int dos_open_file(int create, int access_mode, int name_addr)
 {
     int h = get_new_handle();
-    int al = cpuGetAX() & 0xFF;
     if(h < 0)
     {
         cpuSetAX(4);
         cpuSetFlag(cpuFlag_CF);
-        return;
+        return 0;
     }
-    int name_addr = cpuGetAddrDS(cpuGetDX());
     char *fname = dos_unix_path(name_addr, create, append_path());
     if(!memory[name_addr] || !fname)
     {
         debug(debug_dos, "\t(file not found)\n");
         cpuSetAX(2);
         cpuSetFlag(cpuFlag_CF);
-        return;
+        return 0;
     }
     const char *mode;
     if(create)
         mode = "w+b";
     else
     {
-        switch(al & 7)
+        switch(access_mode & 7)
         {
         case 0:
             mode = "rb";
@@ -205,12 +203,13 @@ static void dos_open_file(int create)
         default:
             free(fname);
             cpuSetFlag(cpuFlag_CF);
-            return;
+            return 0;
         }
     }
     debug(debug_dos, "\topen '%s', '%s', %04x ", fname, mode, (unsigned)h);
     if(create == 2)
     {
+        // TODO: should set file attributes in CX
         // Force exclusive access. We could use mode = "x+" in glibc.
         int fd = open(fname, O_CREAT | O_EXCL | O_RDWR, 0666);
         if(fd != -1)
@@ -234,7 +233,7 @@ static void dos_open_file(int create)
         }
         cpuSetFlag(cpuFlag_CF);
         free(fname);
-        return;
+        return 0;
     }
     // Set device info:
     if(!strcmp(fname, "/dev/null"))
@@ -255,6 +254,7 @@ static void dos_open_file(int create)
     cpuClrFlag(cpuFlag_CF);
     cpuSetAX(h);
     free(fname);
+    return create + 1;
 }
 
 static int get_ex_fcb(void)
@@ -1546,10 +1546,10 @@ void intr21(void)
         break;
     }
     case 0x3C: // CREATE FILE
-        dos_open_file(1);
+        dos_open_file(1, cpuGetAX() & 0xFF, cpuGetAddrDS(cpuGetDX()));
         break;
     case 0x3D: // OPEN EXISTING FILE
-        dos_open_file(0);
+        dos_open_file(0, cpuGetAX() & 0xFF, cpuGetAddrDS(cpuGetDX()));
         break;
     case 0x3E: // CLOSE FILE
         dos_close_file(cpuGetBX());
@@ -2068,7 +2068,7 @@ void intr21(void)
         cpuSetAX(ax & 0xFF);
         break;
     case 0x5B: // CREATE NEW FILE
-        dos_open_file(2);
+        dos_open_file(2, cpuGetAX() & 0xFF, cpuGetAddrDS(cpuGetDX()));
         break;
     case 0x62: // GET PSP SEGMENT
         cpuSetBX(get_current_PSP());
@@ -2138,6 +2138,36 @@ void intr21(void)
     case 0x67: // SET HANDLE COUNT
         cpuClrFlag(cpuFlag_CF);
         break;
+    case 0x6C: // EXTENDED OPEN/CREATE FILE
+    {
+        unsigned cmod = cpuGetDX() & 0xFF;
+        //  cmod    action
+        //   00     fail always                                         -
+        //   01     open if exists already, fail if not                 0
+        //   02     clear and open if exists, fail if not               -
+        //   10     create if not exists, fail if not.                  2
+        //   11     create if not exists, open if exists                -
+        //   12     create if not exists, clear and open if exists.     1
+        int create = -1;
+        if(cmod == 0x01)
+            create = 0;
+        else if(cmod == 0x10)
+            create = 2;
+        else if(cmod == 0x12)
+            create = 1;
+        else
+        {
+            // TODO: unsupported open moe
+            debug(debug_dos,"\tUnsupported open mode: %02x\n", cmod);
+            cpuSetAX(1);
+            cpuSetFlag(cpuFlag_CF);
+            break;
+        }
+        int e = dos_open_file(create, cpuGetBX() & 0xFF, cpuGetAddrDS(cpuGetSI()));
+        if(e)
+            cpuSetCX(e);
+        break;
+    }
     default:
         debug(debug_dos, "UNHANDLED INT 21, AX=%04x\n", cpuGetAX());
         debug(debug_int, "UNHANDLED INT 21, AX=%04x\n", cpuGetAX());
