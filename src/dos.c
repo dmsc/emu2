@@ -2068,6 +2068,12 @@ void intr21(void)
     case 0x62: // GET PSP SEGMENT
         cpuSetBX(get_current_PSP());
         break;
+    case 0x63: // GET DOUBLE BYTE CHARACTER SET LEAD-BYTE TABLE
+        cpuSetSI(nls_dbc_set_table & 0xF);
+        cpuSetDS(nls_dbc_set_table >> 4);
+        cpuSetAX(cpuGetAX() & 0xFF00);
+        cpuClrFlag(cpuFlag_CF);
+        break;
     case 0x65: // GET NLS DATA
     {
         uint32_t addr = cpuGetAddrES(cpuGetDI());
