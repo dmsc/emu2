@@ -26,7 +26,7 @@ all: emu2
 emu2: $(OBJS:%=obj/%)
 	$(CC) -o $@ $^ $(LDFLAGS) $(LDLIBS)
 
-obj/%.o: src/%.c obj
+obj/%.o: src/%.c | obj
 	$(CC) $(CFLAGS) -c -o $@ $<
 obj:
 	mkdir -p obj
