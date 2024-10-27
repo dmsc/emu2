@@ -407,9 +407,7 @@ static void init_keyboard(void)
     {
         tty_fd = open("/dev/tty", O_NOCTTY | O_RDONLY);
         if(tty_fd < 0)
-        {
             print_error("error at open TTY, %s\n", strerror(errno));
-        }
         atexit(exit_keyboard);
     }
     set_raw_term(1);

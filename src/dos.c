@@ -532,9 +532,7 @@ static struct find_first_dta *get_find_first_dta(void)
             if(!find_first_dta[i].dta_addr)
                 break;
         if(i == NUM_FIND_FIRST_DTA)
-        {
             print_error("Too many find-first DTA areas opened\n");
-        }
         find_first_dta[i].dta_addr = dosDTA;
         find_first_dta[i].find_first_list = 0;
         find_first_dta[i].find_first_ptr = 0;
@@ -807,9 +805,7 @@ static int run_emulator(char *file, const char *prgname, char *cmdline, char *en
         while(waitpid(pid, &status, 0) == -1)
         {
             if(errno != EINTR)
-            {
                 print_error("error waiting child, %s\n", strerror(errno));
-            }
         }
         return_code = (WEXITSTATUS(status) & 0xFF);
         if(!WIFEXITED(status))
