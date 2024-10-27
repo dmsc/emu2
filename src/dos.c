@@ -778,6 +778,11 @@ static void dos_putchar(uint8_t ch, int fd)
     }
     else if(!handles[fd])
         putchar(ch);
+    else if(!fd && devinfo[0] == 0x80D3 && devinfo[1] == 0x80D3)
+        // DOS programs can write to STDIN and expect output to the terminal.
+        // This hack will only work if STDOUT is not redirected, in real DOS
+        // you can redirect STDOUT and write to STDIN.
+        fputc(ch, handles[1]);
     else
         fputc(ch, handles[fd]);
 }
