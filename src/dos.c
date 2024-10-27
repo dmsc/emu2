@@ -945,6 +945,11 @@ static int line_input(FILE *f, uint8_t *buf, int max)
         for(i = 0; i < max; i++)
         {
             int c = fgetc(f);
+            if(c == EOF && errno == EINTR)
+            {
+                --i;
+                continue;
+            }
             if(c < 0)
                 break;
             if(c == '\n' && !cr && i < max)
