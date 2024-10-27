@@ -233,7 +233,7 @@ static int get_esc_secuence(void)
     // ESC <number>                     ALT+number
     // ESC [ <modifiers> <letter>       Function Keys
     mod_state = 0;
-    char ch = 0xFF;
+    char ch = '\xFF';
     if(read(tty_fd, &ch, 1) == 0)
         return 0x011B; // ESC
     if(ch != '[' && ch != 'O')
@@ -242,7 +242,7 @@ static int get_esc_secuence(void)
     int n1 = 0, n2 = 0;
     while(1)
     {
-        char cn = 0xFF;
+        char cn = '\xFF';
         if(read(tty_fd, &cn, 1) == 0)
         {
             if(n1 == 0 && n2 == 0)
@@ -322,7 +322,7 @@ static int get_esc_secuence(void)
 
 static int read_key(void)
 {
-    char ch = 0xFF;
+    char ch = '\xFF';
     // Reads first key code
     if(read(tty_fd, &ch, 1) == 0)
         return -1; // No data
@@ -339,14 +339,14 @@ static int read_key(void)
     // Unicode character, read rest of codes
     if((ch & 0xE0) == 0xC0)
     {
-        char ch1 = 0xFF;
+        char ch1 = '\xFF';
         if(read(tty_fd, &ch1, 1) == 0 || (ch1 & 0xC0) != 0x80)
             return 0; // INVALID UTF-8
         return get_dos_char(((ch & 0x1F) << 6) | (ch1 & 0x3F));
     }
     else if((ch & 0xF0) == 0xE0)
     {
-        char ch1 = 0xFF, ch2 = 0xFF;
+        char ch1 = '\xFF', ch2 = '\xFF';
         if(read(tty_fd, &ch1, 1) == 0 || (ch1 & 0xC0) != 0x80 ||
            read(tty_fd, &ch2, 1) == 0 || (ch2 & 0xC0) != 0x80)
             return -1; // INVALID UTF-8
@@ -354,7 +354,7 @@ static int read_key(void)
     }
     else if((ch & 0xF8) == 0xF0)
     {
-        char ch1 = 0xFF, ch2 = 0xFF, ch3 = 0xFF;
+        char ch1 = '\xFF', ch2 = '\xFF', ch3 = '\xFF';
         if(read(tty_fd, &ch1, 1) == 0 || (ch1 & 0xC0) != 0x80 ||
            read(tty_fd, &ch2, 1) == 0 || (ch2 & 0xC0) != 0x80 ||
            read(tty_fd, &ch3, 1) == 0 || (ch3 & 0xC0) != 0x80)
