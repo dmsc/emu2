@@ -135,7 +135,7 @@ static int dos_glob(const uint8_t *n, const char *g)
         // An '*' consumes any letter, except the dot
         if(cg == '*')
         {
-            // Spacial case "." and ".."
+            // Special case "." and ".."
             if(cn == '.' && (n[1] != '.' && n[1] != 0))
                 g++;
             else
@@ -212,7 +212,7 @@ static struct dos_file_list *dos_read_dir(const char *path, const char *glob, in
             free(fpath);
             continue;
         }
-        // Spacial case "." and "..", only on "full directory" mode
+        // Special case "." and "..", only on "full directory" mode
         if(!strcmp(dir[i]->d_name, ".") || !strcmp(dir[i]->d_name, ".."))
         {
             if(dirs != 2)
@@ -439,7 +439,7 @@ static int char_valid(unsigned char c)
         return 1;
 }
 
-// Checks if char is a valid path separato
+// Checks if char is a valid path separator
 static int char_pathsep(unsigned char c)
 {
     if(c == '/' || c == '\\')

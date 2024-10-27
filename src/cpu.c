@@ -2272,7 +2272,7 @@ NORETURN static void i_halt(void)
 
 static void debug_instruction(void)
 {
-    unsigned nip = (cpuGetIP() + 0xFFFF) & 0xFFFF; // substract 1!
+    unsigned nip = (cpuGetIP() + 0xFFFF) & 0xFFFF; // subtract 1!
     const uint8_t *ip = memory + sregs[CS] * 16 + nip;
 
     debug(debug_cpu, "AX=%04X BX=%04X CX=%04X DX=%04X SP=%04X BP=%04X SI=%04X DI=%04X ",
