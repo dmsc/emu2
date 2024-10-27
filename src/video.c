@@ -30,7 +30,7 @@ union term_cell
 // Note that this array holds the character and color of each text cell,
 // with the byte-order given as the 8086 little-endian.
 static union term_cell term_screen[64][256];
-// Current line in output, lines bellow this are not currently displayed.
+// Current line in output, lines below this are not currently displayed.
 // This allows using only part of the terminal.
 static int output_row;
 // Current cursor row/column position in the terminal.
@@ -182,7 +182,7 @@ static void set_text_mode(int clear)
     memory[0x463] = 0xD4;                             // I/O port of video CRTC
     memory[0x464] = 0x03;                             // ...
     memory[0x465] = 0x29;                             // video mode select reg
-    memory[0x466] = 0x30;                             // CGA pallete select
+    memory[0x466] = 0x30;                             // CGA palette select
     memory[0x484] = vid_sy - 1;                       // screen rows - 1
     memory[0x485] = vid_font_lines;                   // character font height
     memory[0x486] = 0;                                // ...
@@ -754,7 +754,7 @@ void intr10(void)
         cpuSetBX((memory[0x462] << 8) | (0xFF & cpuGetBX()));
         break;
     case 0x10:
-        if(ax == 0x1002) // TODO: Set pallete registers - ignore
+        if(ax == 0x1002) // TODO: Set palette registers - ignore
             break;
         else if(ax == 0x1003) // TODO: Set blinking state
             break;

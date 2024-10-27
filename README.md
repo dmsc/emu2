@@ -102,8 +102,6 @@ First, make a new directory and unzip the file:
     $ cd tp302
     $ unzip ../tp302.zip
     $ ls
-    $ ls
-    $ ls
     ACCESS3.BOX   CALC.PAS      DEMO-BCD.PAS  GRAPH.P     SUBDIR.PAS    TURBO.COM
     ART.PAS       CMDLINE.PAS   EXTERNAL.DOC  LISTER.PAS  TINST.COM     TURBO.MSG
     CALCDEMO.MCS  COLOR.PAS     GETDATE.PAS   README      TINST.MSG     TURTLE.PAS

@@ -1949,7 +1949,7 @@ void intr21(void)
         else
         {
             // Exit to parent
-            // TODO: we must close all child file descriptors and dealocate
+            // TODO: we must close all child file descriptors and deallocate
             //       child memory.
             return_code = cpuGetAX() & 0xFF;
             // Patch INT 22h, 23h and 24h addresses to the ones saved in new PSP
