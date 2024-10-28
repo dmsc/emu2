@@ -196,19 +196,24 @@ static int dos_open_file(int create, int access_mode, int name_addr)
         return 0;
     }
     const char *mode;
+    int mflag = 0;
     if(create)
+    {
+        // Use exclusive access on create == 2, to fail on existing file
+        mflag = O_CREAT | O_RDWR | (create == 2 ? O_EXCL : 0);
         mode = "w+b";
+    }
     else
     {
         switch(access_mode & 7)
         {
         case 0:
+            mflag = O_RDONLY;
             mode = "rb";
             break;
-        case 1:
-            mode = "r+b";
-            break;
+        case 1: // Write only, but DOS sometimes allows reading, so we open as read/write
         case 2:
+            mflag = O_RDWR;
             mode = "r+b";
             break;
         default:
@@ -220,18 +225,20 @@ static int dos_open_file(int create, int access_mode, int name_addr)
         }
     }
     debug(debug_dos, "\topen '%s', '%s', %04x ", fname, mode, (unsigned)h);
-    if(create == 2)
+
+    // TODO: should set file attributes in CX
+    handles[h] = 0;
+    int fd = open(fname, mflag, 0666);
+    if(fd != -1)
     {
-        // TODO: should set file attributes in CX
-        // Force exclusive access. We could use mode = "x+" in glibc.
-        int fd = open(fname, O_CREAT | O_EXCL | O_RDWR, 0666);
-        if(fd != -1)
-            handles[h] = fdopen(fd, mode);
+        // Check if we opened a directory and fail
+        struct stat st;
+        if(0 != fstat(fd, &st) || S_ISDIR(st.st_mode))
+            close(fd);
         else
-            handles[h] = 0;
+            handles[h] = fdopen(fd, mode);
     }
-    else
-        handles[h] = fopen(fname, mode);
+
     if(!handles[h])
     {
         if(errno != ENOENT)
