@@ -953,17 +953,20 @@ static int line_input(FILE *f, uint8_t *buf, int max)
 {
     if(video_active())
     {
+        static int last_key = 0;
         int len = 0;
-        while(len < max - 1)
+        while(len < max)
         {
-            char key = getch(1);
+            int kcode = last_key ? last_key : getch(1);
+            char key = kcode & 0xFF;
+            last_key = key ? 0 : kcode >> 8;
             if(key == '\r')
             {
                 video_putch('\r');
                 video_putch('\n');
-                buf[len] = '\r';
-                buf[len + 1] = '\n';
-                len += 2;
+                buf[len++] = '\r';
+                if(len < max)
+                    buf[len++] = '\n';
                 break;
             }
             else if(key == 8)
