@@ -450,12 +450,12 @@ static int char_pathsep(unsigned char c)
 
 // Normalizes DOS path, removing relative items and adding base
 // Modifies the passed string and returns the drive as integer.
-int dos_path_normalize(char *path)
+int dos_path_normalize(char *path, unsigned max)
 {
     int drive = dos_default_drive;
 
     // Force nul terminated
-    path[63] = 0;
+    path[max] = 0;
 
     if(path[0] && path[1] == ':')
     {
@@ -466,20 +466,20 @@ int dos_path_normalize(char *path)
             drive = drive - 'a';
         else
             drive = dos_default_drive;
-        memmove(path, path + 2, 62);
-        path[62] = path[63] = 0;
+        memmove(path, path + 2, max - 1);
+        path[max - 1] = path[max] = 0;
     }
 
     // Copy CWD to base
-    char base[64];
-    memcpy(base, dos_cwd[drive], 64);
+    char base[max + 1];
+    memcpy(base, dos_cwd[drive], max + 1);
     // Test for absolute path
     if(path[0] == '\\' || path[0] == '/')
-        memset(base, 0, 64);
+        memset(base, 0, max + 1);
 
     // Process each component of path
     int beg, end = 0;
-    while(end < 63 && path[end])
+    while(end < max && path[end])
     {
         beg = end;
         while(char_valid(path[end]))
@@ -487,7 +487,7 @@ int dos_path_normalize(char *path)
 
         if(path[end] && !char_pathsep(path[end]))
             path[end] = 0;
-        if(!path[end] && end < 63)
+        if(!path[end] && end < max)
             path[end + 1] = 0;
 
         // Test path
@@ -506,14 +506,14 @@ int dos_path_normalize(char *path)
         {
             // Standard path, add to base
             int e = strlen(base);
-            if(e < 63)
+            if(e < max)
             {
                 if(e)
                 {
                     base[e] = '\\';
                     e++;
                 }
-                while(e < 62 && path[beg])
+                while(e < max - 1 && path[beg])
                 {
                     base[e] = path[beg];
                     e++;
@@ -525,7 +525,7 @@ int dos_path_normalize(char *path)
         end++;
     }
     // Copy result
-    memcpy(path, base, 64);
+    memcpy(path, base, max + 1);
     return drive;
 }
 
@@ -550,7 +550,7 @@ const uint8_t *dos_get_cwd(int drive)
 int dos_change_cwd(char *path)
 {
     debug(debug_dos, "\tchdir '%s'\n", path);
-    int drive = dos_path_normalize(path);
+    int drive = dos_path_normalize(path, 63);
     // Check if path exists
     char *fname = dos_unix_path_rec(get_base_path(drive), path, 0);
     if(!fname)
@@ -574,7 +574,7 @@ int dos_change_dir(int addr)
 static char *dos_unix_path_base(char *path, int force)
 {
     // Normalize
-    int drive = dos_path_normalize(path);
+    int drive = dos_path_normalize(path, 63);
     // Get UNIX base path:
     const char *base = get_base_path(drive);
     // Adds CWD if path is not absolute

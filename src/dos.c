@@ -2172,25 +2172,25 @@ void intr21(void)
         break;
     case 0x60: // TRUENAME - CANONICALIZE FILENAME OR PATH
     {
-        char *path = (char *)getptr(cpuGetAddrDS(cpuGetSI()), 64);
-        char *truename = (char *)getptr(cpuGetAddrES(cpuGetDI()), 128);
-        char *no_drive_path = truename + 3;
-        if(strlen(path) > 63)
+        uint8_t *path_ptr = getptr(cpuGetAddrDS(cpuGetSI()), 64);
+        uint8_t *out_ptr = getptr(cpuGetAddrES(cpuGetDI()), 128);
+
+        if(!path_ptr || !out_ptr)
         {
             dos_error = 3;
             cpuSetFlag(cpuFlag_CF);
+            break;
         }
-        else
-        {
-            strncpy(no_drive_path, path, 64);
-            no_drive_path[64] = 0;
-            int drive = dos_path_normalize(no_drive_path);
-            truename[2] = '\\';
-            truename[1] = ':';
-            truename[0] = 'A' + drive;
-            cpuClrFlag(cpuFlag_CF);
-            cpuSetAX(0x5C);
-        }
+
+        // Copy input path to output
+        memcpy(out_ptr + 3, path_ptr, 64);
+        out_ptr[64 + 3] = 0;
+        int drive = dos_path_normalize((char *)(out_ptr + 3), 127 - 3);
+        out_ptr[2] = '\\';
+        out_ptr[1] = ':';
+        out_ptr[0] = 'A' + drive;
+        cpuClrFlag(cpuFlag_CF);
+        cpuSetAX(0x5C);
         break;
     }
     case 0x62: // GET PSP SEGMENT
