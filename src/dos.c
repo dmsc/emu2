@@ -32,6 +32,9 @@ static uint8_t *nls_country_info;
 static uint32_t dos_sysvars;
 static uint32_t dos_append;
 
+// Last error - used to implement "get extended error"
+static uint8_t dos_error;
+
 // Returns "APPEND" path, if activated:
 static const char *append_path(void)
 {
@@ -103,6 +106,7 @@ static int dos_close_file(int h)
     {
         cpuSetFlag(cpuFlag_CF);
         cpuSetAX(6);
+        dos_error = 6;
         return -1;
     }
     handles[h] = 0;
@@ -114,6 +118,7 @@ static int dos_close_file(int h)
     if(f == stdin || f == stdout || f == stderr)
         return 0; // Never close standard streams
     fclose(f);
+    dos_error = 0;
     return 0;
 }
 
@@ -126,18 +131,20 @@ static void create_dir(void)
         free(fname);
         cpuSetFlag(cpuFlag_CF);
         if(errno == EACCES)
-            cpuSetAX(5);
+            dos_error = 5;
         else if(errno == ENAMETOOLONG || errno == ENOTDIR)
-            cpuSetAX(3);
+            dos_error = 3;
         else if(errno == ENOENT)
-            cpuSetAX(2);
+            dos_error = 2;
         else if(errno == EEXIST)
-            cpuSetAX(5);
+            dos_error = 5;
         else
-            cpuSetAX(1);
+            dos_error = 1;
+        cpuSetAX(dos_error);
         debug(debug_dos, "ERROR %u\n", cpuGetAX());
         return;
     }
+    dos_error = 0;
     debug(debug_dos, "OK\n");
     free(fname);
     cpuClrFlag(cpuFlag_CF);
@@ -152,16 +159,18 @@ static void remove_dir(void)
         free(fname);
         cpuSetFlag(cpuFlag_CF);
         if(errno == EACCES)
-            cpuSetAX(5);
+            dos_error = 5;
         else if(errno == ENAMETOOLONG || errno == ENOTDIR)
-            cpuSetAX(3);
+            dos_error = 3;
         else if(errno == ENOENT)
-            cpuSetAX(2);
+            dos_error = 2;
         else
-            cpuSetAX(1);
+            dos_error = 1;
+        cpuSetAX(dos_error);
         debug(debug_dos, "ERROR %u\n", cpuGetAX());
         return;
     }
+    dos_error = 0;
     debug(debug_dos, "OK\n");
     free(fname);
     cpuClrFlag(cpuFlag_CF);
@@ -172,6 +181,7 @@ static int dos_open_file(int create, int access_mode, int name_addr)
     int h = get_new_handle();
     if(h < 0)
     {
+        dos_error = 4;
         cpuSetAX(4);
         cpuSetFlag(cpuFlag_CF);
         return 0;
@@ -180,6 +190,7 @@ static int dos_open_file(int create, int access_mode, int name_addr)
     if(!memory[name_addr] || !fname)
     {
         debug(debug_dos, "\t(file not found)\n");
+        dos_error = 2;
         cpuSetAX(2);
         cpuSetFlag(cpuFlag_CF);
         return 0;
@@ -202,6 +213,8 @@ static int dos_open_file(int create, int access_mode, int name_addr)
             break;
         default:
             free(fname);
+            dos_error = 1;
+            cpuSetAX(1);
             cpuSetFlag(cpuFlag_CF);
             return 0;
         }
@@ -224,13 +237,14 @@ static int dos_open_file(int create, int access_mode, int name_addr)
         if(errno != ENOENT)
         {
             debug(debug_dos, "%s.\n", strerror(errno));
-            cpuSetAX(5);
+            dos_error = 5;
         }
         else
         {
             debug(debug_dos, "not found.\n");
-            cpuSetAX(2);
+            dos_error = 2;
         }
+        cpuSetAX(dos_error);
         cpuSetFlag(cpuFlag_CF);
         free(fname);
         return 0;
@@ -253,6 +267,7 @@ static int dos_open_file(int create, int access_mode, int name_addr)
     debug(debug_dos, "OK.\n");
     cpuClrFlag(cpuFlag_CF);
     cpuSetAX(h);
+    dos_error = 0;
     free(fname);
     return create + 1;
 }
@@ -293,6 +308,7 @@ static void dos_open_file_fcb(int create)
     int h = get_new_handle();
     if(h < 0)
     {
+        dos_error = 4;
         cpuSetAL(0xFF);
         cpuSetFlag(cpuFlag_CF);
         return;
@@ -301,6 +317,7 @@ static void dos_open_file_fcb(int create)
     char *fname = dos_unix_path_fcb(fcb_addr, create, append_path());
     if(!fname)
     {
+        dos_error = 2;
         debug(debug_dos, "\t(file not found)\n");
         cpuSetAL(0xFF);
         cpuSetFlag(cpuFlag_CF);
@@ -311,6 +328,7 @@ static void dos_open_file_fcb(int create)
     handles[h] = fopen(fname, mode);
     if(!handles[h])
     {
+        dos_error = 4;
         debug(debug_dos, "%s.\n", strerror(errno));
         cpuSetAL(0xFF);
         cpuSetFlag(cpuFlag_CF);
@@ -339,6 +357,7 @@ static void dos_open_file_fcb(int create)
     debug(debug_dos, "OK.\n");
     cpuClrFlag(cpuFlag_CF);
     cpuSetAL(0x00);
+    dos_error = 0;
     dos_show_fcb();
     free(fname);
 }
@@ -359,7 +378,10 @@ static int dos_rw_record_fcb(unsigned addr, int write, int update, int seq)
 {
     FILE *f = handles[get_fcb_handle()];
     if(!f)
+    {
+        dos_error = 6;
         return 1; // no data read/write
+    }
 
     int fcb = get_fcb();
     unsigned rsize = get16(0x0E + fcb);
@@ -380,6 +402,7 @@ static int dos_rw_record_fcb(unsigned addr, int write, int update, int seq)
     if(!buf || !rsize)
     {
         debug(debug_dos, "\tbuffer pointer invalid\n");
+        dos_error = 9;
         return 2; // segment wrap in DTA
     }
     // Seek to block and read
@@ -400,6 +423,7 @@ static int dos_rw_record_fcb(unsigned addr, int write, int update, int seq)
     if(write && (pos + n > get32(fcb + 0x10)))
         put32(fcb + 0x10, pos + n);
 
+    dos_error = 0;
     if(n == rsize)
         return 0; // read/write full record
     else if(!n || write)
@@ -456,7 +480,8 @@ static void intr21_43(void)
         {
             debug(debug_dos, "\t(file not found)\n");
             cpuSetFlag(cpuFlag_CF);
-            cpuSetAX(2);
+            dos_error = 2;
+            cpuSetAX(dos_error);
             return;
         }
         debug(debug_dos, "\tattr '%s' = ", fname);
@@ -466,13 +491,14 @@ static void intr21_43(void)
         {
             cpuSetFlag(cpuFlag_CF);
             if(errno == EACCES)
-                cpuSetAX(5);
+                dos_error = 5;
             else if(errno == ENAMETOOLONG || errno == ENOTDIR)
-                cpuSetAX(3);
+                dos_error = 3;
             else if(errno == ENOENT)
-                cpuSetAX(2);
+                dos_error = 2;
             else
-                cpuSetAX(1);
+                dos_error = 1;
+            cpuSetAX(dos_error);
             free(fname);
             debug(debug_dos, "ERROR %u\n", cpuGetAX());
             return;
@@ -490,7 +516,8 @@ static void intr21_43(void)
             if(dif & 0x1C)
             {
                 cpuSetFlag(cpuFlag_CF);
-                cpuSetAX(5);
+                dos_error = 5;
+                cpuSetAX(dos_error);
                 free(fname);
                 debug(debug_dos, "ERROR %u\n", cpuGetAX());
                 return;
@@ -502,6 +529,7 @@ static void intr21_43(void)
         return;
     }
     cpuSetFlag(cpuFlag_CF);
+    dos_error = 0;
     cpuSetAX(1);
     return;
 }
@@ -573,7 +601,8 @@ static void dos_find_next(int first)
         debug(debug_dos, "\t(end)\n");
         clear_find_first_dta(p);
         cpuSetFlag(cpuFlag_CF);
-        cpuSetAX(first ? 0x02 : 0x12);
+        dos_error = first ? 0x02 : 0x12;
+        cpuSetAX(dos_error);
     }
     else
     {
@@ -610,6 +639,7 @@ static void dos_find_next(int first)
         p->find_first_ptr++;
         cpuClrFlag(cpuFlag_CF);
         // Some DOS programs require returning AX=0 on success.
+        dos_error = 0;
         cpuSetAX(0);
     }
 }
@@ -640,6 +670,7 @@ static void dos_find_next_fcb(void)
     {
         debug(debug_dos, "\t(end)\n");
         clear_find_first_dta(p);
+        dos_error = 0x12;
         cpuSetAL(0xFF);
     }
     else
@@ -691,6 +722,7 @@ static void dos_find_next_fcb(void)
             memory[dosDTA + 6] = memory[ofcb + 0x0C];
         }
         p->find_first_ptr++;
+        dos_error = 0;
         cpuSetAL(0x00);
     }
 }
@@ -717,7 +749,8 @@ static void intr21_57(void)
     if(!f)
     {
         cpuSetFlag(cpuFlag_CF);
-        cpuSetAX(6); // invalid handle
+        dos_error = 6;
+        cpuSetAX(dos_error); // invalid handle
         return;
     }
     if(al == 0)
@@ -727,9 +760,11 @@ static void intr21_57(void)
         if(0 != fstat(fileno(f), &st))
         {
             cpuSetFlag(cpuFlag_CF);
-            cpuSetAX(1);
+            dos_error = 1;
+            cpuSetAX(dos_error);
             return;
         }
+        dos_error = 0;
         cpuClrFlag(cpuFlag_CF);
         uint32_t td = get_time_date(st.st_mtime);
         cpuSetCX(td & 0xFFFF);
@@ -743,7 +778,8 @@ static void intr21_57(void)
         return;
     }
     cpuSetFlag(cpuFlag_CF);
-    cpuSetAX(1);
+    dos_error = 1;
+    cpuSetAX(dos_error);
     return;
 }
 
@@ -758,6 +794,7 @@ static void dos_get_drive_info(uint8_t drive)
     cpuSetDX(0xFFFF); // total 1GB
     cpuSetBX(0x0000); // media ID byte, offset
     cpuSetDS(0x0000); // and segment
+    dos_error = 0;
     cpuClrFlag(cpuFlag_CF);
 }
 
@@ -794,6 +831,7 @@ static void intr21_9(void)
     for(; memory[i] != 0x24 && i < 0x100000; i++)
         dos_putchar(memory[i], 1);
 
+    dos_error = 0;
     cpuSetAL(0x24);
 }
 
@@ -890,6 +928,7 @@ static void char_input(int brk)
             inp_last_key = getch(brk);
     }
     debug(debug_dos, "\tgetch = %02x '%c'\n", inp_last_key, (char)inp_last_key);
+    dos_error = 0;
     cpuSetAL(inp_last_key);
     if((inp_last_key & 0xFF) == 0)
         inp_last_key = inp_last_key >> 8;
@@ -1231,6 +1270,7 @@ void intr21(void)
         if(!fname)
         {
             debug(debug_dos, "\t(file not found)\n");
+            dos_error = 2;
             cpuSetAL(0xFF);
             break;
         }
@@ -1240,6 +1280,7 @@ void intr21(void)
         if(e)
         {
             debug(debug_dos, "\tcould not delete file (%d).\n", errno);
+            dos_error = 5;
             cpuSetAL(0xFF);
         }
         else
@@ -1264,6 +1305,7 @@ void intr21(void)
             if(!fname1)
             {
                 debug(debug_dos, "\t(file not found)\n");
+                dos_error = 2;
                 cpuSetAL(0xFF);
                 cpuSetFlag(cpuFlag_CF);
                 break;
@@ -1280,6 +1322,7 @@ void intr21(void)
                 free(fname1);
                 debug(debug_dos, "\t(destination invalid)\n");
                 cpuSetAL(0xFF);
+                dos_error = 3;
                 cpuSetFlag(cpuFlag_CF);
                 break;
             }
@@ -1288,10 +1331,12 @@ void intr21(void)
             free(fname1);
             if(e)
             {
+                dos_error = 5;
                 cpuSetAL(0xFF);
                 cpuSetFlag(cpuFlag_CF);
                 break;
             }
+            dos_error = 0;
             cpuSetAL(0);
             cpuClrFlag(cpuFlag_CF);
         }
@@ -1543,11 +1588,15 @@ void intr21(void)
     {
         if(dos_change_dir(cpuGetAddrDS(cpuGetDX())))
         {
-            cpuSetAX(2);
+            dos_error = 3;
+            cpuSetAX(3);
             cpuSetFlag(cpuFlag_CF);
         }
         else
+        {
+            dos_error = 0;
             cpuClrFlag(cpuFlag_CF);
+        }
         break;
     }
     case 0x3C: // CREATE FILE
@@ -1565,14 +1614,16 @@ void intr21(void)
         if(!f)
         {
             cpuSetFlag(cpuFlag_CF);
-            cpuSetAX(6); // invalid handle
+            dos_error = 6; // invalid handle
+            cpuSetAX(dos_error);
             break;
         }
         uint8_t *buf = getptr(cpuGetAddrDS(cpuGetDX()), cpuGetCX());
         if(!buf)
         {
             debug(debug_dos, "\tbuffer pointer invalid\n");
-            cpuSetAX(5);
+            dos_error = 5; // access denied
+            cpuSetAX(dos_error);
             cpuSetFlag(cpuFlag_CF);
             break;
         }
@@ -1587,6 +1638,7 @@ void intr21(void)
             unsigned n = fread(buf, 1, cpuGetCX(), f);
             cpuSetAX(n);
         }
+        dos_error = 0;
         cpuClrFlag(cpuFlag_CF);
         break;
     }
@@ -1597,7 +1649,8 @@ void intr21(void)
         if(!f)
         {
             cpuSetFlag(cpuFlag_CF);
-            cpuSetAX(6); // invalid handle
+            dos_error = 6; // invalid handle
+            cpuSetAX(dos_error);
             return;
         }
         unsigned len = cpuGetCX();
@@ -1605,13 +1658,15 @@ void intr21(void)
         if(!len)
         {
             cpuClrFlag(cpuFlag_CF);
+            dos_error = 0;
             cpuSetAX(0);
             // flush output
             int e = fflush(f);
             if(e)
             {
                 cpuSetFlag(cpuFlag_CF);
-                cpuSetAX(5); // access denied
+                dos_error = 5; // access denied
+                cpuSetAX(dos_error);
             }
             else if(devinfo[fd] != 0x80D3)
             {
@@ -1619,7 +1674,8 @@ void intr21(void)
                 if(pos != -1 && -1 == ftruncate(fileno(f), pos))
                 {
                     cpuSetFlag(cpuFlag_CF);
-                    cpuSetAX(5); // access denied
+                    dos_error = 5; // access denied
+                    cpuSetAX(dos_error);
                 }
             }
             break;
@@ -1628,7 +1684,8 @@ void intr21(void)
         if(!buf)
         {
             debug(debug_dos, "\tbuffer pointer invalid\n");
-            cpuSetAX(5);
+            dos_error = 5; // access denied
+            cpuSetAX(dos_error);
             cpuSetFlag(cpuFlag_CF);
             break;
         }
@@ -1643,6 +1700,7 @@ void intr21(void)
             unsigned n = fwrite(buf, 1, len, f);
             cpuSetAX(n);
         }
+        dos_error = 0;
         cpuClrFlag(cpuFlag_CF);
         break;
     }
@@ -1653,7 +1711,8 @@ void intr21(void)
         {
             debug(debug_dos, "\t(file not found)\n");
             cpuSetFlag(cpuFlag_CF);
-            cpuSetAX(0x02);
+            dos_error = 2;
+            cpuSetAX(dos_error);
             break;
         }
         debug(debug_dos, "\tunlink '%s'\n", fname);
@@ -1661,16 +1720,20 @@ void intr21(void)
         free(fname);
         if(e)
         {
-            cpuSetFlag(cpuFlag_CF);
             if(errno == ENOTDIR)
-                cpuSetAX(0x03);
+                dos_error = 3;
             else if(errno == ENOENT)
-                cpuSetAX(0x02);
+                dos_error = 2;
             else
-                cpuSetAX(0x05);
+                dos_error = 5;
+            cpuSetAX(dos_error);
+            cpuSetFlag(cpuFlag_CF);
         }
         else
+        {
+            dos_error = 0;
             cpuClrFlag(cpuFlag_CF);
+        }
         break;
     }
     case 0x42: // LSEEK
@@ -1686,7 +1749,8 @@ void intr21(void)
         if(!f)
         {
             cpuSetFlag(cpuFlag_CF);
-            cpuSetAX(6); // invalid handle
+            dos_error = 6; // invalid handle
+            cpuSetAX(dos_error);
             break;
         }
         switch(ax & 0xFF)
@@ -1702,12 +1766,14 @@ void intr21(void)
             break;
         default:
             cpuSetFlag(cpuFlag_CF);
-            cpuSetAX(1);
+            dos_error = 1;
+            cpuSetAX(dos_error);
             return;
         }
         pos = ftell(f);
         cpuSetAX(pos & 0xFFFF);
         cpuSetDX((pos >> 16) & 0xFFFF);
+        dos_error = 0;
         cpuClrFlag(cpuFlag_CF);
         break;
     }
@@ -1724,10 +1790,12 @@ void intr21(void)
             // Show error if it is a file handle.
             debug(debug_dos, "\t(invalid file handle)\n");
             cpuSetFlag(cpuFlag_CF);
-            cpuSetAX(6); // invalid handle
+            dos_error = 6; // invalid handle
+            cpuSetAX(dos_error);
             break;
         }
         cpuClrFlag(cpuFlag_CF);
+        dos_error = 0;
         switch(al)
         {
         case 0x00: // GET DEV INFO
@@ -1741,7 +1809,8 @@ void intr21(void)
         case 0x03: // IOCTL CHAR DEV WRITE
         case 0x04: // IOCTL BLOCK DEV READ
         case 0x05: // IOCTL BLOCK DEV |WRITE
-            cpuSetAX(5);
+            dos_error = 5;
+            cpuSetAX(dos_error);
             cpuSetFlag(cpuFlag_CF);
             break;
         case 0x06: // GET INPUT STATUS
@@ -1773,7 +1842,8 @@ void intr21(void)
         case 0x0F: // SET LOGICAL DRIVE MAP
         case 0x10: // QUERY CHAR DEV CAPABILITY
         case 0x11: // QUERY BLOCK DEV CAPABILITY
-            cpuSetAX(1);
+            dos_error = 1;
+            cpuSetAX(dos_error);
             cpuSetFlag(cpuFlag_CF);
             break;
         case 0x0E: // GET LOGICAL DRIVE MAP
@@ -1788,13 +1858,15 @@ void intr21(void)
             // Show error if it is a file handle.
             debug(debug_dos, "\t(invalid file handle)\n");
             cpuSetFlag(cpuFlag_CF);
-            cpuSetAX(6); // invalid handle
+            dos_error = 6; // invalid handle
+            cpuSetAX(dos_error);
             break;
         }
         int h = get_new_handle();
         if(h < 0)
         {
-            cpuSetAX(4);
+            dos_error = 4;
+            cpuSetAX(dos_error);
             cpuSetFlag(cpuFlag_CF);
             break;
         }
@@ -1802,6 +1874,7 @@ void intr21(void)
         handles[h] = handles[cpuGetBX()];
         devinfo[h] = devinfo[cpuGetBX()];
         cpuSetAX(h);
+        dos_error = 0;
         cpuClrFlag(cpuFlag_CF);
         break;
     }
@@ -1811,8 +1884,9 @@ void intr21(void)
         {
             // Show error if it is a file handle.
             debug(debug_dos, "\t(invalid file handle)\n");
+            dos_error = 6; // invalid handle
+            cpuSetAX(dos_error);
             cpuSetFlag(cpuFlag_CF);
-            cpuSetAX(6); // invalid handle
             break;
         }
         if(handles[cpuGetCX()])
@@ -1829,6 +1903,7 @@ void intr21(void)
         debug(debug_dos, "\tcwd '%c' = '%s'\n", '@' + (int)(cpuGetDX() & 0xFF), path);
         putmem(cpuGetAddrDS(cpuGetSI()), path, 64);
         cpuSetAX(0x0100);
+        dos_error = 0;
         cpuClrFlag(cpuFlag_CF);
         break;
     }
@@ -1839,13 +1914,15 @@ void intr21(void)
         if(seg)
         {
             debug(debug_dos, "\tallocated at %04x.\n", seg);
+            dos_error = 0;
             cpuSetAX(seg);
             cpuClrFlag(cpuFlag_CF);
         }
         else
         {
             debug(debug_dos, "\tnot enough memory, max=$%04x paragraphs\n", max);
-            cpuSetAX(0x8);
+            dos_error = 8;
+            cpuSetAX(dos_error);
             cpuSetBX(max);
             cpuSetFlag(cpuFlag_CF);
         }
@@ -1864,7 +1941,8 @@ void intr21(void)
             cpuClrFlag(cpuFlag_CF);
         else
         {
-            cpuSetAX(0x8);
+            dos_error = 8;
+            cpuSetAX(dos_error);
             cpuSetBX(sz);
             cpuSetFlag(cpuFlag_CF);
             debug(debug_dos, "\tmax memory available: $%04x\n", sz);
@@ -1877,8 +1955,9 @@ void intr21(void)
         if(!fname)
         {
             debug(debug_dos, "\texec error, file not found\n");
+            dos_error = 2;
+            cpuSetAX(dos_error);
             cpuSetFlag(cpuFlag_CF);
-            cpuSetAX(2);
             break;
         }
         // Flags:   0 = Load and Go, 1 = LOAD, 3 = Overlay
@@ -1893,11 +1972,15 @@ void intr21(void)
             if(!f || dos_read_overlay(f, load_seg, reloc_seg))
             {
                 debug(debug_dos, "\tERROR\n");
+                dos_error = 11;
+                cpuSetAX(dos_error);
                 cpuSetFlag(cpuFlag_CF);
-                cpuSetAX(11);
             }
             else
+            {
+                dos_error = 0;
                 cpuClrFlag(cpuFlag_CF);
+            }
         }
         else if((ax & 0xFF) == 0)
         {
@@ -1929,18 +2012,23 @@ void intr21(void)
             }
             if(run_emulator(fname, prgname, cmdline, env))
             {
-                cpuSetAX(5); // access denied
+                dos_error = 5; // access denied
+                cpuSetAX(dos_error);
                 cpuSetFlag(cpuFlag_CF);
             }
             else
+            {
+                dos_error = 0;
                 cpuClrFlag(cpuFlag_CF);
+            }
         }
         else
         {
             debug(debug_dos, "\texec '%s': type %02xh not supported.\n", fname,
                   ax & 0xFF);
+            dos_error = 1;
+            cpuSetAX(dos_error);
             cpuSetFlag(cpuFlag_CF);
-            cpuSetAX(1);
         }
         free(fname);
         break;
@@ -2021,7 +2109,8 @@ void intr21(void)
         if(!fname1)
         {
             debug(debug_dos, "\t(file not found)\n");
-            cpuSetAX(0x02);
+            dos_error = 2;
+            cpuSetAX(dos_error);
             cpuSetFlag(cpuFlag_CF);
             break;
         }
@@ -2030,7 +2119,8 @@ void intr21(void)
         {
             free(fname1);
             debug(debug_dos, "\t(destination not found)\n");
-            cpuSetAX(0x03);
+            dos_error = 3;
+            cpuSetAX(dos_error);
             cpuSetFlag(cpuFlag_CF);
             break;
         }
@@ -2042,14 +2132,18 @@ void intr21(void)
         {
             cpuSetFlag(cpuFlag_CF);
             if(errno == ENOTDIR)
-                cpuSetAX(0x03);
+                dos_error = 3;
             else if(errno == ENOENT)
-                cpuSetAX(0x02);
+                dos_error = 2;
             else
-                cpuSetAX(0x05);
+                dos_error = 5;
+            cpuSetAX(dos_error);
         }
         else
+        {
+            dos_error = 0;
             cpuClrFlag(cpuFlag_CF);
+        }
         break;
     }
     case 0x57: // DATE/TIME
@@ -2065,12 +2159,13 @@ void intr21(void)
         else if(3 == al)
         {
             cpuSetFlag(cpuFlag_CF);
-            cpuSetAX(1);
+            dos_error = 1;
+            cpuSetAX(dos_error);
         }
         break;
     }
     case 0x59: // GET EXTENDED ERROR
-        cpuSetAX(ax & 0xFF);
+        cpuSetAX(dos_error);
         break;
     case 0x5B: // CREATE NEW FILE
         dos_open_file(2, cpuGetAX() & 0xFF, cpuGetAddrDS(cpuGetDX()));
@@ -2082,6 +2177,7 @@ void intr21(void)
         char *no_drive_path = truename + 3;
         if(strlen(path) > 63)
         {
+            dos_error = 3;
             cpuSetFlag(cpuFlag_CF);
         }
         else
@@ -2151,7 +2247,8 @@ void intr21(void)
             cpuSetCX(5);
             break;
         default:
-            cpuSetAX(1);
+            dos_error = 1;
+            cpuSetAX(dos_error);
             cpuSetFlag(cpuFlag_CF);
             break;
         }
@@ -2186,7 +2283,8 @@ void intr21(void)
         {
             // TODO: unsupported open moe
             debug(debug_dos,"\tUnsupported open mode: %02x\n", cmod);
-            cpuSetAX(1);
+            dos_error = 1;
+            cpuSetAX(dos_error);
             cpuSetFlag(cpuFlag_CF);
             break;
         }
@@ -2198,6 +2296,7 @@ void intr21(void)
     default:
         debug(debug_dos, "UNHANDLED INT 21, AX=%04x\n", cpuGetAX());
         debug(debug_int, "UNHANDLED INT 21, AX=%04x\n", cpuGetAX());
+        dos_error = 1;
         cpuSetFlag(cpuFlag_CF);
         cpuSetAX(ax & 0xFF00);
     }
