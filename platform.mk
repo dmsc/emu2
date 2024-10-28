@@ -27,6 +27,23 @@ ifneq "$(findstring clang,$(CC))" ""
  GCC_CLANG=1
 endif
 
+# Detect if GCC (or Clang) needs `-std=c99`
+ifeq ($(GCC_CLANG),1)
+ C99_WR:=$(shell printf '%s\n' \
+  "int main(void){for(int i=0;i<1;++i);return 0;}" > .test.c; \
+   $(CC) .test.c -o .test.out > /dev/null 2>&1; \
+    echo $$?; rm -f .test.c .test.out > /dev/null 2>&1)
+ ifeq ($(C99_WR),1)
+  C99_OK:=$(shell printf '%s\n' \
+   "int main(void){for(int i=0;i<1;++i);return 0;}" > .test.c; \
+    $(CC) -std=c99 .test.c -o .test.out > /dev/null 2>&1; \
+     echo $$?; rm -f .test.c .test.out > /dev/null 2>&1)
+ endif
+ ifeq ($(C99_OK),0)
+  CFLAGS+=-std=c99
+ endif
+endif
+
 # Extra CFLAGS for GCC or Clang
 EXTRA_CFLAGS?=-Wall -g -Werror=implicit-function-declaration -pedantic-errors
 ifeq ($(GCC_CLANG),1)
