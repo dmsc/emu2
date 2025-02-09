@@ -1948,7 +1948,11 @@ void intr21(void)
     {
         uint16_t sz = mem_resize_segment(cpuGetES(), cpuGetBX());
         if(sz == cpuGetBX())
+        {
             cpuClrFlag(cpuFlag_CF);
+            // See bug #115
+            cpuSetAX(cpuGetES());
+        }
         else
         {
             dos_error = 8;
