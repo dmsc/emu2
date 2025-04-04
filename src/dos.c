@@ -2224,6 +2224,14 @@ void intr21(void)
         {
         case 1:
         {
+            if (cpuGetCX() < 41)
+            {
+                dos_error = 1;
+                cpuSetAX(dos_error);
+                cpuSetFlag(cpuFlag_CF);
+                break;
+            }
+
             static const uint8_t data[] = {1, 38, 0, 1, 0, 181, 1};
             putmem(addr, data, 7);
             putmem(addr + 7, nls_country_info, 34);
