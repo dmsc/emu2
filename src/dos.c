@@ -2219,53 +2219,51 @@ void intr21(void)
     case 0x65: // GET NLS DATA
     {
         uint32_t addr = cpuGetAddrES(cpuGetDI());
+        uint16_t len = cpuGetCX();
+        uint32_t table = 0;
         cpuClrFlag(cpuFlag_CF);
         switch(ax & 0xFF)
         {
         case 1:
         {
+            if(len < 41)
+                break;
             static const uint8_t data[] = {1, 38, 0, 1, 0, 181, 1};
             putmem(addr, data, 7);
             putmem(addr + 7, nls_country_info, 34);
             cpuSetCX(41);
-            break;
+            return;
         }
         case 2:
-            memory[addr] = 2;
-            put16(addr + 1, nls_uppercase_table & 0xF);
-            put16(addr + 3, nls_uppercase_table >> 4);
-            cpuSetCX(5);
+            table = nls_uppercase_table;
             break;
         case 4:
-            memory[addr] = 4;
-            put16(addr + 1, nls_uppercase_table & 0xF);
-            put16(addr + 3, nls_uppercase_table >> 4);
-            cpuSetCX(5);
+            table = nls_uppercase_table;
             break;
         case 5:
-            memory[addr] = 5;
-            put16(addr + 1, nls_terminator_table & 0xF);
-            put16(addr + 3, nls_terminator_table >> 4);
-            cpuSetCX(5);
+            table = nls_terminator_table;
             break;
         case 6:
-            memory[addr] = 6;
-            put16(addr + 1, nls_collating_table & 0xF);
-            put16(addr + 3, nls_collating_table >> 4);
-            cpuSetCX(5);
+            table = nls_collating_table;
             break;
         case 7:
-            memory[addr] = 7;
-            put16(addr + 1, nls_dbc_set_table & 0xF);
-            put16(addr + 3, nls_dbc_set_table >> 4);
-            cpuSetCX(5);
+            table = nls_dbc_set_table;
             break;
         default:
-            dos_error = 1;
-            cpuSetAX(dos_error);
-            cpuSetFlag(cpuFlag_CF);
             break;
         }
+        if(table && len >= 5)
+        {
+            memory[addr] = ax & 0xFF;
+            put16(addr + 1, table & 0xF);
+            put16(addr + 3, table >> 4);
+            cpuSetCX(5);
+            return;
+        }
+        // Unsupported function code
+        dos_error = 1;
+        cpuSetAX(dos_error);
+        cpuSetFlag(cpuFlag_CF);
         break;
     }
     case 0x66: // GET GLOBAL CODE PAGE
