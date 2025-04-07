@@ -6,10 +6,10 @@
 #include "env.h"
 #include "keyb.h"
 #include "loader.h"
+#include "os.h"
 #include "timer.h"
 #include "utils.h"
 #include "video.h"
-#include "os.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -420,7 +420,7 @@ static int dos_rw_record_fcb(unsigned addr, int write, int update, int seq)
     // Update random and block positions
     if(update)
     {
-        unsigned rnum = (pos + ((n>0) ? rsize : 0)) / rsize;
+        unsigned rnum = (pos + ((n > 0) ? rsize : 0)) / rsize;
         memory[0x20 + fcb] = rnum & 127;
         put16(0x0C + fcb, rnum / 128);
         if(!seq)
@@ -1022,29 +1022,109 @@ static int line_input(FILE *f, uint8_t *buf, int max)
 
 static void intr21_debug(void)
 {
-    static const char *func_names[] =
-    {
-        "terminate", "getchar", "putchar", "getc(aux)", "putc(aux)", // 0-4
-        "putc(prn)", "console i/o", "getch", "getch", "puts", // 5-9
-        "gets", "eof(stdin)", "flush(stdin)+", "disk reset", "set drive", // 0A-0E
-        "open fcb", "close fcb", "find first fcb", "find next fcb", "del fcb", // 0F-13
-        "read fcb", "write fcb", "creat fcb", "rename fcb", "n/a", // 14-18
-        "get drive", "set DTA", "stat def drive", "stat drive", "n/a", // 19-1D
-        "n/a", "get def DPB", "n/a", "read fcb", "write fcb", // 1E-22
-        "size fcb", "set record fcb", "set int vect", "create PSP", "read blk fcb", // 23-27
-        "write blk fcb", "parse filename", "get date", "set date", "get time", // 28-2C
-        "set time", "set verify", "get DTA", "version", "go TSR", // 2D-31
-        "get DPB", "g/set brk check", "InDOS addr", "get int vect", "get free", // 32-36
-        "get/set switch", "country info", "mkdir", "rmdir", "chdir", // 37-3B
-        "creat", "open", "close", "read", "write", // 3C-40
-        "unlink", "lseek", "get/set attr", "g/set devinfo", "dup", // 41-45
-        "dup2", "get CWD", "mem alloc", "mem free", "mem resize", // 46-4A
-        "exec", "exit", "get errorlevel", "find first", "find next", // 4B-4F
-        "set PSP", "get PSP", "get sysvars", "trans BPB to DPB", "get verify", // 50-54
-        "create PSP", "rename", "g/set file dates", "g/set alloc type", "ext error", // 55-59
-        "create tmpfile", "creat new file", "flock", "(server fn)", "(net fn)", // 5A-5E
-        "(net redir)", "truename", "n/a", "get PSP", "intl char info", // 5F-63
-        "(internal)", "get ext country info"
+    static const char *func_names[] = {
+        "terminate",            // 00
+        "getchar",              // 01
+        "putchar",              // 02
+        "getc(aux)",            // 03
+        "putc(aux)",            // 04
+        "putc(prn)",            // 05
+        "console i/o",          // 06
+        "getch",                // 07
+        "getch",                // 08
+        "puts",                 // 09
+        "gets",                 // 0a
+        "eof(stdin)",           // 0b
+        "flush(stdin)+",        // 0c
+        "disk reset",           // 0d
+        "set drive",            // 0e
+        "open fcb",             // 0f
+        "close fcb",            // 10
+        "find first fcb",       // 11
+        "find next fcb",        // 12
+        "del fcb",              // 13
+        "read fcb",             // 14
+        "write fcb",            // 15
+        "creat fcb",            // 16
+        "rename fcb",           // 17
+        "n/a",                  // 18
+        "get drive",            // 19
+        "set DTA",              // 1a
+        "stat def drive",       // 1b
+        "stat drive",           // 1c
+        "n/a",                  // 1d
+        "n/a",                  // 1e
+        "get def DPB",          // 1f
+        "n/a",                  // 20
+        "read fcb",             // 21
+        "write fcb",            // 22
+        "size fcb",             // 23
+        "set record fcb",       // 24
+        "set int vect",         // 25
+        "create PSP",           // 26
+        "read blk fcb",         // 27
+        "write blk fcb",        // 28
+        "parse filename",       // 29
+        "get date",             // 2a
+        "set date",             // 2b
+        "get time",             // 2c
+        "set time",             // 2d
+        "set verify",           // 2e
+        "get DTA",              // 2f
+        "version",              // 30
+        "go TSR",               // 31
+        "get DPB",              // 32
+        "g/set brk check",      // 33
+        "InDOS addr",           // 34
+        "get int vect",         // 35
+        "get free",             // 36
+        "get/set switch",       // 37
+        "country info",         // 38
+        "mkdir",                // 39
+        "rmdir",                // 3a
+        "chdir",                // 3b
+        "creat",                // 3c
+        "open",                 // 3d
+        "close",                // 3e
+        "read",                 // 3f
+        "write",                // 40
+        "unlink",               // 41
+        "lseek",                // 42
+        "get/set attr",         // 43
+        "g/set devinfo",        // 44
+        "dup",                  // 45
+        "dup2",                 // 46
+        "get CWD",              // 47
+        "mem alloc",            // 48
+        "mem free",             // 49
+        "mem resize",           // 4a
+        "exec",                 // 4b
+        "exit",                 // 4c
+        "get errorlevel",       // 4d
+        "find first",           // 4e
+        "find next",            // 4f
+        "set PSP",              // 50
+        "get PSP",              // 51
+        "get sysvars",          // 52
+        "trans BPB to DPB",     // 53
+        "get verify",           // 54
+        "create PSP",           // 55
+        "rename",               // 56
+        "g/set file dates",     // 57
+        "g/set alloc type",     // 58
+        "ext error",            // 59
+        "create tmpfile",       // 5a
+        "creat new file",       // 5b
+        "flock",                // 5c
+        "(server fn)",          // 5d
+        "(net fn)",             // 5e
+        "(net redir)",          // 5f
+        "truename",             // 60
+        "n/a",                  // 61
+        "get PSP",              // 62
+        "intl char info",       // 63
+        "(internal)",           // 64
+        "get ext country info", // 65
     };
     const char *fn;
     static int count = 0;
@@ -1089,13 +1169,13 @@ void intr2f(void)
         debug(debug_dos, "W-2F1680: sleep\n");
         usleep(33000);
         break;
-    case 0xB700:
+    case 0xB700: // APPEND installation check
         cpuSetAL(0xFF);
         break;
-    case 0xB702:
+    case 0xB702: // Get Append Version
         cpuSetAX(0xFDFD);
         break;
-    case 0xB704: // Get append Path
+    case 0xB704: // Get Append Path
         cpuSetES(dos_append >> 4);
         cpuSetDI((dos_append & 0xF) + 24);
         break;
@@ -1309,48 +1389,48 @@ void intr21(void)
         dos_open_file_fcb(1);
         break;
     case 0x17: // RENAME FILE USING FCB
+    {
+        int fcb_addr = get_fcb();
+        char *fname1 = dos_unix_path_fcb(fcb_addr, 0, append_path());
+        if(!fname1)
         {
-            int fcb_addr = get_fcb();
-            char *fname1 = dos_unix_path_fcb(fcb_addr, 0, append_path());
-            if(!fname1)
-            {
-                debug(debug_dos, "\t(file not found)\n");
-                dos_error = 2;
-                cpuSetAL(0xFF);
-                cpuSetFlag(cpuFlag_CF);
-                break;
-            }
-            // Backup old name, and copy new name to standard location
-            uint8_t buf[11];
-            memcpy(buf, memory + fcb_addr + 1, 11);
-            memcpy(memory + fcb_addr + 1, memory + fcb_addr + 0x11, 11);
-            char *fname2 = dos_unix_path_fcb(fcb_addr, 1, append_path());
-            // Restore name
-            memcpy(memory + fcb_addr + 1, buf, 11);
-            if(!fname2)
-            {
-                free(fname1);
-                debug(debug_dos, "\t(destination invalid)\n");
-                cpuSetAL(0xFF);
-                dos_error = 3;
-                cpuSetFlag(cpuFlag_CF);
-                break;
-            }
-            int e = rename(fname1, fname2);
-            free(fname2);
-            free(fname1);
-            if(e)
-            {
-                dos_error = 5;
-                cpuSetAL(0xFF);
-                cpuSetFlag(cpuFlag_CF);
-                break;
-            }
-            dos_error = 0;
-            cpuSetAL(0);
-            cpuClrFlag(cpuFlag_CF);
+            debug(debug_dos, "\t(file not found)\n");
+            dos_error = 2;
+            cpuSetAL(0xFF);
+            cpuSetFlag(cpuFlag_CF);
+            break;
         }
+        // Backup old name, and copy new name to standard location
+        uint8_t buf[11];
+        memcpy(buf, memory + fcb_addr + 1, 11);
+        memcpy(memory + fcb_addr + 1, memory + fcb_addr + 0x11, 11);
+        char *fname2 = dos_unix_path_fcb(fcb_addr, 1, append_path());
+        // Restore name
+        memcpy(memory + fcb_addr + 1, buf, 11);
+        if(!fname2)
+        {
+            free(fname1);
+            debug(debug_dos, "\t(destination invalid)\n");
+            cpuSetAL(0xFF);
+            dos_error = 3;
+            cpuSetFlag(cpuFlag_CF);
+            break;
+        }
+        int e = rename(fname1, fname2);
+        free(fname2);
+        free(fname1);
+        if(e)
+        {
+            dos_error = 5;
+            cpuSetAL(0xFF);
+            cpuSetFlag(cpuFlag_CF);
+            break;
+        }
+        dos_error = 0;
+        cpuSetAL(0);
+        cpuClrFlag(cpuFlag_CF);
         break;
+    }
     case 0x19: // GET DEFAULT DRIVE
         debug(debug_dos, "\tget default drive = '%c'\n", dos_get_default_drive() + 'A');
         cpuSetAL(dos_get_default_drive());
@@ -1535,7 +1615,8 @@ void intr21(void)
         break;
     }
     case 0x2B: // SET SYSTEM DATE
-        cpuSetAL(0xFF); // Invalid date - don't support setting date.
+        // Invalid date - don't support setting date.
+        cpuSetAL(0xFF);
         break;
     case 0x2C: // GET SYSTEM TIME
     {
@@ -1554,7 +1635,8 @@ void intr21(void)
         break;
     }
     case 0x2D: // SET SYSTEM TIME
-        cpuSetAL(0xFF); // Invalid time - don't support setting time.
+        // Invalid time - don't support setting time.
+        cpuSetAL(0xFF);
         break;
     case 0x2F: // GET DTA
         cpuSetES((dosDTA & 0xFFF00) >> 4);
@@ -1765,15 +1847,9 @@ void intr21(void)
         }
         switch(ax & 0xFF)
         {
-        case 0:
-            fseek(f, pos, SEEK_SET);
-            break;
-        case 1:
-            fseek(f, pos, SEEK_CUR);
-            break;
-        case 2:
-            fseek(f, pos, SEEK_END);
-            break;
+        case 0: fseek(f, pos, SEEK_SET); break;
+        case 1: fseek(f, pos, SEEK_CUR); break;
+        case 2: fseek(f, pos, SEEK_END); break;
         default:
             cpuSetFlag(cpuFlag_CF);
             dos_error = 1;
@@ -2234,22 +2310,23 @@ void intr21(void)
             cpuSetCX(41);
             return;
         }
-        case 2:
+        case 2: // Uppercase table
             table = nls_uppercase_table;
             break;
-        case 4:
+        case 4: // File name uppercase table
             table = nls_uppercase_table;
             break;
-        case 5:
+        case 5: // File name terminator table
             table = nls_terminator_table;
             break;
-        case 6:
+        case 6: // Collating sequence table
             table = nls_collating_table;
             break;
-        case 7:
+        case 7: // Double byte character set table
             table = nls_dbc_set_table;
             break;
         default:
+            // Not supported
             break;
         }
         if(table && len >= 5)
@@ -2293,8 +2370,8 @@ void intr21(void)
             create = 1;
         else
         {
-            // TODO: unsupported open moe
-            debug(debug_dos,"\tUnsupported open mode: %02x\n", cmod);
+            // TODO: unsupported open mode
+            debug(debug_dos, "\tUnsupported open mode: %02x\n", cmod);
             dos_error = 1;
             cpuSetAX(dos_error);
             cpuSetFlag(cpuFlag_CF);
@@ -2351,32 +2428,38 @@ static void init_append(void)
 static void init_nls_data(void)
 {
     static const uint8_t uppercase_table[128] = {
-        0x80,0x9A,0x45,0x41,0x8E,0x41,0x8F,0x80,0x45,0x45,0x45,0x49,0x49,0x49,0x8E,0x8F,
-        0x90,0x92,0x92,0x4F,0x99,0x4F,0x55,0x55,0x59,0x99,0x9A,0x9B,0x9C,0x9D,0x9E,0x9F,
-        0x41,0x49,0x4F,0x55,0xA5,0xA5,0xA6,0xA7,0xA8,0xA9,0xAA,0xAB,0xAC,0xAD,0xAE,0xAF,
-        0xB0,0xB1,0xB2,0xB3,0xB4,0xB5,0xB6,0xB7,0xB8,0xB9,0xBA,0xBB,0xBC,0xBD,0xBE,0xBF,
-        0xC0,0xC1,0xC2,0xC3,0xC4,0xC5,0xC6,0xC7,0xC8,0xC9,0xCA,0xCB,0xCC,0xCD,0xCE,0xCF,
-        0xD0,0xD1,0xD2,0xD3,0xD4,0xD5,0xD6,0xD7,0xD8,0xD9,0xDA,0xDB,0xDC,0xDD,0xDE,0xDF,
-        0xE0,0xE1,0xE2,0xE3,0xE4,0xE5,0xE6,0xE7,0xE8,0xE9,0xEA,0xEB,0xEC,0xED,0xEE,0xEF,
-        0xF0,0xF1,0xF2,0xF3,0xF4,0xF5,0xF6,0xF7,0xF8,0xF9,0xFA,0xFB,0xFC,0xFD,0xFE,0xFF,
+        0x80, 0x9A, 0x45, 0x41, 0x8E, 0x41, 0x8F, 0x80, 0x45, 0x45, 0x45, 0x49, 0x49,
+        0x49, 0x8E, 0x8F, 0x90, 0x92, 0x92, 0x4F, 0x99, 0x4F, 0x55, 0x55, 0x59, 0x99,
+        0x9A, 0x9B, 0x9C, 0x9D, 0x9E, 0x9F, 0x41, 0x49, 0x4F, 0x55, 0xA5, 0xA5, 0xA6,
+        0xA7, 0xA8, 0xA9, 0xAA, 0xAB, 0xAC, 0xAD, 0xAE, 0xAF, 0xB0, 0xB1, 0xB2, 0xB3,
+        0xB4, 0xB5, 0xB6, 0xB7, 0xB8, 0xB9, 0xBA, 0xBB, 0xBC, 0xBD, 0xBE, 0xBF, 0xC0,
+        0xC1, 0xC2, 0xC3, 0xC4, 0xC5, 0xC6, 0xC7, 0xC8, 0xC9, 0xCA, 0xCB, 0xCC, 0xCD,
+        0xCE, 0xCF, 0xD0, 0xD1, 0xD2, 0xD3, 0xD4, 0xD5, 0xD6, 0xD7, 0xD8, 0xD9, 0xDA,
+        0xDB, 0xDC, 0xDD, 0xDE, 0xDF, 0xE0, 0xE1, 0xE2, 0xE3, 0xE4, 0xE5, 0xE6, 0xE7,
+        0xE8, 0xE9, 0xEA, 0xEB, 0xEC, 0xED, 0xEE, 0xEF, 0xF0, 0xF1, 0xF2, 0xF3, 0xF4,
+        0xF5, 0xF6, 0xF7, 0xF8, 0xF9, 0xFA, 0xFB, 0xFC, 0xFD, 0xFE, 0xFF,
     };
     static const uint8_t collating_table[256] = {
-        0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0a,0x0b,0x0c,0x0d,0x0e,0x0f,
-        0x10,0x11,0x12,0x13,0x14,0x15,0x16,0x17,0x18,0x19,0x1a,0x1b,0x1c,0x1d,0x1e,0x1f,
-        0x20,0x21,0x22,0x23,0x24,0x25,0x26,0x27,0x28,0x29,0x2a,0x2b,0x2c,0x2d,0x2e,0x2f,
-        0x30,0x31,0x32,0x33,0x34,0x35,0x36,0x37,0x38,0x39,0x3a,0x3b,0x3c,0x3d,0x3e,0x3f,
-        0x40,0x41,0x42,0x43,0x44,0x45,0x46,0x47,0x48,0x49,0x4a,0x4b,0x4c,0x4d,0x4e,0x4f,
-        0x50,0x51,0x52,0x53,0x54,0x55,0x56,0x57,0x58,0x59,0x5a,0x5b,0x5c,0x5d,0x5e,0x5f,
-        0x60,0x41,0x42,0x43,0x44,0x45,0x46,0x47,0x48,0x49,0x4a,0x4b,0x4c,0x4d,0x4e,0x4f,
-        0x50,0x51,0x52,0x53,0x54,0x55,0x56,0x57,0x58,0x59,0x5a,0x7b,0x7c,0x7d,0x7e,0x7f,
-        0x43,0x55,0x45,0x41,0x41,0x41,0x41,0x43,0x45,0x45,0x45,0x49,0x49,0x49,0x41,0x41,
-        0x45,0x41,0x41,0x4f,0x4f,0x4f,0x55,0x55,0x59,0x4f,0x55,0x24,0x24,0x24,0x24,0x24,
-        0x41,0x49,0x4f,0x55,0x4e,0x4e,0xa6,0xa7,0x3f,0xa9,0xaa,0xab,0xac,0x21,0x22,0x22,
-        0xb0,0xb1,0xb2,0xb3,0xb4,0xb5,0xb6,0xb7,0xb8,0xb9,0xba,0xbb,0xbc,0xbd,0xbe,0xbf,
-        0xc0,0xc1,0xc2,0xc3,0xc4,0xc5,0xc6,0xc7,0xc8,0xc9,0xca,0xcb,0xcc,0xcd,0xce,0xcf,
-        0xd0,0xd1,0xd2,0xd3,0xd4,0xd5,0xd6,0xd7,0xd8,0xd9,0xda,0xdb,0xdc,0xdd,0xde,0xdf,
-        0xe0,0x53,0xe2,0xe3,0xe4,0xe5,0xe6,0xe7,0xe8,0xe9,0xea,0xeb,0xec,0xed,0xee,0xef,
-        0xf0,0xf1,0xf2,0xf3,0xf4,0xf5,0xf6,0xf7,0xf8,0xf9,0xfa,0xfb,0xfc,0xfd,0xfe,0xff
+        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C,
+        0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19,
+        0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F, 0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26,
+        0x27, 0x28, 0x29, 0x2A, 0x2B, 0x2C, 0x2D, 0x2E, 0x2F, 0x30, 0x31, 0x32, 0x33,
+        0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3A, 0x3B, 0x3C, 0x3D, 0x3E, 0x3F, 0x40,
+        0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4A, 0x4B, 0x4C, 0x4D,
+        0x4E, 0x4F, 0x50, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57, 0x58, 0x59, 0x5A,
+        0x5B, 0x5C, 0x5D, 0x5E, 0x5F, 0x60, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47,
+        0x48, 0x49, 0x4A, 0x4B, 0x4C, 0x4D, 0x4E, 0x4F, 0x50, 0x51, 0x52, 0x53, 0x54,
+        0x55, 0x56, 0x57, 0x58, 0x59, 0x5A, 0x7B, 0x7C, 0x7D, 0x7E, 0x7F, 0x43, 0x55,
+        0x45, 0x41, 0x41, 0x41, 0x41, 0x43, 0x45, 0x45, 0x45, 0x49, 0x49, 0x49, 0x41,
+        0x41, 0x45, 0x41, 0x41, 0x4F, 0x4F, 0x4F, 0x55, 0x55, 0x59, 0x4F, 0x55, 0x24,
+        0x24, 0x24, 0x24, 0x24, 0x41, 0x49, 0x4F, 0x55, 0x4E, 0x4E, 0xA6, 0xA7, 0x3F,
+        0xA9, 0xAA, 0xAB, 0xAC, 0x21, 0x22, 0x22, 0xB0, 0xB1, 0xB2, 0xB3, 0xB4, 0xB5,
+        0xB6, 0xB7, 0xB8, 0xB9, 0xBA, 0xBB, 0xBC, 0xBD, 0xBE, 0xBF, 0xC0, 0xC1, 0xC2,
+        0xC3, 0xC4, 0xC5, 0xC6, 0xC7, 0xC8, 0xC9, 0xCA, 0xCB, 0xCC, 0xCD, 0xCE, 0xCF,
+        0xD0, 0xD1, 0xD2, 0xD3, 0xD4, 0xD5, 0xD6, 0xD7, 0xD8, 0xD9, 0xDA, 0xDB, 0xDC,
+        0xDD, 0xDE, 0xDF, 0xE0, 0x53, 0xE2, 0xE3, 0xE4, 0xE5, 0xE6, 0xE7, 0xE8, 0xE9,
+        0xEA, 0xEB, 0xEC, 0xED, 0xEE, 0xEF, 0xF0, 0xF1, 0xF2, 0xF3, 0xF4, 0xF5, 0xF6,
+        0xF7, 0xF8, 0xF9, 0xFA, 0xFB, 0xFC, 0xFD, 0xFE, 0xFF,
     };
     static const uint8_t terminator_table[24] = {
         0x16, 0x00, // size of table = 22 bytes
@@ -2402,7 +2485,7 @@ static void init_nls_data(void)
         0xCB              // xit: RETF
     };
     static uint8_t country_info[34] = {
-        1, 0,            // Date format
+        1,   0,          // Date format
         '$', 0, 0, 0, 0, // Currency symbol string
         ',', 0,          // Thousands separator
         '.', 0,          // Decimal separator
@@ -2411,9 +2494,9 @@ static void init_nls_data(void)
         0,               // Currency format
         2,               // Digits after decimal in currency
         0,               // Time format
-        0, 0, 0, 0,      // Uppercase function address - patched in code
+        0,   0, 0, 0,    // Uppercase function address - patched in code
         ',', 0,          // Data list separator
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+        0,   0, 0, 0, 0, 0, 0, 0, 0, 0,
     };
 
     // Uppercase table
@@ -2505,10 +2588,10 @@ void init_dos(int argc, char **argv)
     put16(dos_sysvars + 22, 0x0080); // First MCB
     // NUL driver
     static const uint8_t null_device[] = {
-        0xff, 0xff, 0x00, 0x00,
-        0x04, 0x80,
-        0x00, 0x00, 0x00, 0x00,
-        'N', 'U', 'L', ' ', ' ', ' ', ' ', ' '
+        0xff, 0xff, 0x00, 0x00,                    // Next driver
+        0x04, 0x80,                                // Device Attributes
+        0x00, 0x00, 0x00, 0x00,                    // Request / Int entry points
+        'N',  'U',  'L',  ' ',  ' ', ' ', ' ', ' ' // Name
     };
     putmem(dos_sysvars + 24 + 0x22, null_device, sizeof(null_device));
 
