@@ -996,6 +996,7 @@ static int line_input(FILE *f, uint8_t *buf, int max)
             int c = fgetc(f);
             if(c == EOF && errno == EINTR)
             {
+                errno = 0;
                 --i;
                 continue;
             }
@@ -1300,7 +1301,10 @@ void intr21(void)
             int c = getc(f);
             // Retry if we were interrupted
             if(c == EOF && errno == EINTR)
+            {
+                errno = 0;
                 continue;
+            }
             if(c == '\n' || c == EOF)
                 c = '\r';
             memory[addr + i + 2] = (char)c;
