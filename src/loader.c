@@ -462,6 +462,8 @@ static uint16_t mcb_grow_max(uint16_t mcb)
     uint16_t nxt = mcb_next(mcb);
     while(mcb_is_free(nxt))
     {
+        debug(debug_dos, "\t+ mcb:$%04X size:$%04X merging with mcb:$%04X size:$%04X\n",
+              mcb, mcb_size(mcb), nxt, mcb_size(nxt));
         total += 1 + mcb_size(nxt);
         mcb_set_size(mcb, total);
         mcb_set_last(mcb, mcb_is_last(nxt));
@@ -488,7 +490,7 @@ static uint16_t mcb_alloc_new(uint16_t size, uint16_t owner, uint16_t *max)
     {
         if(mcb_is_free(mcb))
         {
-            int slack = mcb_size(mcb) - size;
+            int slack = mcb_grow_max(mcb) - size;
             if(slack >= 0)
             {
                 if(!best || (stg == 1 && slack < best_slack) || (stg >= 2))
