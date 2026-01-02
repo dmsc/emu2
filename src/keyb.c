@@ -489,7 +489,7 @@ int getch(int detect_brk)
 void update_keyb(void)
 {
     // See if any key is available:
-    if(tty_fd >= 0 && !waiting_key && queued_key == -1)
+    if(tty_fd >= 0 && term_raw && !waiting_key && queued_key == -1)
         kbhit();
 }
 
