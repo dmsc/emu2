@@ -1,11 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
+#include <unistd.h>
 
 #include "cpu.h"
 #include "dbg.h"
 #include "dis.h"
 #include "emu.h"
 #include "os.h"
+#include "env.h"
 
 // Forward declarations
 static void do_instruction(uint8_t code);
@@ -2550,12 +2553,30 @@ static void do_instruction(uint8_t code)
     };
 }
 
+
+static void slow_cpu(struct timespec *start)
+{
+    if (getenv(ENV_SLOW)) {
+        long remaining = atoi(getenv(ENV_SLOW));
+        if (remaining > 0) {
+            struct timespec now;
+            clock_gettime(CLOCK_MONOTONIC, &now);
+            remaining -= (now.tv_sec - start->tv_sec) * 1000000;
+            remaining -= (now.tv_nsec - start->tv_nsec) / 1000;
+            if (remaining > 0) usleep(remaining);
+        }
+    }
+}
+
 void execute(void)
 {
     for(; !exit_cpu;)
     {
+        struct timespec start;
+        clock_gettime(CLOCK_MONOTONIC, &start);
         handle_irq();
         next_instruction();
+        slow_clock(&start);
     }
 }
 
