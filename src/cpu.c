@@ -2576,7 +2576,7 @@ void execute(void)
         clock_gettime(CLOCK_MONOTONIC, &start);
         handle_irq();
         next_instruction();
-        slow_clock(&start);
+        slow_cpu(&start);
     }
 }
 
