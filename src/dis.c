@@ -780,7 +780,7 @@ const char *disa(const uint8_t *ip, uint16_t reg_ip, int segment_override)
     case 0xd3: return decode_wbitcl(ip, segment_override);
     case 0xd4: return decode_adjust(ip, "AAM");
     case 0xd5: return decode_adjust(ip, "AAD");
-    case 0xd6: return decode_databyte(ip, "DB");
+    case 0xd6: return show(ip, "SALC");
     case 0xd7: return show(ip, "XLAT");
     case 0xd8: return show(ip, "ESC");
     case 0xd9: return show(ip, "ESC");
