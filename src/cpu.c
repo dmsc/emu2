@@ -1746,6 +1746,11 @@ static void i_aad(void)
     SetZFB(ax);
 }
 
+static void i_salc(void)
+{
+    wregs[AX] = (wregs[AX] & 0xFF00) | ((-CF) & 0xFF);
+}
+
 static void i_xlat(void)
 {
     wregs[AX] = (wregs[AX] & 0xFF00) | GetMemDSB(wregs[BX] + (wregs[AX] & 0xFF));
@@ -2505,7 +2510,7 @@ static void do_instruction(uint8_t code)
     case 0xd3: i_d3pre();                                      break;
     case 0xd4: i_aam();                                        break;
     case 0xd5: i_aad();                                        break;
-    case 0xd6: i_undefined();                                  break;
+    case 0xd6: i_salc();                                       break;
     case 0xd7: i_xlat();                                       break;
     case 0xd8: i_escape();                                     break;
     case 0xd9: i_escape();                                     break;
