@@ -152,9 +152,9 @@ static void clear_terminal(void)
     putc('\r', tty_file); // Go to column 0
 }
 
-static void set_text_mode(int clear)
+static void set_text_mode(int mode, int clear)
 {
-    debug(debug_video, "set text mode%s\n", clear ? " and clear" : "");
+    debug(debug_video, "set text mode %d%s\n", mode, clear ? " and clear" : "");
     // Clear video screen
     if(clear)
     {
@@ -170,8 +170,8 @@ static void set_text_mode(int clear)
     // Get current scan lines from the configuration registers
     int ega = memory[0x488] & 1;
     int vga = memory[0x489] & 0x10;
-    if(!ega)
-        vid_scan_lines = 200; // CGA
+    if(!ega || mode < 2)
+        vid_scan_lines = 200; // CGA or 0/1 video mode
     else if(!vga)
         vid_scan_lines = 350; // EGA
     else
@@ -180,11 +180,11 @@ static void set_text_mode(int clear)
     vid_page = 0;
     vid_color = 0x07;
     vid_cursor = 1;
-    vid_sx = 80;
+    vid_sx = mode < 2 ? 40 : 80;
     vid_sy = 25;
     vid_font_lines = vid_scan_lines / vid_sy;
     // Fill memory block
-    memory[0x449] = 0x03;                             // video mode
+    memory[0x449] = mode;                             // video mode
     memory[0x44A] = vid_sx;                           // screen columns
     memory[0x44B] = 0;                                // ...
     update_posxy();                                   // Updates 0x4C to 0x5F and 0x62
@@ -308,8 +308,8 @@ void video_init_mem(void)
     // Need to setup VGA/EGA/CGA registers before calling set_text_mode:
     memory[0x488] = 9;    // No CGA emulation
     memory[0x489] = 0x10; // VGA, 400 lines
-    // Set video mode and clear screen
-    set_text_mode(1);
+    // Set video mode 3 and clear screen
+    set_text_mode(3, 1);
     // Setup non-standard mode:
     if(getenv(ENV_ROWS))
     {
@@ -659,7 +659,7 @@ void intr10(void)
         if((ax & 0x7F) > 3)
             debug(debug_video, "-> SET GRAPHICS MODE %x<-\n", ax & 0xFF);
         else
-            set_text_mode((ax & 0x80) == 0);
+            set_text_mode(ax & 0x7F, (ax & 0x80) == 0);
         break;
     case 0x01:                              // SET CURSOR SHAPE
         if((cpuGetCX() & 0x6000) == 0x2000) // Hide cursor
