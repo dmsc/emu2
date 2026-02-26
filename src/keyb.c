@@ -427,39 +427,38 @@ void keyb_wakeup(void)
 
 int kbhit(void)
 {
-    if(queued_key == -1)
-    {
+    if(tty_fd < 0)
         init_keyboard();
-        queued_key = read_key();
-        if(queued_key != -1)
-        {
-            update_bios_state();
-            cpuTriggerIRQ(1);
-        }
-        else
-        {
-            // Used to throttle the CPU on a busy-loop waiting for keyboard
-            static double last_time;
+    int current_key = read_key();
+    if(current_key != -1)
+    {
+        queued_key = current_key;
+        update_bios_state();
+        cpuTriggerIRQ(1);
+    }
+    else
+    {
+        // Used to throttle the CPU on a busy-loop waiting for keyboard
+        static double last_time;
 
-            struct timeval tv;
-            if(gettimeofday(&tv, NULL) != -1)
+        struct timeval tv;
+        if(gettimeofday(&tv, NULL) != -1)
+        {
+            double t1 = tv.tv_usec + tv.tv_sec * 1000000.0;
+            // Arbitrary limit to 4 calls each 100Hz
+            if((t1 - last_time) < 10000)
             {
-                double t1 = tv.tv_usec + tv.tv_sec * 1000000.0;
-                // Arbitrary limit to 4 calls each 100Hz
-                if((t1 - last_time) < 10000)
+                throttle_calls++;
+                if(throttle_calls > MAX_KEYB_CALLS)
                 {
-                    throttle_calls++;
-                    if(throttle_calls > MAX_KEYB_CALLS)
-                    {
-                        debug(debug_int, "keyboard sleep.\n");
-                        usleep(10000);
-                        throttle_calls = 0;
-                    }
-                }
-                else
+                    debug(debug_int, "keyboard sleep.\n");
+                    usleep(10000);
                     throttle_calls = 0;
-                last_time = t1;
+                }
             }
+            else
+                throttle_calls = 0;
+            last_time = t1;
         }
     }
     return (queued_key == -1) ? 0 : queued_key;
@@ -468,10 +467,9 @@ int kbhit(void)
 int getch(int detect_brk)
 {
     int ret;
-    while(queued_key == -1)
+    queued_key = -1; // flush before waiting
+    while(!kbhit())
     {
-        if(kbhit())
-            break;
         usleep(100000);
         waiting_key = 1;
         emulator_update();
@@ -500,8 +498,7 @@ static uint8_t keyb_command = 0;
 // Handle keyboard controller port reading
 uint8_t keyb_read_port(unsigned port)
 {
-    if(queued_key == -1)
-        kbhit();
+    kbhit();
     debug(debug_int, "keyboard read_port: %02X (key=%04X)\n", port, 0xFFFFU & queued_key);
     if(port == 0x60)
         return queued_key >> 8;
