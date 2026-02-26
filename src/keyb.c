@@ -498,15 +498,15 @@ static uint8_t keyb_command = 0;
 // Handle keyboard controller port reading
 uint8_t keyb_read_port(unsigned port)
 {
-    kbhit();
-    debug(debug_int, "keyboard read_port: %02X (key=%04X)\n", port, 0xFFFFU & queued_key);
+    int current_key = kbhit();
+    debug(debug_int, "keyboard read_port: %02X (key=%04X)\n", port, 0xFFFFU & current_key);
     if(port == 0x60)
-        return queued_key >> 8;
+        return current_key >> 8;
     else if(port == 0x61)
         return portB_ctl; // Controller B, used for speaker output
     else if(port == 0x64)
         // bit0 == 1 if there is data available.
-        return (queued_key != -1) | ((keyb_command != 0) << 3);
+        return (current_key != 0) | ((keyb_command != 0) << 3);
     else
         return 0xFF;
 }
