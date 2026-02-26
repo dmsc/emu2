@@ -225,7 +225,7 @@ static int alt_char(int i)
     return add_scancode(i) & 0xFF00; // No ASCII code on ALT+char
 }
 
-static int get_esc_secuence(void)
+static int get_esc_sequence(void)
 {
     // Read and process ESC sequences:
     // ESC                              ESC
@@ -329,7 +329,7 @@ static int read_key(void)
 
     // ESC + keys, terminal codes
     if(ch == 0x1B)
-        return get_esc_secuence();
+        return get_esc_sequence();
 
     mod_state = 0;
     // Normal key
