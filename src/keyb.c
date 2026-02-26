@@ -306,7 +306,10 @@ static int get_esc_secuence(void)
             case 'C': return get_special_code(KEY_RIGHT);
             case 'D': return get_special_code(KEY_LEFT);
             case 'E': return get_special_code(KEY_KP5);
-            case 'F': return get_special_code(KEY_END);
+            case 'F':
+                if ((mod_state & MOD_CTRL) && (mod_state & MOD_ALT))
+                    exit(0);
+                return get_special_code(KEY_END);
             case 'H': return get_special_code(KEY_HOME);
             case 'I': return 0x0F09; // TAB
             case 'P': return get_special_code(KEY_FN(1)); // F1
