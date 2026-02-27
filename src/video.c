@@ -79,18 +79,18 @@ static void term_get_size(void)
         // TODO: perhaps restrict to "known" values
         term_sx = ws.ws_col;
         term_sy = ws.ws_row;
-        if(term_sx > 240)
-            term_sx = 240;
-        if(term_sy > 64)
-            term_sy = 64;
-        debug(debug_video, "terminal size: %ux%u\n", term_sx, term_sy);
+        if(term_sx && term_sy) {
+            if(term_sx > 240)
+                term_sx = 240;
+            if(term_sy > 64)
+                term_sy = 64;
+            debug(debug_video, "terminal size: %ux%u\n", term_sx, term_sy);
+            return;
+        }
     }
-    else
-    {
-        term_sx = 80;
-        term_sy = 25;
-        debug(debug_video, "can't get terminal size, assuming %ux%u\n", term_sx, term_sy);
-    }
+    term_sx = 80;
+    term_sy = 25;
+    debug(debug_video, "can't get terminal size, assuming %ux%u\n", term_sx, term_sy);
 }
 
 // Update posx/posy in BIOS memory and CRTC for one page only
