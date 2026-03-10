@@ -2560,14 +2560,10 @@ static void slow_cpu(struct timespec *start)
     if(!slow_ns)
         return;
     struct timespec now;
-    clock_gettime(CLOCK_MONOTONIC, &now);
-    long left = slow_ns -
-                (now.tv_sec - start->tv_sec) * 1000000000L -
-                (now.tv_nsec - start->tv_nsec);
-    if (left > 0)
-        clock_nanosleep(CLOCK_MONOTONIC, 0,
-                        &(struct timespec){left / 1000000000L,
-                                           left % 1000000000L}, NULL);
+    do {
+        clock_gettime(CLOCK_MONOTONIC, &now);
+    } while (slow_ns > (now.tv_sec - start->tv_sec) * 1000000000L +
+                       (now.tv_nsec - start->tv_nsec));
 }
 
 void execute(void)
