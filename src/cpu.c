@@ -2553,19 +2553,19 @@ static void do_instruction(uint8_t code)
     };
 }
 
-static long slow_ms = 0;
+static long slow_ns = 0;
 
 static void slow_cpu(struct timespec *start)
 {
-    if(!slow_ms)
+    if(!slow_ns)
         return;
     struct timespec now;
     clock_gettime(CLOCK_MONOTONIC, &now);
-    long left = slow_ms * 1000L -
+    long left = slow_ns -
                 (now.tv_sec - start->tv_sec) * 1000000000L -
                 (now.tv_nsec - start->tv_nsec);
     if (left > 0)
-        clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME,
+        clock_nanosleep(CLOCK_MONOTONIC, 0,
                         &(struct timespec){left / 1000000000L,
                                            left % 1000000000L}, NULL);
 }
@@ -2573,7 +2573,7 @@ static void slow_cpu(struct timespec *start)
 void execute(void)
 {
     if (getenv(ENV_SLOW))
-        slow_ms = atol(getenv(ENV_SLOW));
+        slow_ns = atol(getenv(ENV_SLOW));
     for(; !exit_cpu;)
     {
         struct timespec start;

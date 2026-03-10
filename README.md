@@ -90,7 +90,7 @@ The available environment variables are:
                        mode again.
 
 - `EMU_SLOW_FACTOR`    Set a slowing factor, this forces the CPU to take at
-                       least for the given amount of microseconds for every
+                       least for the given amount of nanoseconds for every
                        opcode being executed.
 
 
