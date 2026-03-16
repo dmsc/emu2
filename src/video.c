@@ -74,7 +74,9 @@ static union term_cell get_cell(uint8_t chr, uint8_t color)
 static void term_get_size(void)
 {
     struct winsize ws;
-    if(ioctl(fileno(tty_file), TIOCGWINSZ, &ws) != -1)
+    if(ioctl(fileno(tty_file), TIOCGWINSZ, &ws) != -1 &&
+       ws.ws_col >= 40 &&
+       ws.ws_row >= 12)
     {
         // TODO: perhaps restrict to "known" values
         term_sx = ws.ws_col;
