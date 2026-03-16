@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
+#include <sys/poll.h>
 #include <termios.h>
 #include <unistd.h>
 
@@ -488,6 +489,11 @@ int getch(int detect_brk)
 
 void update_keyb(void)
 {
+    struct pollfd fds;
+    fds.fd = tty_fd;
+    fds.events = POLLIN;
+    if(poll(&fds, 1, 0) == 1)
+        queued_key = -1;
     // See if any key is available:
     if(tty_fd >= 0 && term_raw && !waiting_key && queued_key == -1)
         kbhit();
