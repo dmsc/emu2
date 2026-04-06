@@ -88,3 +88,52 @@ const char *get_program_exe_path(void)
 
 #endif
 }
+
+#if defined(CLOCK_MONOTONIC)
+# define CLK_MULT   1000
+# define CLK_SEC    1000000000
+# define CLK_MIN    tv_nsec
+# define CLK_GET(a) clock_gettime(CLOCK_MONOTONIC, a)
+#else
+# define CLK_MULT   1
+# define CLK_SEC    1000000
+# define CLK_MIN    tv_usec
+# define CLK_GET(a) gettimeofday(a, 0)
+#endif
+
+void emu_get_time(EMU_CLOCK_TYPE *ret)
+{
+    CLK_GET(ret);
+}
+
+/* Advances time in "tm" adding "us" microseconds. */
+void emu_advance_time(int us, EMU_CLOCK_TYPE *tm)
+{
+    while(us >= 1000000)
+    {
+        tm->tv_sec++;
+        us -= 1000000;
+    }
+
+    tm->CLK_MIN += us * CLK_MULT;
+    while(tm->tv_nsec >= CLK_SEC)
+    {
+        tm->tv_sec++;
+        tm->tv_nsec -= CLK_SEC;
+    }
+}
+
+/* Returns true if time "left" is more or equal than time "right" */
+static int emu_compare_times(EMU_CLOCK_TYPE *left, EMU_CLOCK_TYPE *right)
+{
+    return (left->tv_sec > right->tv_sec) ||
+           ((left->tv_sec == right->tv_sec) && (left->CLK_MIN >= right->CLK_MIN));
+}
+
+/* Returns true if current time is more than target */
+int emu_compare_time(EMU_CLOCK_TYPE *target)
+{
+    EMU_CLOCK_TYPE now;
+    emu_get_time(&now);
+    return emu_compare_times(&now, target);
+}

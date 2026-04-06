@@ -1,11 +1,15 @@
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 #include "cpu.h"
 #include "dbg.h"
 #include "dis.h"
 #include "emu.h"
+#include "env.h"
 #include "os.h"
+#include "utils.h"
 
 // Forward declarations
 static void do_instruction(uint8_t code);
@@ -21,6 +25,15 @@ static int8_t CF, PF, ZF, TF, IF, DF;
 
 /* All the word flags may be either none-zero (true) or zero (false) */
 static unsigned AF, OF, SF;
+
+/* CPU speed: number of instructions to execute each millisecond */
+static unsigned ins_per_ms;
+
+/* Number of instructions executed in the current time slice */
+static unsigned num_ins_exec;
+
+/* Last time emulator slept */
+static EMU_CLOCK_TYPE next_sleep_time;
 
 /* Override segment execution */
 static int segment_override;
@@ -253,6 +266,19 @@ void init_cpu(void)
     CF = PF = AF = ZF = SF = TF = IF = DF = OF = 0;
 
     segment_override = NoSeg;
+
+    // Read CPU speed vars
+    ins_per_ms = 0;
+    num_ins_exec = 0;
+    if(getenv(ENV_CPUSPEED))
+    {
+        unsigned speed = atoi(getenv(ENV_CPUSPEED));
+        // Invalid values map to 0
+        if(speed >= 1 && speed <= INT_MAX / 2)
+            ins_per_ms = speed;
+    }
+    emu_get_time(&next_sleep_time);
+    emu_advance_time(1000, &next_sleep_time);
 }
 
 static uint8_t GetModRMRegB(unsigned ModRM)
@@ -2559,6 +2585,19 @@ void execute(void)
 {
     for(; !exit_cpu;)
     {
+        if(ins_per_ms)
+        {
+            // Slowdown CPU count
+            if(num_ins_exec++ >= ins_per_ms)
+            {
+                debug(debug_cpu, "-- CPU SLEEP --\n");
+                while(!emu_compare_time(&next_sleep_time))
+                    usleep(500);
+                // Advance next sleep 1ms
+                emu_advance_time(1000, &next_sleep_time);
+                num_ins_exec -= ins_per_ms;
+            }
+        }
         handle_irq();
         next_instruction();
     }
