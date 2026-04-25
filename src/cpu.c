@@ -1642,7 +1642,7 @@ static uint16_t shifts_w(uint16_t val, int ModRM, unsigned count)
         else
         {
             CF = (val & (0x10000 >> count)) != 0;
-            val <<= count;
+            val = (uint32_t)val << count;
         }
         OF = !(val & 0x8000) != !CF;
         SetZFW(val);
@@ -2090,7 +2090,7 @@ static void i_f7pre(void)
         break;
     case 0x20: /* MUL AX, Ew */
     {
-        uint32_t result = dest * wregs[AX];
+        uint32_t result = (uint32_t)dest * wregs[AX];
 
         wregs[AX] = result & 0xFFFF;
         wregs[DX] = result >> 16;
@@ -2116,7 +2116,7 @@ static void i_f7pre(void)
     break;
     case 0x30: /* DIV AX, Ew */
     {
-        uint32_t numer = (wregs[DX] << 16) + wregs[AX];
+        uint32_t numer = ((uint32_t)wregs[DX] << 16) + wregs[AX];
         if(dest && numer / dest < 0x10000)
         {
             wregs[AX] = numer / dest;
@@ -2128,7 +2128,7 @@ static void i_f7pre(void)
     break;
     case 0x38: /* IDIV AL, Ew */
     {
-        int32_t numer = (wregs[DX] << 16) + wregs[AX];
+        int32_t numer = ((uint32_t)wregs[DX] << 16) + wregs[AX];
         int32_t div;
 
         if(dest && (div = numer / (int16_t)dest) < 0x8000 && div >= -0x8000)
