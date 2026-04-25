@@ -222,6 +222,7 @@ int main(int argc, char **argv)
 
     // Process command line options
     int bin_load_seg = 0, bin_load_ip = 0, bin_load_addr = -1;
+    int skip_init_bios = 0;
     for(i = 1; i < argc; i++)
     {
         char flag;
@@ -288,6 +289,7 @@ int main(int argc, char **argv)
                 chk_mem_arr = malloc(1024 * 1024);
                 chk_mem_len = fread(chk_mem_arr, 1, 1024 * 1024, cf);
                 fprintf(stderr, "%s: will check %X bytes.\n", argv[0], chk_mem_len);
+                skip_init_bios = 1;
                 atexit(check_exit_mem);
             }
         }
@@ -342,7 +344,8 @@ int main(int argc, char **argv)
     itv.it_value.tv_sec = 0;
     itv.it_value.tv_usec = 54925;
     setitimer(ITIMER_REAL, &itv, 0);
-    init_bios_mem();
+    if(!skip_init_bios)
+        init_bios_mem();
     video_init_mem();
     while(1)
     {
