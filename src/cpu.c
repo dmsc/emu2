@@ -1897,6 +1897,18 @@ static void i_outdxax(void)
     write_port(port + 1, wregs[AX] >> 8);
 }
 
+// Executes unconditional REP on the given ins
+#define REP_COUNT(ins) \
+    for(; count > 0; count--)   \
+        ins();                  \
+    wregs[CX] = count;
+
+// Executes conditional REP on the given ins
+#define REP_CONDITION(ins) \
+    for(ZF = flagval; (ZF == flagval) && (count > 0); count--)  \
+        ins();                                                  \
+    wregs[CX] = count;
+
 static void rep(int flagval)
 {
     /* Handles rep- and repnz- prefixes. flagval is the value of ZF for the
@@ -1927,74 +1939,46 @@ static void rep(int flagval)
         segment_override = NoSeg;
         break;
     case 0x6c: /* REP INSB */
-        for(; count > 0; count--)
-            i_insb();
-        wregs[CX] = count;
+        REP_COUNT(i_insb);
         break;
     case 0x6d: /* REP INSW */
-        for(; count > 0; count--)
-            i_insw();
-        wregs[CX] = count;
+        REP_COUNT(i_insw);
         break;
     case 0x6e: /* REP OUTSB */
-        for(; count > 0; count--)
-            i_outsb();
-        wregs[CX] = count;
+        REP_COUNT(i_outsb);
         break;
     case 0x6f: /* REP OUTSW */
-        for(; count > 0; count--)
-            i_outsw();
-        wregs[CX] = count;
+        REP_COUNT(i_outsw);
         break;
     case 0xa4: /* REP MOVSB */
-        for(; count > 0; count--)
-            i_movsb();
-        wregs[CX] = count;
+        REP_COUNT(i_movsb);
         break;
     case 0xa5: /* REP MOVSW */
-        for(; count > 0; count--)
-            i_movsw();
-        wregs[CX] = count;
+        REP_COUNT(i_movsw);
         break;
     case 0xa6: /* REP(N)E CMPSB */
-        for(ZF = flagval; (ZF == flagval) && (count > 0); count--)
-            i_cmpsb();
-        wregs[CX] = count;
+        REP_CONDITION(i_cmpsb);
         break;
     case 0xa7: /* REP(N)E CMPSW */
-        for(ZF = flagval; (ZF == flagval) && (count > 0); count--)
-            i_cmpsw();
-        wregs[CX] = count;
+        REP_CONDITION(i_cmpsw);
         break;
     case 0xaa: /* REP STOSB */
-        for(; count > 0; count--)
-            i_stosb();
-        wregs[CX] = count;
+        REP_COUNT(i_stosb);
         break;
     case 0xab: /* REP LODSW */
-        for(; count > 0; count--)
-            i_stosw();
-        wregs[CX] = count;
+        REP_COUNT(i_stosw);
         break;
     case 0xac: /* REP LODSB */
-        for(; count > 0; count--)
-            i_lodsb();
-        wregs[CX] = count;
+        REP_COUNT(i_lodsb);
         break;
     case 0xad: /* REP LODSW */
-        for(; count > 0; count--)
-            i_lodsw();
-        wregs[CX] = count;
+        REP_COUNT(i_lodsw);
         break;
     case 0xae: /* REP(N)E SCASB */
-        for(ZF = flagval; (ZF == flagval) && (count > 0); count--)
-            i_scasb();
-        wregs[CX] = count;
+        REP_CONDITION(i_scasb);
         break;
     case 0xaf: /* REP(N)E SCASW */
-        for(ZF = flagval; (ZF == flagval) && (count > 0); count--)
-            i_scasw();
-        wregs[CX] = count;
+        REP_CONDITION(i_scasw);
         break;
     default: /* Ignore REP */
         do_instruction(next);
