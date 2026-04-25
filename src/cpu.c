@@ -1897,16 +1897,46 @@ static void i_outdxax(void)
     write_port(port + 1, wregs[AX] >> 8);
 }
 
+// Exit a REP early because we need to sleep the CPU
+static void exit_early_rep(uint16_t count)
+{
+    // Reset IP to start of REP sequence, reduce executed instruction count
+    // and stopre CX register.
+    num_ins_exec--;
+    ip = start_ip;
+    wregs[CX] = count;
+}
+
 // Executes unconditional REP on the given ins
 #define REP_COUNT(ins) \
-    for(; count > 0; count--)   \
-        ins();                  \
-    wregs[CX] = count;
+    if(ins_per_ms)                                                 \
+    {                                                              \
+        for(; count > 0; count--)                                  \
+        {                                                          \
+            if(wregs[CX] != count && num_ins_exec++ >= ins_per_ms) \
+                return exit_early_rep(count);                      \
+            ins();                                                 \
+        }                                                          \
+    }                                                              \
+    else                                                           \
+        for(; count > 0; count--)                                  \
+            ins();                                                 \
+    wregs[CX] = count;                                             \
 
 // Executes conditional REP on the given ins
 #define REP_CONDITION(ins) \
-    for(ZF = flagval; (ZF == flagval) && (count > 0); count--)  \
-        ins();                                                  \
+    if(ins_per_ms)                                                 \
+    {                                                              \
+        for(ZF = flagval; (ZF == flagval) && (count > 0); count--) \
+        {                                                          \
+            if(wregs[CX] != count && num_ins_exec++ >= ins_per_ms) \
+                return exit_early_rep(count);                      \
+            ins();                                                 \
+        }                                                          \
+    }                                                              \
+    else                                                           \
+        for(ZF = flagval; (ZF == flagval) && (count > 0); count--) \
+            ins();                                                 \
     wregs[CX] = count;
 
 static void rep(int flagval)
