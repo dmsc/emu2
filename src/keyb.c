@@ -452,7 +452,7 @@ int kbhit(void)
                     if(throttle_calls > MAX_KEYB_CALLS)
                     {
                         debug(debug_int, "keyboard sleep.\n");
-                        usleep(10000);
+                        cpu_usleep(10000);
                         throttle_calls = 0;
                     }
                 }
@@ -472,7 +472,7 @@ int getch(int detect_brk)
     {
         if(kbhit())
             break;
-        usleep(100000);
+        cpu_usleep(100000);
         waiting_key = 1;
         emulator_update();
         waiting_key = 0;

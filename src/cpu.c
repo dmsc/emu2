@@ -2587,6 +2587,13 @@ void execute(void)
     }
 }
 
+// Sleeps and advances next CPU time slice
+void cpu_usleep(int us)
+{
+    usleep(us);
+    emu_advance_time(us, &next_sleep_time);
+}
+
 // Set CPU registers from outside
 void cpuSetAL(unsigned v) { wregs[AX] = (wregs[AX] & 0xFF00) | (v & 0xFF); }
 void cpuSetAX(unsigned v) { wregs[AX] = v; }

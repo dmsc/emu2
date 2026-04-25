@@ -1168,7 +1168,7 @@ void intr2f(void)
         // Windows "release VM timeslice", use sleep instead of yield to give more
         // cpu to other tasks.
         debug(debug_dos, "W-2F1680: sleep\n");
-        usleep(33000);
+        cpu_usleep(33000);
         break;
     case 0xB700: // APPEND installation check
         cpuSetAL(0xFF);
@@ -2697,7 +2697,7 @@ void init_dos(int argc, char **argv)
 
 void intr28(void)
 {
-    usleep(1); // TODO: process messages?
+    cpu_usleep(1); // TODO: process messages?
 }
 
 void intr29(void)
