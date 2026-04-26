@@ -89,6 +89,15 @@ The available environment variables are:
                        properly, some other will ignore this and setup the text
                        mode again.
 
+- `EMU2_CPU_SPEED`     Limits the emulated CPU speed to at most the given
+                       number of instructions per millisecond. For reference,
+                       a value of 1000 (1 MIPS) approximates a fast 8086 or
+                       slow 80286. By default (or when set to 0), there is no
+                       limit; a modern PC can typically reach 200,000 or more
+                       instructions per millisecond. Note that this does not
+                       accurately emulate a specific CPU speed, since real
+                       8086/80286 processors take a varying number of cycles
+                       per instruction.
 
 Simple Example
 --------------
