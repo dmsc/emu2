@@ -2621,7 +2621,14 @@ void execute(void)
 void cpu_usleep(int us)
 {
     usleep(us);
-    emu_advance_time(us, &next_sleep_time);
+    // Restart the clock after the sleep, recalculating next CPU sleep time
+    if(ins_per_ms)
+    {
+        emu_get_time(&next_sleep_time);
+        if(num_ins_exec < ins_per_ms)
+            emu_advance_time(1000 - 1000 * num_ins_exec / ins_per_ms, &next_sleep_time);
+        num_ins_exec = 0;
+    }
 }
 
 // Set CPU registers from outside
