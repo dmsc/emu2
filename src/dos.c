@@ -1456,6 +1456,43 @@ void intr21(void)
         dos_show_fcb();
         cpuSetAL(dos_rw_record_fcb(dosDTA, 1, 0, 0));
         break;
+    case 0x23: // GET FILE SIZE USING FCB
+    {
+        // Get file by FCB filename, set the records (FCB[0x21..0x23]/24-bit)
+        // to ceil(size/record_size). AL=0 on success, and 0xFF if not found.
+        // FCB does not need to be open; the directory is searched by name.
+        dos_show_fcb();
+        int fcb_addr = get_fcb();
+        char *fname = dos_unix_path_fcb(fcb_addr, 0, append_path());
+        if(!fname)
+        {
+            debug(debug_dos, "\t(file not found)\n");
+            dos_error = 2;
+            cpuSetAL(0xFF);
+            break;
+        }
+        struct stat st;
+        if(0 != stat(fname, &st))
+        {
+            debug(debug_dos, "\tstat() failed: %s\n", strerror(errno));
+            free(fname);
+            dos_error = 2;
+            cpuSetAL(0xFF);
+            break;
+        }
+        free(fname);
+        unsigned rsize = get16(0x0E + fcb_addr);
+        if(!rsize)
+            rsize = 128;
+        unsigned long records =
+            ((unsigned long)st.st_size + rsize - 1) / rsize;
+        put16(fcb_addr + 0x21, records & 0xFFFF);
+        memory[fcb_addr + 0x23] = (records >> 16) & 0xFF;
+        debug(debug_dos, "\trsize=%u size=%lu -> records=%lu\n",
+              rsize, (unsigned long)st.st_size, records);
+        cpuSetAL(0x00);
+        break;
+    }
     case 0x24: // SET RANDOM RECORD NUMBER IN FCB
         dos_show_fcb();
         dos_seq_to_rand_fcb(get_fcb());
