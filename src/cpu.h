@@ -1,8 +1,7 @@
 /*
  * This is based on code by David Hedley, from pcemu.
- *
  * Most of the CPU emulation was rewritten and code was extended to support
- * 80186 and some 81280 instructions.
+ * 80186 and 80286 instructions.
  */
 
 #pragma once

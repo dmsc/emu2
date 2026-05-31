@@ -22,6 +22,10 @@ static const char *table_fe[] = {"INC", "DEC", "ILL", "ILL", "ILL", "ILL", "ILL"
 static const char *table_ff[] = {"INC", "DEC", "CALL", "CALL",
                                  "JMP", "JMP", "PUSH", "ILL"};
 static const char *table_8x[] = {"ADD", "OR", "ADC", "SBB", "AND", "SUB", "XOR", "CMP"};
+static const char *table_0f00[] = {"SLDT", "STR",  "LLDT", "LTR",
+                                   "VERR", "VERW", "DB",   "DB"};
+static const char *table_0f01[] = {"SGDT", "SIDT", "LGDT", "LIDT",
+                                   "SMSW", "DB",   "LMSW", "DB"};
 
 #define BREG byte_reg[(ModRM & 0x38) >> 3]
 #define WREG word_reg[(ModRM & 0x38) >> 3]
@@ -472,6 +476,38 @@ static const char *decode_ff(const uint8_t *ip, int seg_over)
         return decode_w(ip, table_ff[m], seg_over);
 }
 
+static const char *decode_0f_w(const uint8_t *ip, const char *ins, int seg_over)
+{
+    unsigned ModRM = ip[2];
+    fillbytes(ip, 3 + get_mem_len(ModRM));
+    sprintf(IPOS, "%-7s %s", ins, get_mem(ModRM, ip + 2, word_reg, "", seg_over));
+    return buf;
+}
+
+static const char *decode_0f_r16w(const uint8_t *ip, const char *ins, int seg_over)
+{
+    unsigned ModRM = ip[2];
+    fillbytes(ip, 3 + get_mem_len(ModRM));
+    sprintf(IPOS, "%-7s %s,%s", ins, word_reg[(ModRM & 0x38) >> 3],
+            get_mem(ModRM, ip + 2, word_reg, "", seg_over));
+    return buf;
+}
+
+static const char *decode_0f(const uint8_t *ip, int seg_over)
+{
+    unsigned m = (ip[2] & 0x38) >> 3;
+    switch(ip[1])
+    {
+    case 0x00: return decode_0f_w(ip, table_0f00[m], seg_over);
+    case 0x01: return decode_0f_w(ip, table_0f01[m], seg_over);
+    case 0x02: return decode_0f_r16w(ip, "LAR", seg_over);
+    case 0x03: return decode_0f_r16w(ip, "LSL", seg_over);
+    case 0x05: fillbytes(ip, 2); sprintf(IPOS, "LOADALL"); return buf;
+    case 0x06: fillbytes(ip, 2); sprintf(IPOS, "CLTS"); return buf;
+    default:   return decode_databyte(ip, "DB");
+    }
+}
+
 static const char *show_io(const uint8_t *ip, const char *ins, const char *regs)
 {
     fillbytes(ip, 1);
@@ -581,7 +617,7 @@ const char *disa(const uint8_t *ip, uint16_t reg_ip, int segment_override)
     case 0x0c: return decode_ald8(ip, "OR");
     case 0x0d: return decode_axd16(ip, "OR");
     case 0x0e: return decode_pushpopseg(ip, "PUSH");
-    case 0x0f: return decode_databyte(ip, "DB");
+    case 0x0f: return decode_0f(ip, segment_override);
     case 0x10: return decode_br8(ip, "ADC", segment_override);
     case 0x11: return decode_wr16(ip, "ADC", segment_override);
     case 0x12: return decode_r8b(ip, "ADC", segment_override);
@@ -665,7 +701,7 @@ const char *disa(const uint8_t *ip, uint16_t reg_ip, int segment_override)
     case 0x60: return show(ip, "PUSHA");
     case 0x61: return show(ip, "POPA");
     case 0x62: return decode_w(ip, "BOUND", segment_override);
-    case 0x63: return decode_databyte(ip, "DB");
+    case 0x63: return decode_wr16(ip, "ARPL", segment_override);
     case 0x64: return decode_databyte(ip, "DB");
     case 0x65: return decode_databyte(ip, "DB");
     case 0x66: return decode_databyte(ip, "DB");

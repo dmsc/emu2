@@ -26,6 +26,16 @@ static int8_t CF, PF, ZF, TF, IF, DF;
 /* All the word flags may be either none-zero (true) or zero (false) */
 static unsigned AF, OF, SF;
 
+/*
+ * 80286 system registers:
+ * Descriptor table registers are loadable (LGDT/LIDT) and readable (SGDT/SIDT).
+ * Machine status word is readable (SMSW) so CPU-detection code works.
+ * Since we only emulate real mode none of these affect addressing.
+ */
+static uint32_t gdt_base, idt_base;
+static uint16_t gdt_limit, idt_limit;
+static uint16_t msw;
+
 /* CPU speed: number of instructions to execute each millisecond */
 static unsigned ins_per_ms;
 
@@ -266,6 +276,12 @@ void init_cpu(void)
     CF = PF = AF = ZF = SF = TF = IF = DF = OF = 0;
 
     segment_override = NoSeg;
+
+    // 80286 system registers, reset state
+    gdt_base = idt_base = 0;
+    gdt_limit = 0xFFFF;
+    idt_limit = 0x03FF;
+    msw = 0xFFF0; // real mode PE clear
 
     // Read CPU speed vars
     ins_per_ms = 0;
@@ -2315,6 +2331,89 @@ NORETURN static void i_halt(void)
     exit(0);
 }
 
+// 80286 LMSW: load machine status word.
+// Setting PE means switching to protected mode.
+static void do_lmsw(uint16_t val)
+{
+    if((val & 1) && !(msw & 1))
+        print_error("error, program tried to switch to 80286 protected mode "
+                    "(LMSW with PE=1), which is not supported\n");
+    msw = (msw & 0xFFF0) | (val & 0x000F);
+}
+
+// 80286 CLTS: clear the Task-Switched flag in the machine status word.
+static void i_clts(void)
+{
+    msw = msw & ~0x0008u;
+}
+
+// 80286 group 7 (0F 01): SGDT, SIDT, LGDT, LIDT, SMSW and LMSW.
+static void i_0f_01(void)
+{
+    unsigned ModRM = FETCH_B();
+    switch(ModRM & 0x38)
+    {
+    case 0x20: // SMSW r/m16
+        GetModRMRMW(ModRM);
+        SetModRMRMW(ModRM, msw);
+        break;
+    case 0x30: // LMSW r/m16
+        do_lmsw(GetModRMRMW(ModRM));
+        break;
+    case 0x00: // SGDT m
+    case 0x08: // SIDT m
+    case 0x10: // LGDT m
+    case 0x18: // LIDT m
+        if(ModRM >= 0xC0)
+        {
+            i_undefined(); // register operand illegal for these
+            break;
+        }
+        {
+            uint32_t addr = GetModRMAddress(ModRM);
+            switch(ModRM & 0x38)
+            {
+            case 0x00: // SGDT: 16-bit + 24-bit base, high bytes are FF
+                SetMemAbsW(addr + 0, gdt_limit);
+                SetMemAbsW(addr + 2, gdt_base);
+                SetMemAbsB(addr + 4, gdt_base >> 16);
+                SetMemAbsB(addr + 5, 0xFF);
+                break;
+            case 0x08: // SIDT
+                SetMemAbsW(addr + 0, idt_limit);
+                SetMemAbsW(addr + 2, idt_base);
+                SetMemAbsB(addr + 4, idt_base >> 16);
+                SetMemAbsB(addr + 5, 0xFF);
+                break;
+            case 0x10: // LGDT
+                gdt_limit = GetMemAbsW(addr);
+                gdt_base = GetMemAbsW(addr + 2) | ((uint32_t)GetMemAbsB(addr + 4) << 16);
+                break;
+            case 0x18: // LIDT
+                idt_limit = GetMemAbsW(addr);
+                idt_base = GetMemAbsW(addr + 2) | ((uint32_t)GetMemAbsB(addr + 4) << 16);
+                break;
+            }
+        }
+        break;
+    default: // 0x28 and 0x38 are undefined
+        i_undefined();
+        break;
+    }
+}
+
+// 80286 two-byte 0F-prefix opcodes
+static void i_0fpre(void)
+{
+    uint8_t op = FETCH_B();
+    switch(op)
+    {
+    case 0x01: i_0f_01(); break;
+    case 0x06: i_clts();  break;
+    default:   i_undefined(); break;
+    }
+}
+
 static void debug_instruction(void)
 {
     unsigned nip = (cpuGetIP() + 0xFFFF) & 0xFFFF; // subtract 1!
@@ -2351,7 +2450,7 @@ static void do_instruction(uint8_t code)
     case 0x0C: OP_ald8(OR);
     case 0x0D: OP_axd16(OR);
     case 0x0e: PushWord(sregs[CS]);                            break;
-    case 0x0f: i_undefined();                                  break;
+    case 0x0f: i_0fpre();                                      break; /* 286 */
     case 0x10: OP_br8(ADC);
     case 0x11: OP_wr16(ADC);
     case 0x12: OP_r8b(ADC);
@@ -2435,7 +2534,7 @@ static void do_instruction(uint8_t code)
     case 0x60: i_pusha();                                      break; /* 186 */
     case 0x61: i_popa();                                       break; /* 186 */
     case 0x62: i_bound();                                      break; /* 186 */
-    case 0x63: i_undefined();                                  break;
+    case 0x63: i_undefined();                                  break; /* 286 */
     case 0x64: i_undefined();                                  break;
     case 0x65: i_undefined();                                  break;
     case 0x66: i_undefined();                                  break;
