@@ -513,13 +513,12 @@ int dos_path_normalize(char *path, unsigned max)
                     base[e] = '\\';
                     e++;
                 }
-                while(e < max - 1 && path[beg])
-                {
-                    base[e] = path[beg];
-                    e++;
-                    beg++;
-                }
-                base[e] = 0;
+                int avail = e < (int)max - 1 ? (int)max - 1 - e : 0;
+                int len = strlen(&path[beg]);
+                if(len > avail)
+                    len = avail;
+                memcpy(base + e, &path[beg], len);
+                base[e + len] = 0;
             }
         }
         end++;
