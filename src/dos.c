@@ -199,8 +199,21 @@ static int dos_open_file(int create, int access_mode, int name_addr)
     int mflag = 0;
     if(create)
     {
-        // Use exclusive access on create == 2, to fail on existing file
-        mflag = O_CREAT | O_RDWR | (create == 2 ? O_EXCL : 0);
+        // Use exclusive access on create == 2, to fail on existing file.
+        // O_TRUNC is required here: DOS "create" semantics (AH=3Ch, and
+        // AH=6Ch cmod=0x12 "create if not exists, clear and open if
+        // exists") clear an already-existing file to zero length before
+        // writing, matching the "w+b" mode string already used below for
+        // fdopen()'s own stdio-buffering wrapper -- but fdopen() only
+        // wraps an already-open fd, it does not itself reopen/truncate
+        // anything, so without O_TRUNC on the real open() call just
+        // below, an existing file's old content past whatever the new,
+        // possibly-shorter write covers was silently left on disk
+        // (confirmed: re-running a program that assign/rewrite/write/
+        // close's a shorter amount of new text over an existing longer
+        // file left the old file's own untouched byte length and stale
+        // trailing bytes past the new content, mid-token in one repro).
+        mflag = O_CREAT | O_RDWR | O_TRUNC | (create == 2 ? O_EXCL : 0);
         mode = "w+b";
     }
     else
